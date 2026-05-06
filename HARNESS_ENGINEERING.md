@@ -117,6 +117,11 @@ docker buildx build --platform linux/amd64 \
 kubectl apply -f k8s/traffic-route-viz.yaml
 ```
 
+### 辅助导出脚本（可选）
+
+- `tools/export-ingress-services.sh`：导出 Ingress + 关联 Service（按 Ingress 分文件）
+- `tools/export-istio-vs-destinationrules.sh`：导出 VirtualService + 匹配的 DestinationRule（按 VS 分文件，默认输出到 `./<namespace>/istio/`；如需适配 01/02/03 分层导入，可显式指定 `--out-root traffic/example --tier 02 --group <namespace>-istio`）
+
 ---
 
 ## 5. Semantic Model（语义模型）
