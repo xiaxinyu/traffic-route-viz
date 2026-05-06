@@ -53,6 +53,34 @@ npm run preview
 
 ---
 
+## Docker & K8s 发布（可选）
+
+### 构建镜像（示例）
+
+```bash
+cd web
+docker build -t your-registry/traffic-route-viz:latest .
+docker push your-registry/traffic-route-viz:latest
+```
+
+### 部署到 Kubernetes（示例）
+
+1) 修改 `k8s/traffic-route-viz.yaml` 中的 `image:` 与 `Ingress host`
+
+2) 应用资源：
+
+```bash
+kubectl apply -f k8s/traffic-route-viz.yaml
+```
+
+### 登录配置（运行时）
+
+- 通过挂载到站点根目录的 `config.json` 控制（K8s 已用 ConfigMap 示例）
+- 开关：`auth.enabled`
+- 账号/密码：`auth.username` / `auth.password`
+
+---
+
 ## 已知限制与陷阱
 
 - 仅 Ingress YAML：若缺少 Service/Endpoints，图只能画到 Service 名（不会凭空补资源）

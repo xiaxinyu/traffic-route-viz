@@ -57,6 +57,66 @@
 - 允许直接粘贴/编辑 YAML
 - 点击“解析并刷新图表”后更新画布
 
+### 登录与发布（必须）
+
+- 系统支持可选登录（Auth Gate）：
+  - 默认开启：**不登录不得进入主界面**
+  - 通过运行时 `GET /config.json` 控制（K8s 通过 ConfigMap 挂载）
+  - `auth.enabled=true` 且配置 `username/password` 时启用登录页
+  - 登录态存储在浏览器本地并支持“退出”
+- 推荐发布形态：Vite build → Nginx 静态托管（Docker 多阶段构建）
+
+#### 本地运行时登录配置（开发必备）
+
+在 `web/` 目录准备 `public/config.json`（不要提交仓库，已在 `.gitignore` 中忽略）：
+
+```bash
+cd web
+cp public/config.example.json public/config.json
+```
+
+修改 `public/config.json` 中账号密码后，启动：
+
+```bash
+cd web
+npm run dev
+```
+
+#### Docker 编译镜像（必须可复现）
+
+本项目部署目标为 **Linux amd64**。若你在 **macOS（尤其 Apple Silicon / arm64）** 上构建镜像，务必显式指定平台为 `linux/amd64`，避免“本地能跑、上服务器拉起失败/架构不匹配”。
+
+在仓库根目录执行（使用 `web/Dockerfile`，构建上下文为 `web/`）：
+
+```bash
+docker buildx build --platform linux/amd64 -t traffic-route-viz:local -f web/Dockerfile web --load
+docker run --rm -p 8080:80 traffic-route-viz:local
+```
+
+#### 推送 Harbor（示例）
+
+```bash
+docker login harbor.ms5-sit.aswatson.net:8080
+docker buildx build --platform linux/amd64 \
+  -t harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz:latest \
+  -f web/Dockerfile web --push
+```
+
+> 说明：`--load` 用于本地运行验证；`--push` 用于直接推送到 Harbor（无需先在本地保存镜像）。
+
+#### 部署到 Kubernetes（示例清单）
+
+- 清单文件：`k8s/traffic-route-viz.yaml`
+- 清单内包含：
+  - `ConfigMap/traffic-route-viz-config`（挂载为站点根目录 `/config.json`，用于强制登录配置）
+  - `Deployment/Service/Ingress`
+
+应用：
+
+```bash
+kubectl apply -f k8s/traffic-route-viz.yaml
+```
+
 ---
 
 ## 5. Semantic Model（语义模型）

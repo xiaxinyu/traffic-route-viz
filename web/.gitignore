@@ -32,3 +32,6 @@ coverage/
 # Vite cache
 .vite/
 .traffic/
+
+# Runtime config (mounted in K8s); contains secrets locally
+public/config.json

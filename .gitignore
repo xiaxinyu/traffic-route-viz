@@ -1,6 +1,9 @@
 # 本地/敏感示例数据：不纳入版本库（含子目录）
 traffic/
 
+# 部署清单：不上传到 GitHub（含子目录）
+k8s/
+
 # 常见系统文件
 .DS_Store
 Thumbs.db

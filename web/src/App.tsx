@@ -12,6 +12,7 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 
+import { AuthGate, clearSession } from "./AuthGate";
 import { DiagramActions } from "./DiagramActions";
 import { buildFlowGraph } from "./buildGraph";
 import {
@@ -34,6 +35,7 @@ import {
   RouteNode,
   ServiceNode,
 } from "./FlowNodes";
+import { getRuntimeConfig } from "./runtimeConfig";
 
 const nodeTypes = {
   ingressRegion: IngressRegionNode,
@@ -290,6 +292,27 @@ function AppInner() {
           <span style={{ fontSize: 11, color: "#64748b" }}>Entry → Host → Route → Service → Endpoints</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {getRuntimeConfig().auth?.enabled !== false ? (
+            <button
+              type="button"
+              onClick={() => {
+                clearSession();
+                window.location.reload();
+              }}
+              style={{
+                padding: "8px 10px",
+                borderRadius: 999,
+                border: "1px solid #e2e8f0",
+                background: "#fff",
+                color: "#334155",
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+              title="退出登录"
+            >
+              退出
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => applyYaml(mergedImportedText ?? yamlText)}
@@ -695,7 +718,9 @@ function AppInner() {
 export default function App() {
   return (
     <ReactFlowProvider>
-      <AppInner />
+      <AuthGate>
+        <AppInner />
+      </AuthGate>
     </ReactFlowProvider>
   );
 }
