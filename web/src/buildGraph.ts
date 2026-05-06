@@ -134,6 +134,34 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       },
     });
 
+    // For Contour gateway regions: add an explicit HTTPProxy config node so the chain can be
+    // Service(gateway) -> Contour Gateway -> HTTPProxy -> Host -> Route -> Service(upstream).
+    const httpProxyNodeId = ing.kind === "HTTPProxy" ? `${iid}-httpproxy` : null;
+    if (httpProxyNodeId) {
+      nodes.push({
+        id: httpProxyNodeId,
+        type: "httpProxy",
+        parentNode: regionId,
+        extent: "parent",
+        draggable: true,
+        position: { x: leftPad + col * 0.95, y: layoutOriginY + 6 },
+        data: {
+          label: "HTTPProxy Routes",
+          subtitle: ing.namespace ? `namespace: ${ing.namespace}` : undefined,
+        },
+      });
+      edges.push({
+        id: `e-${iid}-${httpProxyNodeId}-${edgeIdx++}`,
+        source: iid,
+        target: httpProxyNodeId,
+        type: edgeType,
+        label: "HTTPProxy",
+        style: { stroke: "#0f766e" },
+        labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
+        labelBgStyle: { fill: "#ccfbf1", fillOpacity: 0.92 },
+      });
+    }
+
     const hostIdByHost = new Map<string, string>();
     const routeYsByService = new Map<string, number[]>();
     const serviceIdByKey = new Map<string, string>();
@@ -164,12 +192,12 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         extent: "parent",
         draggable: true,
         position: { x: hostX, y: hostY },
-        data: { label: host, tlsSecretName, ingressName: ing.name },
+        data: { label: host, tlsSecretName, ingressName: ing.name, entryKind: ing.kind },
       });
 
       edges.push({
         id: `e-${iid}-${hid}-${edgeIdx++}`,
-        source: iid,
+        source: httpProxyNodeId ?? iid,
         target: hid,
         type: edgeType,
         animated: true,
@@ -200,6 +228,8 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
             pathType: r.pathType,
             serviceName: r.serviceName,
             servicePort: r.servicePort,
+            upstreamServiceName: r.upstreamServiceName,
+            upstreamServicePort: r.upstreamServicePort,
           },
         });
 
@@ -297,6 +327,59 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           type: edgeType,
           label: "Pod IP",
           style: { stroke: "#0d9488" },
+        });
+      }
+    }
+
+    // 2.5) For Contour Gateway: enforce Ingress -> Service(gateway) -> Contour Gateway -> HTTPProxy.
+    if (ing.kind === "HTTPProxy") {
+      // Ensure gateway Service node exists even if no route directly targets it.
+      const gatewayServiceKey = resourceKey(ing.namespace, ing.name);
+      const gatewayScoped = `${iid}::${gatewayServiceKey}`;
+      if (!serviceIdByKey.has(gatewayScoped)) {
+        serviceIdByKey.set(gatewayScoped, `svc-${sanitizeId(gatewayScoped)}`);
+        routeYsByService.set(gatewayScoped, [layoutOriginY]);
+      }
+
+      // If serviceEntries were already placed above, the gateway service might be missing.
+      // Add it late if needed (with a reasonable y).
+      const gatewaySid = serviceIdByKey.get(gatewayScoped);
+      if (gatewaySid) {
+        // Create missing gateway service node if it wasn't rendered in step 2.
+        if (!nodes.some((n) => n.id === gatewaySid)) {
+          const y = layoutOriginY + 18;
+          const svcX = leftPad + col * 3.1;
+          const si = serviceByKey.get(gatewayServiceKey);
+          nodes.push({
+            id: gatewaySid,
+            type: "service",
+            parentNode: regionId,
+            extent: "parent",
+            draggable: true,
+            position: { x: svcX, y },
+            data: {
+              label: ing.name,
+              subtitle: ing.namespace ? `namespace: ${ing.namespace}` : undefined,
+              type: si?.type,
+              clusterIP: si?.clusterIP,
+              ports: si?.ports,
+              istioSubsets: si?.istioSubsets,
+            },
+          });
+          maxX = Math.max(maxX, svcX + cardMaxW);
+          maxY = Math.max(maxY, y);
+        }
+
+        // Service(gateway) -> Contour Gateway node
+        edges.push({
+          id: `e-${gatewaySid}-${iid}-gateway-${edgeIdx++}`,
+          source: gatewaySid,
+          target: iid,
+          type: edgeType,
+          label: "Contour Gateway",
+          style: { stroke: "#0f766e", strokeDasharray: "6 4" },
+          labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
+          labelBgStyle: { fill: "#ccfbf1", fillOpacity: 0.92 },
         });
       }
     }

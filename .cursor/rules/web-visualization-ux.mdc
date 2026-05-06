@@ -8,7 +8,7 @@ alwaysApply: false
 
 ## Scope / resources
 
-- This tool targets traffic visualization for Kubernetes **Ingress / Service / Endpoints** and Istio **VirtualService / DestinationRule**.
+- This tool targets traffic visualization for Kubernetes **Ingress / Service / Endpoints**, Istio **VirtualService / DestinationRule**, and Contour **Gateway (HTTPProxy)**.
 - Adding new resource kinds must update: parser → graph → node UI → harness spec.
 
 ## Import experience
@@ -30,6 +30,7 @@ alwaysApply: false
 
 - Ingress: name, ns, class, LB/status IP, TLS blocks (secret + hosts)
 - VirtualService: name, ns, hosts, HTTP matches (path), destination service + port
+- Contour Gateway (HTTPProxy): name, ns, fqdn/hosts（如可得）, HTTP prefix matches (path), destination service + port
 - DestinationRule: subsets shown on related Service card when possible
 - Host: host, ingress name, TLS secret match (or explicit “no TLS”)
 - Service: name, ns, type, clusterIP, spec ports, ingress backend port

@@ -28,6 +28,7 @@ import { parseK8sYaml } from "./k8sParser";
 import {
   EndpointsNode,
   HostNode,
+  HttpProxyNode,
   IngressNode,
   IngressRegionNode,
   RouteNode,
@@ -38,6 +39,7 @@ const nodeTypes = {
   ingressRegion: IngressRegionNode,
   ingress: IngressNode,
   host: HostNode,
+  httpProxy: HttpProxyNode,
   route: RouteNode,
   service: ServiceNode,
   endpoints: EndpointsNode,

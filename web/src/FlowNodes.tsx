@@ -35,7 +35,7 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
     hint,
   } = props.data as {
     partitionIndex?: number;
-    entryKind?: "Ingress" | "VirtualService";
+    entryKind?: "Ingress" | "VirtualService" | "HTTPProxy";
     ingressName?: string;
     namespace?: string;
     sourceSummary?: string;
@@ -45,8 +45,12 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
 
   const idx = partitionIndex ?? 1;
   const files = (sourceFiles ?? []).filter(Boolean);
-  const kindLabel =
-    entryKind === "VirtualService" ? "Istio VirtualService" : "Kubernetes Ingress";
+  const kindLabel2 =
+    entryKind === "HTTPProxy"
+      ? "Contour Gateway"
+      : entryKind === "VirtualService"
+        ? "Istio VirtualService"
+        : "Kubernetes Ingress";
 
   return (
     <div
@@ -80,7 +84,7 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
         <div
           style={{ fontSize: 11, marginTop: 4, color: "#4338ca", fontWeight: 700 }}
         >
-          {kindLabel}：{ingressName ?? "—"}
+          {kindLabel2}：{ingressName ?? "—"}
         </div>
         <div style={{ ...meta({ marginTop: 2 }), color: "#57534e" }}>
           命名空间：{namespace ?? "—"}
@@ -124,13 +128,17 @@ export const IngressNode = memo(function IngressNode(props: NodeProps) {
     className?: string;
     tls?: IngressTlsEntry[];
     loadBalancerIps?: string[];
-    kind?: "Ingress" | "VirtualService";
+    kind?: "Ingress" | "VirtualService" | "HTTPProxy";
   };
   const hasTls = tls && tls.length > 0;
   return (
     <div style={{ ...cardStyle, borderLeft: "4px solid #4f46e5" }}>
       <div style={{ fontWeight: 700, color: "#1e293b" }}>
-        {kind === "VirtualService" ? "VirtualService" : "Ingress"}
+        {kind === "VirtualService"
+          ? "VirtualService"
+          : kind === "HTTPProxy"
+            ? "Contour Gateway"
+            : "Ingress"}
       </div>
       <div style={{ marginTop: 4, fontWeight: 700, color: "#4f46e5" }}>{label}</div>
       {subtitle ? <div style={meta()}>{subtitle}</div> : null}
@@ -162,7 +170,9 @@ export const IngressNode = memo(function IngressNode(props: NodeProps) {
         <div style={meta()}>
           {kind === "VirtualService"
             ? "VirtualService 不展示 Ingress TLS（请查看 Gateway/证书配置）"
-            : "未配置 spec.tls（入口为 HTTP 或仅注解终端）"}
+            : kind === "HTTPProxy"
+              ? "Contour Gateway 未配置 TLS（或未解析）"
+              : "未配置 spec.tls（入口为 HTTP 或仅注解终端）"}
         </div>
       )}
       <Handle type="source" position={Position.Right} />
@@ -171,10 +181,11 @@ export const IngressNode = memo(function IngressNode(props: NodeProps) {
 });
 
 export const HostNode = memo(function HostNode(props: NodeProps) {
-  const { label, tlsSecretName, ingressName } = props.data as {
+  const { label, tlsSecretName, ingressName, entryKind } = props.data as {
     label?: string;
     tlsSecretName?: string;
     ingressName?: string;
+    entryKind?: "Ingress" | "VirtualService" | "HTTPProxy";
   };
   return (
     <div style={{ ...cardStyle, borderLeft: "4px solid #7c3aed" }}>
@@ -202,7 +213,11 @@ export const HostNode = memo(function HostNode(props: NodeProps) {
           secret: {tlsSecretName}
         </div>
       ) : (
-        <div style={meta()}>无匹配证书（或未配置 TLS）</div>
+        <div style={meta()}>
+          {entryKind === "HTTPProxy"
+            ? "Contour Gateway 未解析 TLS（或未配置）"
+            : "无匹配证书（或未配置 TLS）"}
+        </div>
       )}
       <Handle type="source" position={Position.Right} />
     </div>
@@ -248,12 +263,28 @@ export const ServiceNode = memo(function ServiceNode(props: NodeProps) {
   );
 });
 
+export const HttpProxyNode = memo(function HttpProxyNode(props: NodeProps) {
+  const { label, subtitle } = props.data as { label?: string; subtitle?: string };
+  return (
+    <div style={{ ...cardStyle, borderLeft: "4px solid #0f766e", background: "#f0fdfa" }}>
+      <Handle type="target" position={Position.Left} />
+      <div style={{ fontWeight: 800, color: "#0f766e", fontSize: 12 }}>HTTPProxy</div>
+      <div style={{ marginTop: 4, fontWeight: 800, color: "#064e3b" }}>{label ?? "—"}</div>
+      {subtitle ? <div style={meta()}>{subtitle}</div> : null}
+      <Handle type="source" position={Position.Right} />
+    </div>
+  );
+});
+
 export const RouteNode = memo(function RouteNode(props: NodeProps) {
-  const { path, pathType, serviceName, servicePort } = props.data as {
+  const { path, pathType, serviceName, servicePort, upstreamServiceName, upstreamServicePort } =
+    props.data as {
     path?: string;
     pathType?: string;
     serviceName?: string;
     servicePort?: number | string;
+    upstreamServiceName?: string;
+    upstreamServicePort?: number | string;
   };
   return (
     <div
@@ -275,6 +306,11 @@ export const RouteNode = memo(function RouteNode(props: NodeProps) {
       <div style={{ ...meta(), marginTop: 4, color: "#4338ca", fontWeight: 700 }}>
         backend: {serviceName} :{String(servicePort ?? "?")}
       </div>
+      {upstreamServiceName ? (
+        <div style={{ ...meta({ marginTop: 2 }), color: "#0f766e", fontWeight: 700 }}>
+          upstream: {upstreamServiceName} :{String(upstreamServicePort ?? "?")}
+        </div>
+      ) : null}
       <Handle type="source" position={Position.Right} />
     </div>
   );

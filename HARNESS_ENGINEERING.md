@@ -8,7 +8,7 @@
 
 ## 1. Purpose（目标）
 
-把 Kubernetes / Istio YAML（至少包含 `Ingress` / `Service` / `Endpoints` 以及 Istio `VirtualService` / `DestinationRule`）解析成**可交互拓扑图**，用于快速理解入口域名/路径如何路由到后端服务与实例。
+把 Kubernetes / Istio / Contour YAML（至少包含 `Ingress` / `Service` / `Endpoints` 以及 Istio `VirtualService` / `DestinationRule`、Contour Gateway（`HTTPProxy`））解析成**可交互拓扑图**，用于快速理解入口域名/路径如何路由到后端服务与实例。
 
 ---
 
@@ -19,6 +19,7 @@
 - `Ingress`（`networking.k8s.io/v1`）
 - `Service`（`v1`）
 - `Endpoints`（`v1`）
+- Contour Gateway（`HTTPProxy`, `projectcontour.io/*`）
 - Istio `VirtualService`（`networking.istio.io/*`）
 - Istio `DestinationRule`（`networking.istio.io/*`）
 
@@ -33,7 +34,7 @@
 ## 3. Glossary（名词）
 
 - **画布 / Canvas**：右侧 React Flow 视图（节点+边+缩放/小地图）
-- **分区 / Area / Region**：每个入口对象（Ingress / VirtualService）对应一个父节点 `ingressRegion`（紫色底板）
+- **分区 / Area / Region**：每个入口对象（Ingress / VirtualService / Contour Gateway）对应一个父节点 `ingressRegion`（紫色底板）
 - **手写边 / Manual Edge**：用户通过拖拽手柄添加的边，`edge.data.manual === true`
 - **画图文件 / Diagram File**：`*.traffic-viz.json`，用于保存/恢复会话
 

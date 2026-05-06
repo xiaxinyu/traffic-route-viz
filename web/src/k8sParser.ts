@@ -23,8 +23,8 @@ export interface IngressTlsEntry {
 }
 
 export interface IngressRoute {
-  /** Origin kind: Ingress or Istio VirtualService. */
-  ingressKind?: "Ingress" | "VirtualService";
+  /** Origin kind: Ingress / Istio VirtualService / Contour HTTPProxy. */
+  ingressKind?: "Ingress" | "VirtualService" | "HTTPProxy";
   ingressNs?: string;
   ingressName: string;
   host: string;
@@ -32,6 +32,11 @@ export interface IngressRoute {
   pathType?: string;
   serviceName: string;
   servicePort: number | string;
+  /** For Contour gateway: which gateway Service this route is attached to. */
+  gatewayServiceName?: string;
+  /** For gateway-style configs: preserve original backend service (if we normalize serviceName). */
+  upstreamServiceName?: string;
+  upstreamServicePort?: number | string;
   /** Namespace where the Service is expected (Ingress namespace if not cross-ns in spec). */
   serviceNamespace?: string;
   /** TLS secret for this host from `spec.tls`, if matched. */
@@ -62,7 +67,7 @@ export interface EndpointsInfo {
 }
 
 export interface IngressSummary {
-  kind: "Ingress" | "VirtualService";
+  kind: "Ingress" | "VirtualService" | "HTTPProxy";
   name: string;
   namespace?: string;
   className?: string;
@@ -172,6 +177,11 @@ function parseIstioHostToServiceKey(
   return { name, namespace };
 }
 
+function baseNameNoExt(pathLike: string): string {
+  const file = pathLike.split(/[/\\]/).pop() ?? pathLike;
+  return file.replace(/\.(ya?ml)$/i, "");
+}
+
 export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
   const errors: string[] = [];
   const ingressByKey = new Map<string, IngressSummary>();
@@ -276,6 +286,108 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
           });
         }
       }
+      continue;
+    }
+
+    // Contour HTTPProxy (minimal modeling as "Ingress-like" entry)
+    if (
+      kind === "HTTPProxy" &&
+      typeof api === "string" &&
+      api.startsWith("projectcontour.io/")
+    ) {
+      const meta = getMeta(o);
+      const proxyName = meta.name ?? "(unnamed)";
+      const proxyNs = meta.namespace;
+      const spec = asRecord(o.spec);
+      const className =
+        typeof spec?.ingressClassName === "string"
+          ? spec.ingressClassName
+          : undefined;
+
+      // Host from metadata annotations (observed in your rbac-gateway.yaml)
+      const metadataObj = asRecord(o.metadata);
+      const annotations = asRecord(metadataObj?.annotations);
+      const fqdnKey = "app.projectsesame.io/fqdn";
+      const hostFromAnn =
+        typeof (annotations as Record<string, unknown> | undefined)?.[
+          fqdnKey
+        ] === "string"
+          ? ((annotations as Record<string, unknown>)[fqdnKey] as string)
+          : undefined;
+      const host = hostFromAnn ?? "*";
+
+      // Per requirement: when the user wraps contour gateway routes into a single file,
+      // that file name is the "source node name" AND also the gateway Service name.
+      // So we group all HTTPProxy docs from the same sourceFile into ONE entry.
+      const gatewayServiceName = sourceFile ? baseNameNoExt(sourceFile) : proxyName;
+      const ikey = `HTTPProxy:${resourceKey(proxyNs, gatewayServiceName)}`;
+      const incoming: IngressSummary = {
+        kind: "HTTPProxy",
+        name: gatewayServiceName,
+        namespace: proxyNs,
+        className,
+        tls: [],
+        loadBalancerIps: [],
+        sourceFiles: sourceFile ? [sourceFile] : [],
+      };
+      ingressByKey.set(ikey, mergeIngressSummary(ingressByKey.get(ikey), incoming));
+
+      const routesArr = Array.isArray(spec?.routes) ? spec!.routes! : [];
+      for (const r of routesArr) {
+        const rr = asRecord(r);
+        const conditionsArr = Array.isArray(rr?.conditions) ? rr!.conditions! : [];
+        const prefixes: string[] = [];
+        for (const c of conditionsArr) {
+          const cc = asRecord(c);
+          if (typeof cc?.prefix === "string" && cc.prefix) {
+            prefixes.push(cc.prefix);
+          }
+        }
+        if (!prefixes.length) prefixes.push("*");
+
+        const servicesArr = Array.isArray(rr?.services) ? rr!.services! : [];
+        for (const svc of servicesArr) {
+          const ss = asRecord(svc);
+          const svcName = typeof ss?.name === "string" ? ss!.name : "?";
+          const portRaw = (ss as unknown as Record<string, unknown> | undefined)
+            ?.port;
+          let svcPort: number | string = "?";
+          if (typeof portRaw === "number") svcPort = portRaw;
+          else if (typeof portRaw === "string") svcPort = portRaw;
+          else if (asRecord(portRaw)) {
+            const pr = asRecord(portRaw as unknown);
+            const portObj = pr as Record<string, unknown>;
+            if (typeof portObj.number === "number") svcPort = portObj.number;
+            else if (typeof portObj.name === "string") svcPort = portObj.name;
+          }
+
+          for (const p of prefixes) {
+            // Principle: HTTPProxy is a gateway route config:
+            // Ingress -> Service(gateway) -> Contour Gateway -> HTTPProxy -> Service(upstream)
+            // So on each route we keep the upstream service as serviceName,
+            // and also record which gateway service this HTTPProxy belongs to.
+            const normalizedServiceName = svcName;
+            const normalizedPort: number | string = svcPort;
+            routes.push({
+              ingressKind: "HTTPProxy",
+              ingressNs: proxyNs,
+              ingressName: gatewayServiceName,
+              host,
+              path: p === "*" ? "/" : p,
+              pathType: "Prefix",
+              serviceName: normalizedServiceName,
+              servicePort: normalizedPort,
+              gatewayServiceName,
+              upstreamServiceName: svcName,
+              upstreamServicePort: svcPort,
+              serviceNamespace: proxyNs,
+              tlsSecretName: undefined,
+              sourceFile,
+            });
+          }
+        }
+      }
+
       continue;
     }
 
