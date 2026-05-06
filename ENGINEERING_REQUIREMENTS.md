@@ -66,17 +66,18 @@
 
 ## 画布 Harness 规格（React Flow · 拓扑视图）
 
-本节为画布侧**单一事实来源**：实现以 `web/src/App.tsx`（宿主）、`web/src/buildGraph.ts`（构图）、`web/src/FlowNodes.tsx`（节点外壳）为准；改动画布行为时须同步修订本文。
+本节为画布侧**单一事实来源**；实现涉及 `web/src/App.tsx`、`web/src/buildGraph.ts`、`web/src/FlowNodes.tsx`，以及手写边 / 存档 / PNG：`diagramPersist.ts`、`diagramExportPng.ts`、`DiagramActions.tsx`、`mergeYamlBundles.ts`。改动画布行为或导出格式时须同步修订本文与实现。
 
 ### 页面结构
 
 - 左侧：**YAML 输入 / 导入**（非画布条款见上文「输入与导入体验」）。
-- 右侧：**拓扑画布**（React Flow）：点阵背景、`Controls`（缩放控件）、`MiniMap`（缩略导航）。
+- 右侧：**拓扑画布**（React Flow）：点阵背景、`Controls`、`MiniMap`，以及 **右上工具条**（导出 PNG、保存/打开 `*.traffic-viz.json`）。
 
 ### 数据与刷新
 
 - **首次加载**：画布由内置示例 YAML 经解析、构图初始化。
-- **刷新**：点击「解析并刷新图表」，或导入多文件并成功合并解析后触发刷新时，按解析结果 **重新构图**、`nodes` / `edges` **整批替换**。用户上一次**拖拽节点**调整出的位置**不回写** YAML，也不在刷新后继承；画布**视口**平移 / 缩放一般由 React Flow 维持当前会话状态（宿主未主动 `fitView` 复位时）。
+- **刷新（解析 YAML）**：点击「解析并刷新图表」或导入成功后触发构图时：**节点**始终按 YAML 重新生成（用户拖拽得到的节点坐标**丢弃**）。
+- **用户手写连线与刷新**：`edge.data.manual === true` 的边若在刷新后两端 `source`/`target` 仍指向**存在的节点**且与系统自动边不构成「同端点重复」，则 **保留**；其余手写边或因 YAML 删减而失效的手写边剔除。画布**视口**平移 / 缩放默认维持当前会话（宿主未主动复位时）。
 
 ### React Flow 壳层（宿主约束）
 
@@ -84,13 +85,33 @@
 
 | 能力 | 要求 |
 |------|------|
-| 初始视图 | **fitView**：进入时可见整图主要内容。 |
+| 初次适配 | **`onInit` + fitView**：首屏适配内容（padding 按实现）；**不包含**画布右上工具面板的常驻 `fitView` 防抖（避免打断用户缩放）。 |
 | 缩放范围 | `minZoom`：约 **0.2**；`maxZoom`：约 **1.8**（与实现一致）。 |
 | 背景 | **点阵**（`Background`），`gap` 约 **14** px。 |
-| 控件 | 左下角 **Controls**（含缩放、复位视口）；右下角 **MiniMap**。 |
+| 控件 | 左下角 **Controls**（含缩放、复位视口）；右下角 **MiniMap**；画布 **右上角 Panel**：导出 PNG / 保存与打开画图文件。 |
 | 画布平移 / 缩放 | 支持拖拽空白处平移、滚轮缩放（React Flow 默认行为）。 |
 
-> 画布上允许通过 `onConnect` **手工连线**（示教/草稿）；流量语义的主干边必须由 **YAML 构图**生成。
+### 手写连线（用户边）
+
+- **必须支持**：从一个节点手柄（Handle）拖拽到另一个节点手柄完成连线（推荐使用 **`connectionMode.Loose`** 便于跨层级连接）。
+- **视觉区分**：用户边使用 **`smoothstep`**， **`data.manual: true`**，线色与 **虚线样式**区别于 YAML 自动生成的实线拓扑边。
+- **删除**：选中所连边后可按 **`Delete` / `Backspace`**（与 React Flow 默认一致）移除。
+- **语义**：用户边为**增补说明**；Ingress 宿主解析生成的主链路仍必须由 **YAML → `buildFlowGraph`** 产出。
+
+### 导出 PNG（必须）
+
+- 画布须提供 **导出 PNG**：从 React Flow **主视图区域**截取位图下载；PNG 中**排除**右上工具面板、**Controls**、**MiniMap**、**右下角 attribution**，背景色与实现对齐以便打印/贴文档。
+- 实现依赖：**`html-to-image`**（或对等方案），导出失败时须有用户可读的提示。
+
+### 画图会话文件（必须）
+
+- 必须支持 **保存**与 **打开**拓扑会话文件（扩展名：**`*.traffic-viz.json`**，内容为 UTF-8 JSON）。
+- **`schemaVersion: 1`** 时文档字段至少包含：
+  - **`yamlText`**、**`importedFiles`**（`null` 或 `{ name, text }[]`）、**`activeFileIndex`**
+  - **`nodes`**、**`edges`**（React Flow 可序列化的结构；忌写入函数）
+  - **`viewport`**：`{ x, y, zoom }`
+  - **`savedAt`**（ISO 时间戳）
+- **打开文件**行为：还原左侧 YAML/导入上下文、节点与边、视口；并**顺带**跑一次解析告警条（可与保存时的 YAML 对照，允许展示错误但不强制覆盖画布）。
 
 ### 节点类型映射（`nodeTypes`）
 
@@ -156,6 +177,7 @@
 | `Host → Route` | **`#7c3aed`** |
 | `Route → Service` | **`#6366f1`**，边标签形如 `→ :<port>`，附标签背景提升可读性 |
 | `Service → Endpoints` | **`#0d9488`**，边标签 **`Pod IP`** |
+| …（用户手写边） | **`data.manual: true`**，**`smoothstep`**，**灰虚线**，与上表自动边区分 |
 
 ### 可读性验收场景（画布）
 
@@ -241,7 +263,7 @@
 - [ ] 多文件拖拽/选择可用；导入后自动刷新图。
 - [ ] 节点展示字段符合“核心信息”要求（含 **Ingress 分区底板文案**、Ingress/Host/**Route**/Service/Endpoints）。
 - [ ] 多 ingress 时，图上能一眼看出“这是两个 ingress”，且不会互相混淆归属。
-- [ ] **画布 Harness**：`fitView`、`minZoom`/`maxZoom`、点阵背景、Controls、MiniMap；平移画布；**分区与各业务卡片均可拖拽**；子节点 **`extent: 'parent'`**；**分区标题与首张 Ingress 不重叠**（见本文「画布 Harness 规格」）。
+- [ ] **画布 Harness**：`onInit` fitView、`minZoom`/`maxZoom`、点阵背景、Controls、MiniMap、**右上工具条**；平移画布；**分区与各业务卡片均可拖拽**；子节点 **`extent: 'parent'`**；**分区标题与首张 Ingress 不重叠**；**手写连线**（Loose 手柄连接、虚线 **`data.manual`**）；**解析后保留仍有效的手写边**；**导出 PNG**（排除控件与小地图等）；**保存/打开 `*.traffic-viz.json`**（YAML 上下文 + `nodes`/`edges`/`viewport`）。
 
 ### 可读性
 
@@ -264,5 +286,9 @@
 - **节点 UI**：`web/src/FlowNodes.tsx`
   - 核心字段展示、格式化
 - **导入与页面 UI**：`web/src/App.tsx`
-  - 多文件选择、拖拽导入、自动刷新、错误提示
+  - 多文件选择、拖拽导入、自动刷新、错误提示、React Flow 宿主、手写边 `onConnect`
+- **多文件合并**：`web/src/mergeYamlBundles.ts`（`mergeYamlFiles` / `mergeParseResults` / 读取文件列表）
+- **会话与画图文件**：`web/src/diagramPersist.ts`（`*.traffic-viz.json` schema、解析后手写边合并）
+- **画布操作条**：`web/src/DiagramActions.tsx`（保存/打开画图、触发 PNG）
+- **PNG**：`web/src/diagramExportPng.ts`（`html-to-image`）
 

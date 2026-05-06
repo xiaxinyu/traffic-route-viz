@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import ReactFlow, {
   Background,
+  ConnectionMode,
   Controls,
   MiniMap,
   ReactFlowProvider,
@@ -11,8 +12,19 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 
+import { DiagramActions } from "./DiagramActions";
 import { buildFlowGraph } from "./buildGraph";
-import { parseK8sYaml, type ParseResult } from "./k8sParser";
+import {
+  manualEdgeFromConnection,
+  mergeComputedEdgesKeepingManual,
+} from "./diagramPersist";
+import {
+  mergeParseResults,
+  mergeYamlFiles,
+  readImportedYamlFiles,
+  type ImportedYamlFile,
+} from "./mergeYamlBundles";
+import { parseK8sYaml } from "./k8sParser";
 import {
   EndpointsNode,
   HostNode,
@@ -131,115 +143,14 @@ subsets:
         protocol: TCP
 `;
 
-type ImportedFile = { name: string; text: string };
-
-async function readFiles(files: FileList): Promise<ImportedFile[]> {
-  const out: ImportedFile[] = [];
-  for (let i = 0; i < files.length; i++) {
-    const f = files[i];
-    out.push({ name: f.name, text: await f.text() });
-  }
-  return out;
-}
-
-function mergeYamlFiles(files: ImportedFile[]): string {
-  if (files.length === 0) return "";
-  if (files.length === 1) return files[0]!.text;
-  return files.map((f) => f.text).join("\n---\n");
-}
-
-function mergeParseResults(results: ParseResult[]): ParseResult {
-  const errors: string[] = [];
-
-  const ingressByKey = new Map<string, ParseResult["ingresses"][number]>();
-  const routes: ParseResult["routes"] = [];
-
-  const svcByKey = new Map<string, ParseResult["services"][number]>();
-  const epByKey = new Map<string, ParseResult["endpoints"][number]>();
-
-  const key = (ns: string | undefined, name: string) => (ns ? `${ns}/${name}` : name);
-
-  for (const r of results) {
-    errors.push(...r.errors);
-    for (const ing of r.ingresses) {
-      const k = key(ing.namespace, ing.name);
-      const prev = ingressByKey.get(k);
-      if (!prev) {
-        ingressByKey.set(k, ing);
-      } else {
-        // Merge fields similarly to parser behavior.
-        const tlsKey = (t: { secretName?: string; hosts: string[] }) =>
-          `${t.secretName ?? ""}|${t.hosts.join(",")}`;
-        const tlsSeen = new Set(prev.tls.map(tlsKey));
-        const tls = [...prev.tls];
-        for (const t of ing.tls) {
-          const tk = tlsKey(t);
-          if (!tlsSeen.has(tk)) {
-            tlsSeen.add(tk);
-            tls.push(t);
-          }
-        }
-        const loadBalancerIps = [...new Set([...prev.loadBalancerIps, ...ing.loadBalancerIps])];
-        const sourceFiles = [...new Set([...(prev.sourceFiles ?? []), ...(ing.sourceFiles ?? [])])];
-        ingressByKey.set(k, {
-          name: prev.name,
-          namespace: prev.namespace ?? ing.namespace,
-          className: prev.className ?? ing.className,
-          tls,
-          loadBalancerIps,
-          sourceFiles,
-        });
-      }
-    }
-
-    routes.push(...r.routes);
-
-    for (const s of r.services) {
-      const prev = svcByKey.get(s.key);
-      if (!prev) {
-        svcByKey.set(s.key, s);
-      } else {
-        svcByKey.set(s.key, {
-          ...prev,
-          type: prev.type ?? s.type,
-          clusterIP: prev.clusterIP ?? s.clusterIP,
-          ports: prev.ports.length ? prev.ports : s.ports,
-          sourceFiles: [...new Set([...(prev.sourceFiles ?? []), ...(s.sourceFiles ?? [])])],
-        });
-      }
-    }
-
-    for (const e of r.endpoints) {
-      const prev = epByKey.get(e.key);
-      if (!prev) {
-        epByKey.set(e.key, e);
-      } else {
-        epByKey.set(e.key, {
-          ...prev,
-          addresses: [...new Set([...prev.addresses, ...e.addresses])],
-          ports: prev.ports.length ? prev.ports : e.ports,
-          sourceFiles: [...new Set([...(prev.sourceFiles ?? []), ...(e.sourceFiles ?? [])])],
-        });
-      }
-    }
-  }
-
-  return {
-    ingresses: [...ingressByKey.values()],
-    routes,
-    services: [...svcByKey.values()],
-    endpoints: [...epByKey.values()],
-    errors,
-  };
-}
-
 function AppInner() {
   const [yamlText, setYamlText] = useState(SAMPLE);
   const [parsedMsg, setParsedMsg] = useState<string | null>(null);
-  const [importedFiles, setImportedFiles] = useState<ImportedFile[] | null>(null);
+  const [importedFiles, setImportedFiles] = useState<ImportedYamlFile[] | null>(null);
   // null means "merged view"; otherwise index into importedFiles
   const [activeFileIndex, setActiveFileIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const flowContainerRef = useRef<HTMLDivElement | null>(null);
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
     const p = parseK8sYaml(SAMPLE);
@@ -250,7 +161,7 @@ function AppInner() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   const onConnect = useCallback(
-    (c: Connection) => setEdges((eds) => addEdge(c, eds)),
+    (c: Connection) => setEdges((eds) => addEdge(manualEdgeFromConnection(c), eds)),
     [setEdges],
   );
 
@@ -258,17 +169,16 @@ function AppInner() {
     (overrideText?: string) => {
       const src = overrideText ?? yamlText;
       const p = importedFiles?.length
-        ? mergeParseResults(
-            importedFiles.map((f) => parseK8sYaml(f.text, f.name)),
-          )
+        ? mergeParseResults(importedFiles.map((f) => parseK8sYaml(f.text, f.name)))
         : parseK8sYaml(src);
-    const err = p.errors.length ? p.errors.join("\n") : null;
-    setParsedMsg(err);
-    const { nodes: n, edges: e } = buildFlowGraph(p);
-    setNodes(n);
-    setEdges(e);
+      const err = p.errors.length ? p.errors.join("\n") : null;
+      setParsedMsg(err);
+      const { nodes: n, edges: e } = buildFlowGraph(p);
+      const ids = new Set(n.map((x) => x.id));
+      setNodes(n);
+      setEdges((prev) => mergeComputedEdgesKeepingManual(prev, e, ids));
     },
-    [yamlText, importedFiles, setNodes, setEdges],
+    [yamlText, importedFiles, setNodes, setEdges, setParsedMsg],
   );
 
   const mergedImportedText = useMemo(() => {
@@ -289,9 +199,19 @@ function AppInner() {
           flexWrap: "wrap",
         }}
       >
-        <strong style={{ color: "#0f172a" }}>
-          Ingress → Host → Service → Endpoints
-        </strong>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+            <strong style={{ color: "#0f172a", fontSize: 14 }}>
+              Traffic Route Viz
+            </strong>
+            <span style={{ fontSize: 12, color: "#475569", fontWeight: 700 }}>
+              Kubernetes Ingress 流量拓扑可视化
+            </span>
+          </div>
+          <span style={{ fontSize: 11, color: "#64748b" }}>
+            Ingress → Host → Route → Service → Endpoints
+          </span>
+        </div>
         <button
           type="button"
           onClick={() => applyYaml(mergedImportedText ?? yamlText)}
@@ -308,7 +228,8 @@ function AppInner() {
           解析并刷新图表
         </button>
         <span style={{ fontSize: 12, color: "#64748b" }}>
-          画布: Ingress→Host→Route→Service→Endpoints；紫底分区与卡片均可拖拽（卡片限分区内）。
+          画布: 从节点圆点拖线可手写连线（灰虚线）；右上可导出 PNG / 保存
+          *.traffic-viz.json 画图文件；紫底分区与卡片可拖拽。
         </span>
       </header>
       {parsedMsg ? (
@@ -353,7 +274,7 @@ function AppInner() {
                 ev.preventDefault();
                 const list = ev.dataTransfer.files;
                 if (!list?.length) return;
-                const files = await readFiles(list);
+                const files = await readImportedYamlFiles(list);
                 setImportedFiles(files);
                 setActiveFileIndex(null);
                 const merged = mergeYamlFiles(files);
@@ -395,7 +316,7 @@ function AppInner() {
               onChange={async (ev) => {
                 const list = ev.target.files;
                 if (!list?.length) return;
-                const files = await readFiles(list);
+                const files = await readImportedYamlFiles(list);
                 setImportedFiles(files);
                 setActiveFileIndex(null);
                 const merged = mergeYamlFiles(files);
@@ -506,7 +427,7 @@ function AppInner() {
             }}
           />
         </aside>
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div ref={flowContainerRef} style={{ flex: 1, minWidth: 0 }}>
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -514,15 +435,33 @@ function AppInner() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             nodeTypes={nodeTypes}
-            fitView
+            onInit={(instance) => {
+              requestAnimationFrame(() => instance.fitView({ padding: 0.18 }));
+            }}
             minZoom={0.2}
             maxZoom={1.8}
+            connectionMode={ConnectionMode.Loose}
+            connectionLineStyle={{ stroke: "#64748b", strokeWidth: 1.75 }}
           >
             <Background gap={14} />
             <Controls />
             <MiniMap
               nodeStrokeWidth={2}
               maskColor="rgba(15,23,42,0.08)"
+            />
+            <DiagramActions
+              yamlText={yamlText}
+              setYamlText={setYamlText}
+              importedFiles={importedFiles}
+              setImportedFiles={setImportedFiles}
+              activeFileIndex={activeFileIndex}
+              setActiveFileIndex={setActiveFileIndex}
+              nodes={nodes}
+              edges={edges}
+              setNodes={setNodes}
+              setEdges={setEdges}
+              setParsedMsg={setParsedMsg}
+              flowContainerRef={flowContainerRef}
             />
           </ReactFlow>
         </div>

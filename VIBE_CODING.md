@@ -60,10 +60,14 @@ traffic-route-viz/
 └── web/
     ├── package.json
     ├── src/
-    │   ├── App.tsx           UI：左侧 YAML，右侧画布
-    │   ├── k8sParser.ts      解析 Ingress / Service / Endpoints
-    │   ├── buildGraph.ts     构图（Ingress → Host → Service → Endpoints）
-    │   ├── FlowNodes.tsx     节点样式
+    │   ├── App.tsx               UI：左侧 YAML，右侧 React Flow 画布
+    │   ├── k8sParser.ts          解析 Ingress / Service / Endpoints
+    │   ├── mergeYamlBundles.ts   多文件合并与结构化 merge
+    │   ├── buildGraph.ts          构图与初始布局
+    │   ├── diagramPersist.ts      画图文件 schema、手写边合并
+    │   ├── diagramExportPng.ts    导出 PNG
+    │   ├── DiagramActions.tsx     画布右上角：PNG / 保存打开
+    │   ├── FlowNodes.tsx          节点样式
     │   └── main.tsx
     └── dist/                 构建产物（勿手改）
 ```
