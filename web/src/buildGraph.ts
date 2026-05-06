@@ -38,19 +38,19 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     epByKey.set(e.key, e);
   }
 
-  const ingId = (ns: string | undefined, name: string) =>
-    `ing-${resourceKey(ns, name).replace(/[^a-zA-Z0-9/_-]/g, "_")}`;
+  const ingId = (kind: string, ns: string | undefined, name: string) =>
+    `ing-${kind.toLowerCase()}-${resourceKey(ns, name).replace(/[^a-zA-Z0-9/_-]/g, "_")}`;
 
   // ---- Layout: partition by ingress, then by host, then by route list ----
   const ingressIndexById = new Map<string, number>();
   parsed.ingresses.forEach((ing, idx) => {
-    ingressIndexById.set(ingId(ing.namespace, ing.name), idx);
+    ingressIndexById.set(ingId(ing.kind, ing.namespace, ing.name), idx);
   });
 
   // Group routes by ingress -> host
   const routesByIngress = new Map<string, typeof parsed.routes>();
   for (const r of parsed.routes) {
-    const iid = ingId(r.ingressNs, r.ingressName);
+    const iid = ingId(r.ingressKind ?? "Ingress", r.ingressNs, r.ingressName);
     const list = routesByIngress.get(iid) ?? [];
     list.push(r);
     routesByIngress.set(iid, list);
@@ -72,7 +72,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   let rowMaxH = 0;
 
   for (const ing of parsed.ingresses) {
-    const iid = ingId(ing.namespace, ing.name);
+    const iid = ingId(ing.kind, ing.namespace, ing.name);
     // We still use the stable ingressIndex for partitionIndex label, but placement is grid-based.
     const blockIdx = ingressIndexById.get(iid) ?? 0;
 
@@ -100,6 +100,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       position: { x: 0, y: 0 }, // set later by grid placement
       data: {
         partitionIndex: blockIdx + 1,
+        entryKind: ing.kind,
         ingressName: ing.name,
         namespace: ing.namespace ?? "—",
         sourceSummary,
@@ -127,6 +128,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         label: ing.name,
         subtitle: ing.namespace ? `namespace: ${ing.namespace}` : undefined,
         className: ing.className,
+        kind: ing.kind,
         tls: ing.tls,
         loadBalancerIps: ing.loadBalancerIps,
       },
@@ -264,6 +266,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           type: si?.type,
           clusterIP: si?.clusterIP,
           ports: si?.ports,
+          istioSubsets: si?.istioSubsets,
         },
       });
 

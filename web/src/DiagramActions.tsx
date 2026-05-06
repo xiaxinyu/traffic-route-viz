@@ -12,6 +12,8 @@ import { Panel, useReactFlow } from "reactflow";
 import type { Edge, Node } from "reactflow";
 
 import { exportDiagramToPng } from "./diagramExportPng";
+import { exportToDrawioXml } from "./diagramExportDrawio";
+import { exportToMermaid } from "./diagramExportMermaid";
 import type { DiagramFileV1, ImportedFilePersist } from "./diagramPersist";
 import {
   DIAGRAM_FILE_EXTENSION,
@@ -53,6 +55,20 @@ const btnGhost: CSSProperties = {
   color: "#334155",
   border: "1px solid #e2e8f0",
 };
+
+function downloadText(filename: string, content: string, mime = "text/plain;charset=utf-8") {
+  const blob = new Blob([content], { type: mime });
+  const a = document.createElement("a");
+  a.download = filename;
+  a.href = URL.createObjectURL(blob);
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(a.href);
+    a.remove();
+  }, 250);
+}
 
 const btnCompact: CSSProperties = {
   ...btnPrimary,
@@ -128,6 +144,16 @@ export function DiagramActions(props: Props) {
       window.alert("导出 PNG 失败：请稍后重试，或缩放画布后再导出。");
     }
   }, [flowContainerRef]);
+
+  const onExportMermaid = useCallback(() => {
+    const text = exportToMermaid(nodes, edges);
+    downloadText(`traffic-route-viz-${Date.now()}.mmd`, text, "text/plain;charset=utf-8");
+  }, [nodes, edges]);
+
+  const onExportDrawio = useCallback(() => {
+    const xml = exportToDrawioXml(nodes, edges, "traffic-route-viz");
+    downloadText(`traffic-route-viz-${Date.now()}.drawio.xml`, xml, "application/xml;charset=utf-8");
+  }, [nodes, edges]);
 
   const applyLoadedDiagram = useCallback(
     (data: DiagramFileV1) => {
@@ -228,6 +254,26 @@ export function DiagramActions(props: Props) {
               type="button"
               style={btnGhost}
               onClick={() => {
+                onExportMermaid();
+                setOpen(false);
+              }}
+            >
+              导出 Mermaid
+            </button>
+            <button
+              type="button"
+              style={btnGhost}
+              onClick={() => {
+                onExportDrawio();
+                setOpen(false);
+              }}
+            >
+              导出 draw.io
+            </button>
+            <button
+              type="button"
+              style={btnGhost}
+              onClick={() => {
                 onSaveDiagramJson();
                 setOpen(false);
               }}
@@ -249,7 +295,7 @@ export function DiagramActions(props: Props) {
               onChange={onDiagramFileChosen}
             />
             <div style={{ fontSize: 10, color: "#94a3b8", lineHeight: 1.35 }}>
-              从手柄拖线连线；手写边为灰色虚线。打开文件会连同左侧 YAML / 视图一起恢复。
+              画图文件（React Flow JSON）：可用 VS Code/Cursor 打开；可导出 Mermaid / draw.io 供第三方工具打开。
             </div>
           </>
         ) : null}

@@ -6,11 +6,17 @@ alwaysApply: false
 
 # Web visualization UX/layout standards
 
+## Scope / resources
+
+- This tool targets traffic visualization for Kubernetes **Ingress / Service / Endpoints** and Istio **VirtualService / DestinationRule**.
+- Adding new resource kinds must update: parser → graph → node UI → harness spec.
+
 ## Import experience
 
 - Multi-file upload must support: click-select + drag-drop, and should auto-refresh graph after import.
 - Show import state (file count + short list of names).
 - Keep left panel actions minimal; avoid “extra clicks”.
+- Imported file names must be bound into each Area header (“来源文件”) right after import; no “unbound” state on file import.
 
 ## Layout readability (must)
 
@@ -18,10 +24,18 @@ alwaysApply: false
 - Avoid heavy overlaps on initial load; keep generous vertical spacing.
 - Prefer a visible region background per ingress (group/region block with subtle tint + border + title).
 - If there are many routes, prefer a dedicated Route node per path (Host → Route → Service) instead of stacking edge labels.
+- Areas should use a non-flow layout: **at most 4 areas per row**, auto-wrap to multiple rows, and area height/width should expand to fit content.
 
 ## Node content (must)
 
 - Ingress: name, ns, class, LB/status IP, TLS blocks (secret + hosts)
+- VirtualService: name, ns, hosts, HTTP matches (path), destination service + port
+- DestinationRule: subsets shown on related Service card when possible
 - Host: host, ingress name, TLS secret match (or explicit “no TLS”)
 - Service: name, ns, type, clusterIP, spec ports, ingress backend port
 - Endpoints: service context, pod IPs, port/protocol
+
+## Canvas UX (must)
+
+- Manual edges: user can connect via handles; manual edges must be visually distinct (grey dashed) and survive YAML refresh when endpoints remain valid.
+- Toolbar: canvas operations (PNG/export/save/open) should be compact by default and must not obstruct the topology.

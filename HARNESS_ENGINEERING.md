@@ -8,7 +8,7 @@
 
 ## 1. Purpose（目标）
 
-把 Kubernetes YAML（至少包含 `Ingress` / `Service` / `Endpoints`）解析成**可交互拓扑图**，用于快速理解入口域名/路径如何路由到后端服务与实例。
+把 Kubernetes / Istio YAML（至少包含 `Ingress` / `Service` / `Endpoints` 以及 Istio `VirtualService` / `DestinationRule`）解析成**可交互拓扑图**，用于快速理解入口域名/路径如何路由到后端服务与实例。
 
 ---
 
@@ -19,6 +19,8 @@
 - `Ingress`（`networking.k8s.io/v1`）
 - `Service`（`v1`）
 - `Endpoints`（`v1`）
+- Istio `VirtualService`（`networking.istio.io/*`）
+- Istio `DestinationRule`（`networking.istio.io/*`）
 
 ### Out of Scope（除非明确扩展）
 
@@ -31,7 +33,7 @@
 ## 3. Glossary（名词）
 
 - **画布 / Canvas**：右侧 React Flow 视图（节点+边+缩放/小地图）
-- **分区 / Area / Region**：每个 Ingress 对应一个父节点 `ingressRegion`（紫色底板）
+- **分区 / Area / Region**：每个入口对象（Ingress / VirtualService）对应一个父节点 `ingressRegion`（紫色底板）
 - **手写边 / Manual Edge**：用户通过拖拽手柄添加的边，`edge.data.manual === true`
 - **画图文件 / Diagram File**：`*.traffic-viz.json`，用于保存/恢复会话
 
@@ -140,11 +142,11 @@
 
 ### 7.4 分区（Area）规则（必须）
 
-- 多 Ingress 必须明显区分：**禁止跨 Ingress 合并** Host/Service/Endpoints
-- 每个 Ingress 对应一个 `ingressRegion` 父节点；子节点 `parentNode` 指向该父节点
+- 多入口对象（Ingress / VirtualService）必须明显区分：**禁止跨入口对象合并** Host/Service/Endpoints
+- 每个入口对象对应一个 `ingressRegion` 父节点；子节点 `parentNode` 指向该父节点
 - Area 页眉必须包含：
   - 分区序号（第 N 视图）
-  - Kubernetes Ingress 名称
+  - 入口对象类型与名称（Kubernetes Ingress / Istio VirtualService）
   - 命名空间
   - **来源文件名列表**（导入时必须绑定；过长可省略但需可 hover 查看完整）
 

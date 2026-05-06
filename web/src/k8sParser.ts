@@ -23,6 +23,8 @@ export interface IngressTlsEntry {
 }
 
 export interface IngressRoute {
+  /** Origin kind: Ingress or Istio VirtualService. */
+  ingressKind?: "Ingress" | "VirtualService";
   ingressNs?: string;
   ingressName: string;
   host: string;
@@ -45,6 +47,8 @@ export interface ServiceInfo {
   type?: string;
   clusterIP?: string;
   ports: { port: number; targetPort?: number | string; protocol?: string }[];
+  /** Istio DestinationRule subsets for this host/service (if present). */
+  istioSubsets?: string[];
   sourceFiles?: string[];
 }
 
@@ -58,6 +62,7 @@ export interface EndpointsInfo {
 }
 
 export interface IngressSummary {
+  kind: "Ingress" | "VirtualService";
   name: string;
   namespace?: string;
   className?: string;
@@ -131,6 +136,7 @@ function mergeIngressSummary(
   b: IngressSummary,
 ): IngressSummary {
   if (!a) return b;
+  // Kind should be stable for the same key (we key by kind+ns+name).
   const tlsSeen = new Set(a.tls.map(tlsKey));
   const tls = [...a.tls];
   for (const t of b.tls) {
@@ -142,6 +148,7 @@ function mergeIngressSummary(
   const lb = [...new Set([...a.loadBalancerIps, ...b.loadBalancerIps])];
   const sourceFiles = [...new Set([...(a.sourceFiles ?? []), ...(b.sourceFiles ?? [])])];
   return {
+    kind: a.kind,
     name: a.name,
     namespace: a.namespace ?? b.namespace,
     className: a.className ?? b.className,
@@ -151,12 +158,28 @@ function mergeIngressSummary(
   };
 }
 
+function parseIstioHostToServiceKey(
+  rawHost: string,
+  fallbackNs: string | undefined,
+): { name: string; namespace: string | undefined } {
+  // Examples:
+  // - reviews
+  // - reviews.default
+  // - reviews.default.svc.cluster.local
+  const parts = rawHost.split(".").filter(Boolean);
+  const name = parts[0] ?? rawHost;
+  const namespace = parts.length >= 2 ? parts[1] : fallbackNs;
+  return { name, namespace };
+}
+
 export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
   const errors: string[] = [];
   const ingressByKey = new Map<string, IngressSummary>();
   const routes: IngressRoute[] = [];
   const services = new Map<string, ServiceInfo>();
   const endpoints = new Map<string, EndpointsInfo>();
+  // DestinationRule host -> subsets
+  const istioSubsetsByKey = new Map<string, string[]>();
 
   let docs: unknown[];
   try {
@@ -195,8 +218,9 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
           : undefined;
       const tlsBlocks = parseIngressTls(spec);
       const loadBalancerIps = parseIngressLbIps(o.status);
-      const ikey = resourceKey(ingressNs, ingressName);
+      const ikey = `Ingress:${resourceKey(ingressNs, ingressName)}`;
       const incoming: IngressSummary = {
+        kind: "Ingress",
         name: ingressName,
         namespace: ingressNs,
         className,
@@ -238,6 +262,7 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
               : undefined;
           const tlsSecretName = tlsByHost.get(host);
           routes.push({
+            ingressKind: "Ingress",
             ingressNs,
             ingressName,
             host,
@@ -250,6 +275,105 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
             sourceFile,
           });
         }
+      }
+      continue;
+    }
+
+    // Istio VirtualService (minimal modeling as "Ingress-like" entry)
+    if (
+      kind === "VirtualService" &&
+      typeof api === "string" &&
+      api.startsWith("networking.istio.io/")
+    ) {
+      const meta = getMeta(o);
+      const vsName = meta.name ?? "(unnamed)";
+      const vsNs = meta.namespace;
+      const spec = asRecord(o.spec);
+      const hosts = Array.isArray(spec?.hosts)
+        ? spec!.hosts!.filter((h): h is string => typeof h === "string")
+        : ["*"];
+
+      const ikey = `VirtualService:${resourceKey(vsNs, vsName)}`;
+      const incoming: IngressSummary = {
+        kind: "VirtualService",
+        name: vsName,
+        namespace: vsNs,
+        className: "istio",
+        tls: [],
+        loadBalancerIps: [],
+        sourceFiles: sourceFile ? [sourceFile] : [],
+      };
+      ingressByKey.set(ikey, mergeIngressSummary(ingressByKey.get(ikey), incoming));
+
+      const http = Array.isArray(spec?.http) ? spec!.http! : [];
+      for (const httpRule of http) {
+        const hr = asRecord(httpRule);
+        const matches = Array.isArray(hr?.match) ? (hr!.match! as unknown[]) : [];
+        const routesArr = Array.isArray(hr?.route) ? (hr!.route! as unknown[]) : [];
+        const firstRoute = routesArr.length ? asRecord(routesArr[0]) : null;
+        const dest = asRecord(firstRoute?.destination);
+        const destHost = typeof dest?.host === "string" ? dest.host : "?";
+        const destPortObj = asRecord(dest?.port);
+        const servicePort: number | string =
+          typeof destPortObj?.number === "number"
+            ? destPortObj.number
+            : typeof destPortObj?.name === "string"
+              ? destPortObj.name
+              : "?";
+        const { name: svcName, namespace: svcNs } = parseIstioHostToServiceKey(destHost, vsNs);
+
+        const matchPaths: { path: string; pathType?: string }[] = [];
+        for (const m of matches) {
+          const mr = asRecord(m);
+          const uri = asRecord(mr?.uri);
+          if (uri) {
+            if (typeof uri.prefix === "string") matchPaths.push({ path: uri.prefix, pathType: "Prefix" });
+            else if (typeof uri.exact === "string") matchPaths.push({ path: uri.exact, pathType: "Exact" });
+            else if (typeof uri.regex === "string") matchPaths.push({ path: uri.regex, pathType: "Regex" });
+          }
+        }
+        if (!matchPaths.length) matchPaths.push({ path: "*", pathType: undefined });
+
+        for (const h of hosts) {
+          for (const mp of matchPaths) {
+            routes.push({
+              ingressKind: "VirtualService",
+              ingressNs: vsNs,
+              ingressName: vsName,
+              host: h,
+              path: mp.path,
+              pathType: mp.pathType,
+              serviceName: svcName,
+              servicePort,
+              serviceNamespace: svcNs,
+              sourceFile,
+            });
+          }
+        }
+      }
+      continue;
+    }
+
+    // Istio DestinationRule: attach subsets to Service by host key
+    if (
+      kind === "DestinationRule" &&
+      typeof api === "string" &&
+      api.startsWith("networking.istio.io/")
+    ) {
+      const meta = getMeta(o);
+      const drNs = meta.namespace;
+      const spec = asRecord(o.spec);
+      const host = typeof spec?.host === "string" ? spec.host : undefined;
+      if (host) {
+        const { name, namespace } = parseIstioHostToServiceKey(host, drNs);
+        const k = resourceKey(namespace, name);
+        const subsetsRaw = Array.isArray(spec?.subsets) ? spec!.subsets! : [];
+        const subsetNames = subsetsRaw
+          .map((s) => asRecord(s))
+          .filter(Boolean)
+          .map((s) => (typeof s!.name === "string" ? s!.name : null))
+          .filter((x): x is string => !!x);
+        if (subsetNames.length) istioSubsetsByKey.set(k, subsetNames);
       }
       continue;
     }
@@ -280,6 +404,7 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
         type,
         clusterIP,
         ports,
+        istioSubsets: istioSubsetsByKey.get(key),
         sourceFiles: sourceFile ? [sourceFile] : [],
       });
       continue;
