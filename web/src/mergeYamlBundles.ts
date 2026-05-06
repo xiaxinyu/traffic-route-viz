@@ -1,12 +1,23 @@
 import type { ParseResult } from "./k8sParser";
 
-export type ImportedYamlFile = { name: string; text: string };
+export type ImportedYamlFile = {
+  /** Basename shown in UI (e.g. foo.yaml) */
+  name: string;
+  /** Relative path when importing a folder (e.g. 01-dce5-global/a/foo.yaml) */
+  relPath?: string;
+  text: string;
+};
 
 export async function readImportedYamlFiles(files: FileList): Promise<ImportedYamlFile[]> {
   const out: ImportedYamlFile[] = [];
   for (let i = 0; i < files.length; i++) {
     const f = files[i]!;
-    out.push({ name: f.name, text: await f.text() });
+    const relPath =
+      typeof (f as unknown as { webkitRelativePath?: string }).webkitRelativePath === "string" &&
+      (f as unknown as { webkitRelativePath?: string }).webkitRelativePath
+        ? (f as unknown as { webkitRelativePath: string }).webkitRelativePath
+        : undefined;
+    out.push({ name: f.name, relPath, text: await f.text() });
   }
   return out;
 }

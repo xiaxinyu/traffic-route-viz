@@ -1,4 +1,4 @@
-import type { Connection, Edge, Node, Viewport } from "reactflow";
+import { MarkerType, type Connection, type Edge, type Node, type Viewport } from "reactflow";
 
 export const DIAGRAM_FILE_VERSION = 1 as const;
 
@@ -60,6 +60,7 @@ export function manualEdgeFromConnection(connection: Connection): Edge {
       strokeDasharray: "6 4",
     },
     labelStyle: { fontSize: 11, fill: "#334155", fontWeight: 500 },
+    markerEnd: { type: MarkerType.ArrowClosed, color: "#475569" },
   };
 }
 

@@ -151,6 +151,7 @@ function AppInner() {
   const [importedFiles, setImportedFiles] = useState<ImportedYamlFile[] | null>(null);
   // null means "merged view"; otherwise index into importedFiles
   const [activeFileIndex, setActiveFileIndex] = useState<number | null>(null);
+  const [leftMode, setLeftMode] = useState<"files" | "yaml">("files");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const flowContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -172,7 +173,9 @@ function AppInner() {
       const src = overrideText ?? yamlText;
       const effectiveFiles = importedFilesOverride ?? importedFiles;
       const p = effectiveFiles?.length
-        ? mergeParseResults(effectiveFiles.map((f) => parseK8sYaml(f.text, f.name)))
+        ? mergeParseResults(
+            effectiveFiles.map((f) => parseK8sYaml(f.text, f.relPath ?? f.name)),
+          )
         : parseK8sYaml(src);
       const err = p.errors.length ? p.errors.join("\n") : null;
       setParsedMsg(err);
@@ -188,14 +191,87 @@ function AppInner() {
     return importedFiles ? mergeYamlFiles(importedFiles) : null;
   }, [importedFiles]);
 
+  const displayPath = useCallback((f: ImportedYamlFile) => f.relPath ?? f.name, []);
+  const displayFolderHint = useCallback((p: string) => {
+    // remove "01/02/03" numeric prefix from segments like "01-foo-bar"
+    return p
+      .split("/")
+      .filter(Boolean)
+      .slice(0, -1)
+      .map((seg) => seg.replace(/^(0[1-3])[-_]/, ""))
+      .join(" / ");
+  }, []);
+
+  const readDroppedFiles = useCallback(async (dt: DataTransfer): Promise<ImportedYamlFile[]> => {
+    const items = Array.from(dt.items ?? []);
+    const hasEntryApi = items.some((it) => typeof (it as any).webkitGetAsEntry === "function");
+    if (!hasEntryApi) {
+      // Fallback: plain file drop (no folder structure)
+      return await readImportedYamlFiles(dt.files);
+    }
+
+    type Entry = {
+      isFile: boolean;
+      isDirectory: boolean;
+      fullPath?: string;
+      name: string;
+      file?: (cb: (f: File) => void) => void;
+      createReader?: () => { readEntries: (cb: (entries: Entry[]) => void) => void };
+    };
+
+    const out: ImportedYamlFile[] = [];
+    const visit = async (entry: Entry): Promise<void> => {
+      if (entry.isFile && entry.file) {
+        const file = await new Promise<File>((resolve) => entry.file!(resolve));
+        const name = file.name;
+        const relPath =
+          typeof entry.fullPath === "string"
+            ? entry.fullPath.replace(/^\//, "")
+            : (file as any).webkitRelativePath || undefined;
+        if (!/\.(ya?ml)$/i.test(name)) return;
+        out.push({ name, relPath, text: await file.text() });
+        return;
+      }
+
+      if (entry.isDirectory && entry.createReader) {
+        const reader = entry.createReader();
+        const readAll = async (): Promise<void> => {
+          const batch = await new Promise<Entry[]>((resolve) => reader.readEntries(resolve));
+          if (!batch.length) return;
+          for (const child of batch) await visit(child);
+          await readAll();
+        };
+        await readAll();
+      }
+    };
+
+    for (const it of items) {
+      const e = (it as any).webkitGetAsEntry?.() as Entry | undefined;
+      if (e) await visit(e);
+    }
+    return out;
+  }, []);
+
+  const mergeImportedFiles = useCallback(
+    (prev: ImportedYamlFile[] | null, next: ImportedYamlFile[]): ImportedYamlFile[] => {
+      const keyOf = (f: ImportedYamlFile) => f.relPath ?? f.name;
+      const m = new Map<string, ImportedYamlFile>();
+      for (const f of prev ?? []) m.set(keyOf(f), f);
+      for (const f of next) m.set(keyOf(f), f); // next wins (refresh/overwrite)
+      return [...m.values()].sort((a, b) => keyOf(a).localeCompare(keyOf(b)));
+    },
+    [],
+  );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       <header
         style={{
           flexShrink: 0,
-          padding: "12px 16px",
+          padding: "10px 14px",
           borderBottom: "1px solid #e2e8f0",
-          background: "#f8fafc",
+          background: "rgba(248,250,252,0.92)",
+          backdropFilter: "blur(8px)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -211,14 +287,9 @@ function AppInner() {
               通用 Traffic 拓扑可视化（Kubernetes / Istio / Contour）
             </span>
           </div>
-          <span style={{ fontSize: 11, color: "#64748b" }}>
-            Entry → Host → Route → Service → Endpoints
-          </span>
+          <span style={{ fontSize: 11, color: "#64748b" }}>Entry → Host → Route → Service → Endpoints</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap" }}>
-            手写连线 / PNG / 保存打开（右上“操作”）
-          </span>
           <button
             type="button"
             onClick={() => applyYaml(mergedImportedText ?? yamlText)}
@@ -254,7 +325,7 @@ function AppInner() {
       <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
         <aside
           style={{
-            width: 420,
+            width: 380,
             flexShrink: 0,
             borderRight: "1px solid #e2e8f0",
             display: "flex",
@@ -263,29 +334,64 @@ function AppInner() {
           }}
         >
           <div style={{ padding: 12, borderBottom: "1px solid #f1f5f9" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-              <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 800 }}>YAML 输入</div>
-              {importedFiles?.length ? (
-                <div style={{ fontSize: 11, color: "#64748b", textAlign: "right" }}>
-                  已导入 {importedFiles.length} 个文件
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 900 }}>输入</div>
+                <div style={{ fontSize: 11, color: "#64748b" }}>
+                  {importedFiles?.length ? `已导入 ${importedFiles.length} 个文件` : "可直接粘贴 YAML 或导入文件/文件夹"}
                 </div>
-              ) : (
-                <div style={{ fontSize: 11, color: "#64748b" }}>未导入文件</div>
-              )}
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={() => setLeftMode("files")}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: 999,
+                    border: "1px solid " + (leftMode === "files" ? "#4f46e5" : "#e2e8f0"),
+                    background: leftMode === "files" ? "#eef2ff" : "#fff",
+                    color: leftMode === "files" ? "#3730a3" : "#334155",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    fontWeight: 800,
+                  }}
+                  title="查看已导入文件列表"
+                >
+                  文件
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLeftMode("yaml")}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: 999,
+                    border: "1px solid " + (leftMode === "yaml" ? "#4f46e5" : "#e2e8f0"),
+                    background: leftMode === "yaml" ? "#eef2ff" : "#fff",
+                    color: leftMode === "yaml" ? "#3730a3" : "#334155",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    fontWeight: 800,
+                  }}
+                  title="查看/编辑 YAML 文本"
+                >
+                  YAML
+                </button>
+              </div>
             </div>
 
             <div
               onDragOver={(ev) => ev.preventDefault()}
               onDrop={async (ev) => {
                 ev.preventDefault();
-                const list = ev.dataTransfer.files;
-                if (!list?.length) return;
-                const files = await readImportedYamlFiles(list);
-                setImportedFiles(files);
+                const incoming = await readDroppedFiles(ev.dataTransfer);
+                if (!incoming?.length) return;
+                const combined = mergeImportedFiles(importedFiles, incoming);
+                setImportedFiles(combined);
                 setActiveFileIndex(null);
-                const merged = mergeYamlFiles(files);
+                setLeftMode("files");
+                const merged = mergeYamlFiles(combined);
                 setYamlText(merged);
-                applyYaml(merged, files);
+                applyYaml(merged, combined);
               }}
               style={{
                 marginTop: 10,
@@ -301,13 +407,16 @@ function AppInner() {
               role="button"
               tabIndex={0}
             >
-              拖拽多个 `.yaml/.yml` 文件到这里，或点击选择
-              <div style={{ fontSize: 11, color: "#6d28d9", marginTop: 6 }}>
-                多文件会以 <code>---</code> 合并解析
+              <div style={{ fontWeight: 900 }}>导入 YAML 文件 / 文件夹</div>
+              <div style={{ fontSize: 11, color: "#6d28d9", marginTop: 6, lineHeight: 1.35 }}>
+                支持多选文件夹（追加导入、按相对路径去重），多文件会用 <code>---</code> 合并解析
               </div>
               {importedFiles?.length ? (
                 <div style={{ fontSize: 11, color: "#5b21b6", marginTop: 6 }}>
-                  {importedFiles.slice(0, 3).map((f) => f.name).join(", ")}
+                  {importedFiles
+                    .slice(0, 3)
+                    .map((f) => displayPath(f))
+                    .join(", ")}
                   {importedFiles.length > 3 ? `...(+${importedFiles.length - 3})` : ""}
                 </div>
               ) : null}
@@ -318,120 +427,227 @@ function AppInner() {
               type="file"
               accept=".yaml,.yml,.YAML,.YML,text/plain,text/yaml"
               multiple
+              {...({ webkitdirectory: "", directory: "" } as unknown as Record<string, string>)}
               style={{ display: "none" }}
               onChange={async (ev) => {
                 const list = ev.target.files;
                 if (!list?.length) return;
-                const files = await readImportedYamlFiles(list);
-                setImportedFiles(files);
+                const incoming = await readImportedYamlFiles(list);
+                const combined = mergeImportedFiles(importedFiles, incoming);
+                setImportedFiles(combined);
                 setActiveFileIndex(null);
-                const merged = mergeYamlFiles(files);
+                setLeftMode("files");
+                const merged = mergeYamlFiles(combined);
                 setYamlText(merged);
                 ev.target.value = "";
-                applyYaml(merged, files);
+                applyYaml(merged, combined);
               }}
             />
 
             {importedFiles?.length ? (
-              <div style={{ marginTop: 10 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 6,
-                    flexWrap: "wrap",
-                    alignItems: "center",
+              <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveFileIndex(null);
+                    const merged = mergeYamlFiles(importedFiles);
+                    setYamlText(merged);
+                    setLeftMode("yaml");
                   }}
+                  style={{
+                    padding: "7px 10px",
+                    borderRadius: 10,
+                    border: "1px solid #e2e8f0",
+                    background: "#fff",
+                    color: "#334155",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    fontWeight: 800,
+                    flex: 1,
+                  }}
+                  title="图表解析默认按合并视图；这里可快速切换到合并后的 YAML"
                 >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveFileIndex(null);
-                      const merged = mergeYamlFiles(importedFiles);
-                      setYamlText(merged);
-                    }}
-                    style={{
-                      padding: "6px 10px",
-                      borderRadius: 999,
-                      border: "1px solid " + (activeFileIndex === null ? "#4f46e5" : "#e2e8f0"),
-                      background: activeFileIndex === null ? "#eef2ff" : "#fff",
-                      color: activeFileIndex === null ? "#3730a3" : "#334155",
-                      cursor: "pointer",
-                      fontSize: 12,
-                      fontWeight: 700,
-                    }}
-                    title="查看合并后的内容（解析也以合并为准）"
-                  >
-                    合并视图（{importedFiles.length}）
-                  </button>
-                  {importedFiles.map((f, idx) => {
-                    const active = activeFileIndex === idx;
-                    return (
-                      <button
-                        key={f.name + idx}
-                        type="button"
-                        onClick={() => {
-                          setActiveFileIndex(idx);
-                          setYamlText(f.text);
-                        }}
-                        style={{
-                          padding: "6px 10px",
-                          borderRadius: 999,
-                          border: "1px solid " + (active ? "#7c3aed" : "#e2e8f0"),
-                          background: active ? "#f5f3ff" : "#fff",
-                          color: active ? "#6d28d9" : "#334155",
-                          cursor: "pointer",
-                          fontSize: 12,
-                          fontWeight: 600,
-                          maxWidth: 240,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                        title={f.name}
-                      >
-                        {f.name}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div style={{ marginTop: 6, fontSize: 11, color: "#64748b" }}>
-                  当前仅切换左侧内容；图表解析默认按“合并视图”进行（点上方按钮或导入时会刷新）。
-                </div>
+                  查看合并 YAML
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImportedFiles(null);
+                    setActiveFileIndex(null);
+                    setYamlText(SAMPLE);
+                    setParsedMsg(null);
+                    setLeftMode("yaml");
+                    applyYaml(SAMPLE, null);
+                  }}
+                  style={{
+                    padding: "7px 10px",
+                    borderRadius: 10,
+                    border: "1px solid rgba(239,68,68,0.25)",
+                    background: "rgba(254,242,242,0.9)",
+                    color: "#b91c1c",
+                    cursor: "pointer",
+                    fontSize: 12,
+                    fontWeight: 900,
+                  }}
+                  title="清空导入并恢复示例"
+                >
+                  清空
+                </button>
               </div>
             ) : null}
           </div>
-          <textarea
-            value={yamlText}
-            onChange={(e) => {
-              const next = e.target.value;
-              setYamlText(next);
-              // If user is editing a specific imported file tab, keep it in sync so merged parse is correct.
-              if (importedFiles && activeFileIndex !== null) {
-                setImportedFiles((prev) => {
-                  if (!prev) return prev;
-                  if (activeFileIndex < 0 || activeFileIndex >= prev.length) return prev;
-                  const copy = [...prev];
-                  copy[activeFileIndex] = { ...copy[activeFileIndex]!, text: next };
-                  return copy;
-                });
-              }
-              // If editing merged view while imported files exist, we treat textarea as the merged source of truth.
-            }}
-            spellCheck={false}
-            style={{
-              flex: 1,
-              minHeight: 200,
-              width: "100%",
-              padding: 12,
-              border: "none",
-              resize: "none",
-              fontFamily:
-                'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
-              fontSize: 12,
-              lineHeight: 1.45,
-              outline: "none",
-            }}
-          />
+          {leftMode === "files" ? (
+            <div style={{ flex: 1, minHeight: 0, padding: 10 }}>
+              {importedFiles?.length ? (
+                <div
+                  style={{
+                    height: "100%",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 12,
+                    overflow: "hidden",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: "10px 10px",
+                      borderBottom: "1px solid #f1f5f9",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      background: "#fff",
+                    }}
+                  >
+                    <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>
+                      文件列表
+                    </div>
+                    <div style={{ fontSize: 11, color: "#64748b" }}>
+                      点击仅切换左侧内容；图表以“合并视图”解析
+                    </div>
+                  </div>
+                  <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "#fff" }}>
+                    {importedFiles.map((f, idx) => {
+                      const active = activeFileIndex === idx;
+                      const p = displayPath(f);
+                      const folderHint = f.relPath ? displayFolderHint(f.relPath) : "";
+                      return (
+                        <div
+                          key={p + idx}
+                          onClick={() => {
+                            setActiveFileIndex(idx);
+                            setYamlText(f.text);
+                            setLeftMode("yaml");
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          title={p}
+                          style={{
+                            padding: "10px 10px",
+                            borderBottom: "1px solid #f1f5f9",
+                            cursor: "pointer",
+                            background: active ? "#eef2ff" : "#fff",
+                            display: "flex",
+                            alignItems: "baseline",
+                            gap: 8,
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: 999,
+                              background: active ? "#4f46e5" : "#cbd5e1",
+                              flexShrink: 0,
+                              marginTop: 4,
+                            }}
+                          />
+                          <div style={{ minWidth: 0 }}>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 900,
+                                color: "#0f172a",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                maxWidth: 320,
+                              }}
+                            >
+                              {f.name}
+                            </div>
+                            {folderHint ? (
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: "#64748b",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                  maxWidth: 320,
+                                }}
+                              >
+                                {folderHint}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    height: "100%",
+                    border: "1px dashed #e2e8f0",
+                    borderRadius: 12,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#64748b",
+                    fontSize: 12,
+                    padding: 12,
+                    textAlign: "center",
+                  }}
+                >
+                  尚未导入文件。你可以直接粘贴 YAML，或导入文件/文件夹。
+                </div>
+              )}
+            </div>
+          ) : (
+            <textarea
+              value={yamlText}
+              onChange={(e) => {
+                const next = e.target.value;
+                setYamlText(next);
+                // If user is editing a specific imported file tab, keep it in sync so merged parse is correct.
+                if (importedFiles && activeFileIndex !== null) {
+                  setImportedFiles((prev) => {
+                    if (!prev) return prev;
+                    if (activeFileIndex < 0 || activeFileIndex >= prev.length) return prev;
+                    const copy = [...prev];
+                    copy[activeFileIndex] = { ...copy[activeFileIndex]!, text: next };
+                    return copy;
+                  });
+                }
+              }}
+              spellCheck={false}
+              style={{
+                flex: 1,
+                minHeight: 200,
+                width: "100%",
+                padding: 12,
+                border: "none",
+                resize: "none",
+                fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
+                fontSize: 12,
+                lineHeight: 1.45,
+                outline: "none",
+              }}
+            />
+          )}
         </aside>
         <div ref={flowContainerRef} style={{ flex: 1, minWidth: 0 }}>
           <ReactFlow

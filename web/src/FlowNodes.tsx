@@ -15,6 +15,35 @@ const cardStyle: CSSProperties = {
   boxShadow: "0 2px 8px rgba(15,23,42,0.06)",
 };
 
+const titleRow = (): CSSProperties => ({
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  fontWeight: 800,
+  color: "#0f172a",
+});
+
+const iconDot = (accent: string): CSSProperties => ({
+  width: 10,
+  height: 10,
+  borderRadius: 3,
+  background: accent,
+  boxShadow: `0 0 0 3px ${accent}22`,
+  flexShrink: 0,
+});
+
+const pill = (bg: string, fg: string): CSSProperties => ({
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  fontSize: 11,
+  fontWeight: 800,
+  padding: "2px 8px",
+  borderRadius: 999,
+  background: bg,
+  color: fg,
+});
+
 const meta = (s: CSSProperties = {}): CSSProperties => ({
   fontSize: 11,
   color: "#64748b",
@@ -33,6 +62,8 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
     sourceSummary,
     sourceFiles,
     hint,
+    tierCode,
+    tierHint,
   } = props.data as {
     partitionIndex?: number;
     entryKind?: "Ingress" | "VirtualService" | "HTTPProxy";
@@ -41,6 +72,8 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
     sourceSummary?: string;
     sourceFiles?: string[];
     hint?: string;
+    tierCode?: "01" | "02" | "03";
+    tierHint?: string;
   };
 
   const idx = partitionIndex ?? 1;
@@ -86,6 +119,28 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
         >
           {kindLabel2}：{ingressName ?? "—"}
         </div>
+        {tierCode ? (
+          <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8 }}>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                color: "#0f172a",
+                background: "rgba(15, 23, 42, 0.06)",
+                padding: "2px 8px",
+                borderRadius: 999,
+              }}
+              title={`example tier: ${tierCode}`}
+            >
+              Level {Number(tierCode)}
+            </span>
+            {tierHint ? (
+              <span style={{ ...meta({ marginTop: 0 }), color: "#57534e" }} title={tierHint}>
+                {tierHint}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         <div style={{ ...meta({ marginTop: 2 }), color: "#57534e" }}>
           命名空间：{namespace ?? "—"}
         </div>
@@ -131,22 +186,32 @@ export const IngressNode = memo(function IngressNode(props: NodeProps) {
     kind?: "Ingress" | "VirtualService" | "HTTPProxy";
   };
   const hasTls = tls && tls.length > 0;
+  const accent =
+    kind === "HTTPProxy" ? "#0f766e" : kind === "VirtualService" ? "#0ea5e9" : "#4f46e5";
   return (
-    <div style={{ ...cardStyle, borderLeft: "4px solid #4f46e5" }}>
+    <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}` }}>
       <Handle type="target" position={Position.Left} id="t-left" />
       <Handle type="target" position={Position.Right} id="t-right" />
-      <div style={{ fontWeight: 700, color: "#1e293b" }}>
-        {kind === "VirtualService"
-          ? "VirtualService"
-          : kind === "HTTPProxy"
-            ? "Contour Gateway"
-            : "Ingress"}
+      <div style={titleRow()}>
+        <span style={iconDot(accent)} />
+        <span>
+          {kind === "VirtualService"
+            ? "VirtualService"
+            : kind === "HTTPProxy"
+              ? "Contour Gateway"
+              : "Ingress"}
+        </span>
+        <span style={pill(`${accent}14`, accent)}>
+          {kind === "VirtualService" ? "Istio" : kind === "HTTPProxy" ? "Contour" : "K8s"}
+        </span>
       </div>
-      <div style={{ marginTop: 4, fontWeight: 700, color: "#4f46e5" }}>{label}</div>
+      <div style={{ marginTop: 6, fontWeight: 900, color: accent, wordBreak: "break-word" }}>
+        {label}
+      </div>
       {subtitle ? <div style={meta()}>{subtitle}</div> : null}
       {className ? <div style={meta()}>class: {className}</div> : null}
       {loadBalancerIps && loadBalancerIps.length > 0 ? (
-        <div style={meta({ color: "#0f766e" })}>
+        <div style={meta({ color: "#0f766e", fontWeight: 700 })}>
           LB / status IP: {loadBalancerIps.join(", ")}
         </div>
       ) : null}
@@ -189,15 +254,19 @@ export const HostNode = memo(function HostNode(props: NodeProps) {
     ingressName?: string;
     entryKind?: "Ingress" | "VirtualService" | "HTTPProxy";
   };
+  const accent = "#7c3aed";
   return (
-    <div style={{ ...cardStyle, borderLeft: "4px solid #7c3aed" }}>
+    <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}` }}>
       <Handle type="target" position={Position.Left} />
-      <div style={{ fontWeight: 700, color: "#6d28d9", fontSize: 12 }}>Host</div>
+      <div style={titleRow()}>
+        <span style={iconDot(accent)} />
+        <span>Host</span>
+      </div>
       <div
         style={{
-          marginTop: 4,
+          marginTop: 6,
           wordBreak: "break-all",
-          fontWeight: 700,
+          fontWeight: 900,
           color: "#0f172a",
           fontSize: 14,
         }}
@@ -236,14 +305,20 @@ export const ServiceNode = memo(function ServiceNode(props: NodeProps) {
     backendPort?: number | string;
     istioSubsets?: string[];
   };
+  const accent = "#4f46e5";
   return (
-    <div style={{ ...cardStyle, borderLeft: "4px solid #6366f1" }}>
+    <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}` }}>
       <Handle type="target" position={Position.Left} />
       <Handle type="source" position={Position.Left} id="s-left" />
-      <div style={{ fontWeight: 700, color: "#4338ca", fontSize: 12 }}>Service</div>
-      <div style={{ marginTop: 4, fontWeight: 700, color: "#312e81" }}>{label}</div>
+      <div style={titleRow()}>
+        <span style={iconDot(accent)} />
+        <span>Service</span>
+        {st ? <span style={pill("#eef2ff", "#3730a3")}>{st}</span> : null}
+      </div>
+      <div style={{ marginTop: 6, fontWeight: 900, color: "#0f172a", wordBreak: "break-word" }}>
+        {label}
+      </div>
       {subtitle ? <div style={meta()}>{subtitle}</div> : null}
-      {st ? <div style={meta()}>type: {st}</div> : null}
       {clusterIP ? <div style={meta()}>clusterIP: {clusterIP}</div> : null}
       {istioSubsets?.length ? (
         <div style={{ ...meta({ marginTop: 4 }), color: "#0f766e", fontWeight: 700 }}>
@@ -268,11 +343,16 @@ export const ServiceNode = memo(function ServiceNode(props: NodeProps) {
 
 export const HttpProxyNode = memo(function HttpProxyNode(props: NodeProps) {
   const { label, subtitle } = props.data as { label?: string; subtitle?: string };
+  const accent = "#0f766e";
   return (
-    <div style={{ ...cardStyle, borderLeft: "4px solid #0f766e", background: "#f0fdfa" }}>
+    <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}`, background: "#f0fdfa" }}>
       <Handle type="target" position={Position.Left} />
-      <div style={{ fontWeight: 800, color: "#0f766e", fontSize: 12 }}>HTTPProxy</div>
-      <div style={{ marginTop: 4, fontWeight: 800, color: "#064e3b" }}>{label ?? "—"}</div>
+      <div style={titleRow()}>
+        <span style={iconDot(accent)} />
+        <span>HTTPProxy</span>
+        <span style={pill("#ccfbf1", "#0f766e")}>Contour</span>
+      </div>
+      <div style={{ marginTop: 6, fontWeight: 900, color: "#064e3b" }}>{label ?? "—"}</div>
       {subtitle ? <div style={meta()}>{subtitle}</div> : null}
       <Handle type="source" position={Position.Right} />
     </div>
@@ -289,11 +369,12 @@ export const RouteNode = memo(function RouteNode(props: NodeProps) {
     upstreamServiceName?: string;
     upstreamServicePort?: number | string;
   };
+  const accent = "#6d28d9";
   return (
     <div
       style={{
         ...cardStyle,
-        borderLeft: "4px solid #7c3aed",
+        borderLeft: `5px solid ${accent}`,
         padding: "8px 12px",
         minWidth: 220,
         maxWidth: 340,
@@ -301,11 +382,14 @@ export const RouteNode = memo(function RouteNode(props: NodeProps) {
       }}
     >
       <Handle type="target" position={Position.Left} />
-      <div style={{ fontWeight: 800, color: "#6d28d9", fontSize: 12 }}>Route</div>
+      <div style={titleRow()}>
+        <span style={iconDot(accent)} />
+        <span>Route</span>
+        {pathType ? <span style={pill("#f3e8ff", "#6d28d9")}>{pathType}</span> : null}
+      </div>
       <div style={{ marginTop: 4, fontWeight: 800, color: "#0f172a" }}>
         {path ?? "/"}
       </div>
-      {pathType ? <div style={meta()}>pathType: {pathType}</div> : null}
       <div style={{ ...meta(), marginTop: 4, color: "#4338ca", fontWeight: 700 }}>
         backend: {serviceName} :{String(servicePort ?? "?")}
       </div>
@@ -325,18 +409,20 @@ export const EndpointsNode = memo(function EndpointsNode(props: NodeProps) {
     ports?: { port: number; protocol?: string }[];
     serviceName?: string;
   };
+  const accent = "#0d9488";
   return (
-    <div style={{ ...cardStyle, borderLeft: "4px solid #0d9488" }}>
+    <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}` }}>
       <Handle type="target" position={Position.Left} />
-      <div style={{ fontWeight: 700, color: "#0f766e", fontSize: 12 }}>
-        Endpoints
+      <div style={titleRow()}>
+        <span style={iconDot(accent)} />
+        <span style={{ color: "#0f766e" }}>Endpoints</span>
+        <span style={pill("#ccfbf1", "#0f766e")}>Pod IP</span>
       </div>
       {serviceName ? (
         <div style={{ ...meta(), fontWeight: 600, color: "#115e59" }}>
           service: {serviceName}
         </div>
       ) : null}
-      <div style={{ ...meta(), marginTop: 4, fontWeight: 600 }}>Pod IP</div>
       <ul
         style={{
           margin: "4px 0 0",

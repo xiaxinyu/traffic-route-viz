@@ -1,4 +1,4 @@
-import type { Edge, Node } from "reactflow";
+import { MarkerType, type Edge, type Node } from "reactflow";
 import type { ParseResult } from "./k8sParser";
 
 function resourceKey(ns: string | undefined, name: string): string {
@@ -16,8 +16,6 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   const serviceGap = 210;
   const baseX = 40;
   const baseY = 20;
-  /** Ingress 分区排版：一行最多放 4 个，超出自动换行 */
-  const maxAreasPerRow = 4;
   const areaGapX = 80;
   const areaGapY = 90;
   /** 分区标题区（Ingress 名、命名空间、来源等）高度预留，避免子节点与标题文字重叠 */
@@ -28,6 +26,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   const leftPad = 24;
   const sanitizeId = (v: string) => v.replace(/[^a-zA-Z0-9/_-]/g, "_");
   const edgeType: Edge["type"] = "smoothstep";
+  const arrow = (color: string) => ({ type: MarkerType.ArrowClosed as const, color });
 
   const serviceByKey = new Map<string, (typeof parsed.services)[0]>();
   for (const s of parsed.services) {
@@ -49,7 +48,53 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     if (k === "HTTPProxy") return 90; // Contour Gateway goes to the right side
     return 50;
   };
+
+  const parseExampleTier = (
+    sourceFiles: string[] | undefined,
+  ):
+    | {
+        tierCode: "01" | "02" | "03";
+        tierIndex: 1 | 2 | 3;
+        /** A human-friendly folder hint without 01/02/03 prefix, e.g. "dce5-global / active01" */
+        effectiveFolderHint: string;
+        activeWeight: number;
+      }
+    | null => {
+    const files = sourceFiles ?? [];
+    const pick = files.find(Boolean) ?? "";
+    const segs = pick.split("/").filter(Boolean);
+    const tierSeg = segs.find((s) => /^(0[1-3])[-_]/.test(s));
+    const m = tierSeg?.match(/^(0[1-3])[-_](.+)$/);
+    if (!m) return null;
+    const tierCode = m[1] as "01" | "02" | "03";
+    const tierIndex = (tierCode === "01" ? 1 : tierCode === "02" ? 2 : 3) as 1 | 2 | 3;
+
+    const lower = segs.map((s) => s.toLowerCase());
+    const activeWeight = lower.some((s) => s.includes("active01"))
+      ? 10
+      : lower.some((s) => s.includes("active02"))
+        ? 20
+        : 50;
+
+    const folderSegs = segs.slice(0, -1).map((s) => s.replace(/^(0[1-3])[-_]/, ""));
+    const effectiveFolderHint = folderSegs.join(" / ");
+    return { tierCode, tierIndex, effectiveFolderHint, activeWeight };
+  };
+
+  const hasTieredExample = parsed.ingresses.some((ing) => !!parseExampleTier(ing.sourceFiles));
+
   const orderedIngresses = [...parsed.ingresses].sort((a, b) => {
+    if (hasTieredExample) {
+      const ta = parseExampleTier(a.sourceFiles);
+      const tb = parseExampleTier(b.sourceFiles);
+      const tw = (ta?.tierIndex ?? 99) - (tb?.tierIndex ?? 99);
+      if (tw !== 0) return tw;
+      const aw = (ta?.activeWeight ?? 99) - (tb?.activeWeight ?? 99);
+      if (aw !== 0) return aw;
+      const fa = (ta?.effectiveFolderHint ?? "").localeCompare(tb?.effectiveFolderHint ?? "");
+      if (fa !== 0) return fa;
+    }
+
     const dw = kindWeight(a.kind) - kindWeight(b.kind);
     if (dw !== 0) return dw;
     const ans = (a.namespace ?? "").localeCompare(b.namespace ?? "");
@@ -83,12 +128,16 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   // Used for cross-area wiring like "Ingress Service -> Contour Gateway".
   const globalServiceNodeIdByKey = new Map<string, { nodeId: string; ownerKind: string }>();
   const pendingServiceToGatewayEdges: { serviceKey: string; gatewayNodeId: string }[] = [];
-  // Grid placement cursors (avoid "flowing" infinite horizontal layout)
-  let rowIdx = 0;
-  let colIdx = 0;
-  let cursorX = baseX;
-  let cursorY = baseY;
-  let rowMaxH = 0;
+  // Placement cursors:
+  // - If files are imported as a tiered folder (01/02/03), use 3 fixed columns and stack vertically.
+  // - Otherwise fall back to a simple multi-column grid.
+  const lanePitchX = Math.round(col * 7.2) + areaGapX; // wide enough for a full region chain + comfortable edges
+  const laneY: Record<1 | 2 | 3, number> = { 1: baseY, 2: baseY, 3: baseY };
+  const fallbackMaxAreasPerRow = 4;
+  let fallbackColIdx = 0;
+  let fallbackCursorX = baseX;
+  let fallbackCursorY = baseY;
+  let fallbackRowMaxH = 0;
 
   for (const ing of orderedIngresses) {
     const iid = ingId(ing.kind, ing.namespace, ing.name);
@@ -97,6 +146,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     const isContourGateway = ing.kind === "HTTPProxy";
 
     const sourceFiles = ing.sourceFiles ?? [];
+    const tier = parseExampleTier(sourceFiles);
     const sourceSummary =
       sourceFiles.length > 0
         ? `来源文件：${sourceFiles.join("，")}`
@@ -125,6 +175,8 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         namespace: ing.namespace ?? "—",
         sourceSummary,
         sourceFiles,
+        tierCode: tier?.tierCode,
+        tierHint: tier?.effectiveFolderHint,
       },
       style: {
         width: ingressBlockMinW,
@@ -190,6 +242,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         style: { stroke: "#0f766e" },
         labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
         labelBgStyle: { fill: "#ccfbf1", fillOpacity: 0.92 },
+        markerEnd: arrow("#0f766e"),
       });
     }
 
@@ -236,6 +289,8 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         target: hid,
         type: edgeType,
         animated: true,
+        style: { stroke: "#7c3aed", strokeWidth: 2 },
+        markerEnd: arrow("#7c3aed"),
       });
 
       const hostRoutes = ingressRoutes
@@ -273,7 +328,8 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           source: hid,
           target: routeId,
           type: edgeType,
-          style: { stroke: "#7c3aed" },
+          style: { stroke: "#7c3aed", strokeWidth: 2 },
+          markerEnd: arrow("#7c3aed"),
         });
 
         const svcNs = r.serviceNamespace ?? r.ingressNs;
@@ -294,9 +350,10 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           target: serviceIdByKey.get(svcScoped)!,
           type: edgeType,
           label: `→ :${String(r.servicePort)}`,
-          style: { stroke: "#6366f1" },
+          style: { stroke: "#4f46e5", strokeWidth: 2.25 },
           labelStyle: { fontSize: 11, fill: "#334155", fontWeight: 500 },
           labelBgStyle: { fill: "#e0e7ff", fillOpacity: 0.95 },
+          markerEnd: arrow("#4f46e5"),
         });
       });
     });
@@ -368,7 +425,8 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           target: eid,
           type: edgeType,
           label: "Pod IP",
-          style: { stroke: "#0d9488" },
+          style: { stroke: "#0d9488", strokeWidth: 2.25 },
+          markerEnd: arrow("#0d9488"),
         });
       }
     }
@@ -388,17 +446,24 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       const w = Math.max(ingressBlockMinW, Math.ceil(maxX + leftPad));
       region.style = { ...(region.style ?? {}), height: h, width: w };
 
-      // ---- Grid placement (max 4 areas per row; auto-wrap) ----
-      region.position = { x: cursorX, y: cursorY };
-      rowMaxH = Math.max(rowMaxH, h);
-      cursorX += w + areaGapX;
-      colIdx += 1;
-      if (colIdx >= maxAreasPerRow) {
-        colIdx = 0;
-        rowIdx += 1;
-        cursorX = baseX;
-        cursorY += rowMaxH + areaGapY;
-        rowMaxH = 0;
+      if (hasTieredExample && tier) {
+        // ---- Tier lanes: 01 -> left, 02 -> middle, 03 -> right; one area per row in each lane ----
+        const x = baseX + (tier.tierIndex - 1) * lanePitchX;
+        const y = laneY[tier.tierIndex];
+        region.position = { x, y };
+        laneY[tier.tierIndex] += h + areaGapY;
+      } else {
+        // ---- Fallback grid placement (max 4 areas per row; auto-wrap) ----
+        region.position = { x: fallbackCursorX, y: fallbackCursorY };
+        fallbackRowMaxH = Math.max(fallbackRowMaxH, h);
+        fallbackCursorX += w + areaGapX;
+        fallbackColIdx += 1;
+        if (fallbackColIdx >= fallbackMaxAreasPerRow) {
+          fallbackColIdx = 0;
+          fallbackCursorX = baseX;
+          fallbackCursorY += fallbackRowMaxH + areaGapY;
+          fallbackRowMaxH = 0;
+        }
       }
     }
   }
@@ -415,9 +480,10 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       targetHandle: "t-left",
       type: edgeType,
       label: "Contour Gateway",
-      style: { stroke: "#0f766e", strokeDasharray: "6 4" },
+      style: { stroke: "#0f766e", strokeWidth: 2.25, strokeDasharray: "6 4" },
       labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
       labelBgStyle: { fill: "#ccfbf1", fillOpacity: 0.92 },
+      markerEnd: arrow("#0f766e"),
     });
   }
 
