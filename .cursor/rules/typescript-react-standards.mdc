@@ -1,0 +1,15 @@
+---
+description: TypeScript + React code standards for web/
+globs: web/src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# TypeScript + React standards (web/)
+
+- Prefer small pure helpers; keep parsing, graph building, and UI concerns separated.
+- Keep types explicit at module boundaries (`ParseResult`, node `data` shapes).
+- Avoid O(n^2) scans like `nodes.some(...)` in hot loops when input grows; use maps/sets.
+- Keep UI state predictable:
+  - Derived graph state comes from `parseK8sYaml(text)` + `buildFlowGraph(parsed)`
+  - File import updates text + triggers refresh
+- Keep components simple and readable; use consistent typography for “primary vs secondary” fields.

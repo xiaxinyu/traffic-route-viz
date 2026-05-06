@@ -1,0 +1,27 @@
+---
+description: UX/layout standards for the visualization tool
+globs: web/src/**/*.{ts,tsx,css}
+alwaysApply: false
+---
+
+# Web visualization UX/layout standards
+
+## Import experience
+
+- Multi-file upload must support: click-select + drag-drop, and should auto-refresh graph after import.
+- Show import state (file count + short list of names).
+- Keep left panel actions minimal; avoid “extra clicks”.
+
+## Layout readability (must)
+
+- Multiple ingresses must be clearly separated (partition/swimlane). Never merge nodes across ingresses if it breaks ownership clarity.
+- Avoid heavy overlaps on initial load; keep generous vertical spacing.
+- Prefer a visible region background per ingress (group/region block with subtle tint + border + title).
+- If there are many routes, prefer a dedicated Route node per path (Host → Route → Service) instead of stacking edge labels.
+
+## Node content (must)
+
+- Ingress: name, ns, class, LB/status IP, TLS blocks (secret + hosts)
+- Host: host, ingress name, TLS secret match (or explicit “no TLS”)
+- Service: name, ns, type, clusterIP, spec ports, ingress backend port
+- Endpoints: service context, pod IPs, port/protocol
