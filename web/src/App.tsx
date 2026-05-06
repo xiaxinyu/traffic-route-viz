@@ -198,42 +198,45 @@ function AppInner() {
           background: "#f8fafc",
           display: "flex",
           alignItems: "center",
+          justifyContent: "space-between",
           gap: 12,
-          flexWrap: "wrap",
         }}
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 260 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
             <strong style={{ color: "#0f172a", fontSize: 14 }}>
               Traffic Route Viz
             </strong>
             <span style={{ fontSize: 12, color: "#475569", fontWeight: 700 }}>
-              Kubernetes Ingress 流量拓扑可视化
+              通用 Traffic 拓扑可视化（Kubernetes / Istio / Contour）
             </span>
           </div>
           <span style={{ fontSize: 11, color: "#64748b" }}>
-            Ingress → Host → Route → Service → Endpoints
+            Entry → Host → Route → Service → Endpoints
           </span>
         </div>
-        <button
-          type="button"
-          onClick={() => applyYaml(mergedImportedText ?? yamlText)}
-          style={{
-            padding: "8px 14px",
-            borderRadius: 8,
-            border: "none",
-            background: "#4f46e5",
-            color: "#fff",
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          解析并刷新图表
-        </button>
-        <span style={{ fontSize: 12, color: "#64748b" }}>
-          画布: 从节点圆点拖线可手写连线（灰虚线）；右上可导出 PNG / 保存
-          *.traffic-viz.json 画图文件；紫底分区与卡片可拖拽。
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: "#64748b", whiteSpace: "nowrap" }}>
+            手写连线 / PNG / 保存打开（右上“操作”）
+          </span>
+          <button
+            type="button"
+            onClick={() => applyYaml(mergedImportedText ?? yamlText)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 999,
+              border: "none",
+              background: "#4f46e5",
+              color: "#fff",
+              fontWeight: 700,
+              cursor: "pointer",
+              boxShadow: "0 2px 10px rgba(15,23,42,0.12)",
+            }}
+            title="重新解析 YAML 并刷新拓扑"
+          >
+            刷新拓扑
+          </button>
+        </div>
       </header>
       {parsedMsg ? (
         <div

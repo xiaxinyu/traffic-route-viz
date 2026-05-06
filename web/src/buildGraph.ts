@@ -42,8 +42,23 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     `ing-${kind.toLowerCase()}-${resourceKey(ns, name).replace(/[^a-zA-Z0-9/_-]/g, "_")}`;
 
   // ---- Layout: partition by ingress, then by host, then by route list ----
+  // Area ordering must be stable and user-friendly: business entries first, gateway config last.
+  const kindWeight = (k: string): number => {
+    if (k === "Ingress") return 10;
+    if (k === "VirtualService") return 20;
+    if (k === "HTTPProxy") return 90; // Contour Gateway goes to the right side
+    return 50;
+  };
+  const orderedIngresses = [...parsed.ingresses].sort((a, b) => {
+    const dw = kindWeight(a.kind) - kindWeight(b.kind);
+    if (dw !== 0) return dw;
+    const ans = (a.namespace ?? "").localeCompare(b.namespace ?? "");
+    if (ans !== 0) return ans;
+    return a.name.localeCompare(b.name);
+  });
+
   const ingressIndexById = new Map<string, number>();
-  parsed.ingresses.forEach((ing, idx) => {
+  orderedIngresses.forEach((ing, idx) => {
     ingressIndexById.set(ingId(ing.kind, ing.namespace, ing.name), idx);
   });
 
@@ -75,7 +90,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   let cursorY = baseY;
   let rowMaxH = 0;
 
-  for (const ing of parsed.ingresses) {
+  for (const ing of orderedIngresses) {
     const iid = ingId(ing.kind, ing.namespace, ing.name);
     // We still use the stable ingressIndex for partitionIndex label, but placement is grid-based.
     const blockIdx = ingressIndexById.get(iid) ?? 0;
@@ -122,14 +137,15 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     }) as unknown as number) - 1;
 
     // Ingress / VirtualService / Contour Gateway node (child of region — moves with partition drag)
-    // Principle: for Contour Gateway areas, gateway stays on the far right; its children stay on the left.
+    // For Contour Gateway areas we enforce a strict left-to-right reading chain:
+    // Contour Gateway -> HTTPProxy -> Host -> Route -> Service(upstream) -> Endpoints(Pod IP)
     const contour = {
-      gatewayX: leftPad + col * 5.05,
-      httpProxyX: leftPad,
-      hostX: leftPad + col * 1.08,
-      routeX: leftPad + col * 2.10,
-      serviceX: leftPad + col * 3.10,
-      endpointsX: leftPad + col * 4.05,
+      gatewayX: leftPad,
+      httpProxyX: leftPad + col * 1.15,
+      hostX: leftPad + col * 2.25,
+      routeX: leftPad + col * 3.30,
+      serviceX: leftPad + col * 4.25,
+      endpointsX: leftPad + col * 5.20,
     };
 
     nodes.push({
@@ -184,6 +200,10 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
 
     let maxY = layoutOriginY + 200;
     let maxX = leftPad + 260;
+    // Ensure region width always includes the whole Contour Gateway chain.
+    if (isContourGateway) {
+      maxX = Math.max(maxX, contour.httpProxyX + cardMaxW);
+    }
 
     // 1) Place hosts + routes (a clean vertical list per host)
     hosts.forEach((host, hostIdx) => {

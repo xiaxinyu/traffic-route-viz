@@ -119,6 +119,19 @@
 
 ## 7. Canvas Harness（React Flow · 单一事实来源）
 
+### 7.0 画布原则清单（必须，供评审/回归快速核对）
+
+以下为本项目在多轮迭代中沉淀出的**硬原则**。任何布局/解析/节点语义变更，均不得破坏这些原则；若确需调整，必须同步更新本条款与实现并给出理由。
+
+- **通用 Traffic 可视化定位**：面向 Kubernetes / Istio / Contour 的流量拓扑，不局限于 Ingress。
+- **Area（分区）呈现**：一行最多 4 个 Area，超出自动换行；Area 宽高应按内容动态扩展，避免内容溢出遮挡。
+- **文件名绑定**：导入文件后，Area 页眉必须展示来源文件名（不可出现“未绑定”状态）。
+- **手写边**：允许手柄拖线；手写边视觉区分（灰虚线）且在解析刷新后只要两端仍存在就应保留。
+- **第三方导出**：提供 PNG；并支持导出 Mermaid / draw.io 以便第三方工具打开（画图会话文件为 React Flow JSON）。
+- **Contour Gateway 强制原则**：
+  - **链路**：Ingress → Service → Contour Gateway（跨 Area 连线也必须稳定出现，不能因构图顺序缺失）。
+  - **布局**：Contour Gateway Area 内部组件顺序必须为：Contour Gateway → HTTPProxy → Host → Route → 上游 Service → Endpoints（Pod IP）。
+
 ### 7.1 页面结构
 
 - 左侧：YAML 输入/导入
@@ -158,7 +171,9 @@
 - **原则链路**：Ingress → Service → Contour Gateway  
   - 解释：Ingress 分区中出现的 gateway Service（例如 `envoy-rbac-gateway-gtw`）必须通过一条边连接到 Contour Gateway 分区内的 Contour Gateway 节点。
   - 该边为**跨 Area 连线**时必须稳定出现：构图顺序不能影响其生成（必要时延迟补边）。
-- **布局原则**：Contour Gateway 节点始终放在其 Area 的**最右侧**；其子节点（HTTPProxy/Host/Route/上游 Service/Endpoints）集中放在该 Area 的**最左侧**，以形成“右锚点”的阅读方向。
+- **布局原则**（必须）：Contour Gateway Area 内部严格按以下顺序排布（从左到右）：  
+  **Contour Gateway → HTTPProxy → Host → Route → 上游 Service → Endpoints（Pod IP）**  
+  该顺序用于确保读图的一致性与可解释性，禁止改回“流式/随意摆放”。
 
 ### 7.5 拖拽策略（必须）
 

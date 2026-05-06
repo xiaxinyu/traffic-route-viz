@@ -25,7 +25,8 @@ alwaysApply: false
 - Prefer a visible region background per ingress (group/region block with subtle tint + border + title).
 - If there are many routes, prefer a dedicated Route node per path (Host → Route → Service) instead of stacking edge labels.
 - Areas should use a non-flow layout: **at most 4 areas per row**, auto-wrap to multiple rows, and area height/width should expand to fit content.
-- Contour Gateway principle (must): **Ingress → Service → Contour Gateway** must be represented, and Contour Gateway node must be **right-anchored** within its Area while its children stay on the **left**.
+- Contour Gateway principle (must): **Ingress → Service → Contour Gateway** must be represented.
+- Contour Gateway layout (must): inside its Area, keep strict left-to-right order: **Contour Gateway → HTTPProxy → Host → Route → Service → Endpoints**.
 
 ## Node content (must)
 
