@@ -8,15 +8,24 @@ function resourceKey(ns: string | undefined, name: string): string {
 export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
-  const col = 300;
-  // Bigger spacing for readability (Host/Service stacks).
-  const hostGap = 170;
-  const routeGap = 64;
-  const serviceGap = 150;
+  // Spacing tuned for readability: keep lines visible even with many nodes.
+  // Increase horizontal spacing aggressively so edges are clearly visible.
+  const col = 440;
+  const hostGap = 220;
+  const routeGap = 84;
+  const serviceGap = 210;
   const baseX = 40;
+  const baseY = 20;
+  /** Ingress 分区排版：一行最多放 4 个，超出自动换行 */
+  const maxAreasPerRow = 4;
+  const areaGapX = 80;
+  const areaGapY = 90;
   /** 分区标题区（Ingress 名、命名空间、来源等）高度预留，避免子节点与标题文字重叠 */
   const regionHeaderReserveY = 168;
-  const ingressBlockW = col * 4;
+  const ingressBlockMinW = Math.round(col * 4.2);
+  /** 右侧 Endpoints 卡片宽度上界（用于估算区域宽度） */
+  const cardMaxW = 360;
+  const leftPad = 24;
   const sanitizeId = (v: string) => v.replace(/[^a-zA-Z0-9/_-]/g, "_");
   const edgeType: Edge["type"] = "smoothstep";
 
@@ -55,15 +64,23 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   };
 
   let edgeIdx = 0;
+  // Grid placement cursors (avoid "flowing" infinite horizontal layout)
+  let rowIdx = 0;
+  let colIdx = 0;
+  let cursorX = baseX;
+  let cursorY = baseY;
+  let rowMaxH = 0;
+
   for (const ing of parsed.ingresses) {
     const iid = ingId(ing.namespace, ing.name);
+    // We still use the stable ingressIndex for partitionIndex label, but placement is grid-based.
     const blockIdx = ingressIndexById.get(iid) ?? 0;
-    const blockX = baseX + blockIdx * ingressBlockW;
 
+    const sourceFiles = ing.sourceFiles ?? [];
     const sourceSummary =
-      ing.sourceFiles && ing.sourceFiles.length
-        ? `配置来源（YAML 文件）：${ing.sourceFiles.join("，")}`
-        : "配置来源：当前为编辑器内 YAML 文本（未绑定本地文件名）";
+      sourceFiles.length > 0
+        ? `来源文件：${sourceFiles.join("，")}`
+        : "来源文件：当前为编辑器内 YAML 文本（未绑定本地文件名）";
 
     const ingressRoutes = routesByIngress.get(iid) ?? [];
     // Order hosts by name for stability
@@ -73,33 +90,30 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
 
     // Region panel first: children use parentNode so dragging the panel moves everything.
     const regionId = `region-${sanitizeId(iid)}`;
-    const regionPos = { x: blockX - 24, y: 20 };
-    /** 画布绝对 Y：整行拓扑起点，落在分区标题栏之下 */
-    const layoutOriginY = regionPos.y + regionHeaderReserveY;
-    const absToRel = (ax: number, ay: number) => ({
-      x: ax - regionPos.x,
-      y: ay - regionPos.y,
-    });
+    // Child nodes are positioned relative to the region.
+    const layoutOriginY = regionHeaderReserveY;
 
-    nodes.push({
+    const regionNodeIdx =
+      (nodes.push({
       id: regionId,
       type: "ingressRegion",
-      position: regionPos,
+      position: { x: 0, y: 0 }, // set later by grid placement
       data: {
         partitionIndex: blockIdx + 1,
         ingressName: ing.name,
         namespace: ing.namespace ?? "—",
         sourceSummary,
+        sourceFiles,
       },
       style: {
-        width: ingressBlockW - 24,
+        width: ingressBlockMinW,
         height: 760,
         padding: 0,
         borderRadius: 16,
       },
       selectable: true,
       draggable: true,
-    });
+    }) as unknown as number) - 1;
 
     // Ingress node (child of region — moves with partition drag)
     nodes.push({
@@ -108,7 +122,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       parentNode: regionId,
       extent: "parent",
       draggable: true,
-      position: absToRel(blockX, layoutOriginY),
+      position: { x: leftPad, y: layoutOriginY },
       data: {
         label: ing.name,
         subtitle: ing.namespace ? `namespace: ${ing.namespace}` : undefined,
@@ -124,6 +138,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     const endpointIdByKey = new Map<string, string>();
 
     let maxY = layoutOriginY + 200;
+    let maxX = leftPad + 260;
 
     // 1) Place hosts + routes (a clean vertical list per host)
     hosts.forEach((host, hostIdx) => {
@@ -138,13 +153,15 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         ingressRoutes.find((r) => r.host === host && r.tlsSecretName)?.tlsSecretName ??
         undefined;
 
+      const hostX = leftPad + col * 1.12;
+      maxX = Math.max(maxX, hostX + cardMaxW);
       nodes.push({
         id: hid,
         type: "host",
         parentNode: regionId,
         extent: "parent",
         draggable: true,
-        position: absToRel(blockX + col, hostY),
+        position: { x: hostX, y: hostY },
         data: { label: host, tlsSecretName, ingressName: ing.name },
       });
 
@@ -167,13 +184,15 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           `${r.path}-${String(r.servicePort)}-${r.serviceName}`,
         )}-${routeIdx}`;
 
+        const routeX = leftPad + col * 2.05;
+        maxX = Math.max(maxX, routeX + cardMaxW);
         nodes.push({
           id: routeId,
           type: "route",
           parentNode: regionId,
           extent: "parent",
           draggable: true,
-          position: absToRel(blockX + col * 1.55, routeY),
+          position: { x: routeX, y: routeY },
           data: {
             path: r.path,
             pathType: r.pathType,
@@ -230,13 +249,15 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       maxY = Math.max(maxY, svcY);
 
       const si = serviceByKey.get(s.skey);
+      const svcX = leftPad + col * 3.1;
+      maxX = Math.max(maxX, svcX + cardMaxW);
       nodes.push({
         id: s.sid,
         type: "service",
         parentNode: regionId,
         extent: "parent",
         draggable: true,
-        position: absToRel(blockX + col * 2.35, svcY),
+        position: { x: svcX, y: svcY },
         data: {
           label: s.name,
           subtitle: s.ns ? `namespace: ${s.ns}` : undefined,
@@ -250,13 +271,15 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       if (ep?.addresses?.length) {
         const eid = `ep-${sanitizeId(`${iid}::${s.skey}`)}`;
         endpointIdByKey.set(s.skey, eid);
+        const epX = leftPad + col * 4.22;
+        maxX = Math.max(maxX, epX + cardMaxW);
         nodes.push({
           id: eid,
           type: "endpoints",
           parentNode: regionId,
           extent: "parent",
           draggable: true,
-          position: absToRel(blockX + col * 3.15, svcY),
+          position: { x: epX, y: svcY },
           data: {
             label: "Endpoints",
             serviceName: s.name,
@@ -276,10 +299,24 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     }
 
     // 3) Resize region to fit content
-    const region = nodes.find((n) => n.id === regionId);
+    const region = nodes[regionNodeIdx];
     if (region) {
-      const h = Math.max(760, maxY - 10);
-      region.style = { ...(region.style ?? {}), height: h };
+      const h = Math.max(760, maxY + 22);
+      const w = Math.max(ingressBlockMinW, Math.ceil(maxX + leftPad));
+      region.style = { ...(region.style ?? {}), height: h, width: w };
+
+      // ---- Grid placement (max 4 areas per row; auto-wrap) ----
+      region.position = { x: cursorX, y: cursorY };
+      rowMaxH = Math.max(rowMaxH, h);
+      cursorX += w + areaGapX;
+      colIdx += 1;
+      if (colIdx >= maxAreasPerRow) {
+        colIdx = 0;
+        rowIdx += 1;
+        cursorX = baseX;
+        cursorY += rowMaxH + areaGapY;
+        rowMaxH = 0;
+      }
     }
   }
 

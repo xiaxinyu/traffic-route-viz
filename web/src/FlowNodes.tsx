@@ -30,16 +30,19 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
     ingressName,
     namespace,
     sourceSummary,
+    sourceFiles,
     hint,
   } = props.data as {
     partitionIndex?: number;
     ingressName?: string;
     namespace?: string;
     sourceSummary?: string;
+    sourceFiles?: string[];
     hint?: string;
   };
 
   const idx = partitionIndex ?? 1;
+  const files = (sourceFiles ?? []).filter(Boolean);
 
   return (
     <div
@@ -78,10 +81,25 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
         <div style={{ ...meta({ marginTop: 2 }), color: "#57534e" }}>
           命名空间：{namespace ?? "—"}
         </div>
-        {sourceSummary ? (
-          <div style={{ ...meta({ marginTop: 4 }), color: "#57534e" }}>
-            {sourceSummary}
+        {files.length > 0 ? (
+          <div style={{ ...meta({ marginTop: 6 }), color: "#57534e" }}>
+            <span style={{ fontWeight: 700 }}>来源文件：</span>
+            <span
+              style={{
+                display: "inline-block",
+                maxWidth: 520,
+                verticalAlign: "top",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={files.join("，")}
+            >
+              {files.join("，")}
+            </span>
           </div>
+        ) : sourceSummary ? (
+          <div style={{ ...meta({ marginTop: 6 }), color: "#57534e" }}>{sourceSummary}</div>
         ) : null}
         {hint ? (
           <div style={{ ...meta({ marginTop: 4 }), color: "#6b7280" }}>{hint}</div>

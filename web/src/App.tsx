@@ -166,10 +166,11 @@ function AppInner() {
   );
 
   const applyYaml = useCallback(
-    (overrideText?: string) => {
+    (overrideText?: string, importedFilesOverride?: ImportedYamlFile[] | null) => {
       const src = overrideText ?? yamlText;
-      const p = importedFiles?.length
-        ? mergeParseResults(importedFiles.map((f) => parseK8sYaml(f.text, f.name)))
+      const effectiveFiles = importedFilesOverride ?? importedFiles;
+      const p = effectiveFiles?.length
+        ? mergeParseResults(effectiveFiles.map((f) => parseK8sYaml(f.text, f.name)))
         : parseK8sYaml(src);
       const err = p.errors.length ? p.errors.join("\n") : null;
       setParsedMsg(err);
@@ -279,7 +280,7 @@ function AppInner() {
                 setActiveFileIndex(null);
                 const merged = mergeYamlFiles(files);
                 setYamlText(merged);
-                applyYaml(merged);
+                applyYaml(merged, files);
               }}
               style={{
                 marginTop: 10,
@@ -322,7 +323,7 @@ function AppInner() {
                 const merged = mergeYamlFiles(files);
                 setYamlText(merged);
                 ev.target.value = "";
-                applyYaml(merged);
+                applyYaml(merged, files);
               }}
             />
 

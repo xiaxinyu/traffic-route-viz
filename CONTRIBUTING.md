@@ -12,8 +12,8 @@ npm run dev
 
 ## 需求与验收
 
-- 所有可视化/布局/导入体验改动必须符合：`ENGINEERING_REQUIREMENTS.md`
-- 改动前先读：`VIBE_CODING.md`（含目录、命令、已知陷阱）
+- 所有可视化/布局/导入体验改动必须符合：`HARNESS_ENGINEERING.md`
+- 改动前先读：`PROJECT_GUIDE.md`（含目录、命令、已知陷阱）
 
 ## 提交前检查
 

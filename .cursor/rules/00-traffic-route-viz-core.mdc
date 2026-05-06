@@ -7,12 +7,12 @@ alwaysApply: true
 
 ## Must read (source of truth)
 
-- `ENGINEERING_REQUIREMENTS.md`（需求、UX、**画布 Harness**、DoD）
-- `VIBE_CODING.md` (workflow, repo map, common commands)
+- `HARNESS_ENGINEERING.md`（需求、UX、**画布 Harness**、DoD）
+- `PROJECT_GUIDE.md`（workflow, repo map, common commands）
 
 ## Working agreement
 
-- Treat `ENGINEERING_REQUIREMENTS.md` as acceptance criteria. If behavior conflicts, update code **and** update the doc in the same change.
+- Treat `HARNESS_ENGINEERING.md` as acceptance criteria. If behavior conflicts, update code **and** update the doc in the same change.
 - Prefer small, reviewable changes. After meaningful edits, ensure `web/` builds (`npm run build`) and no new lints.
 - Keep changes aligned with current architecture:
   - Parse: `web/src/k8sParser.ts`
