@@ -145,7 +145,8 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   // serviceKey(ns/name) -> gateway candidates (since many VS may reference the same gateway)
   const globalIstioGatewayCandidatesByServiceKey = new Map<string, IstioGatewayCandidate[]>();
   // serviceKey(ns/name) -> aggregated ingress tokens that route to that gateway-service
-  const globalIngressTokensByGatewayServiceKey = new Map<string, Set<string>>();
+  // gateway serviceKey(ns/name) -> path tokens extracted from ingress routes to that service
+  const globalIngressPathTokensByGatewayServiceKey = new Map<string, Set<string>>();
 
   // NOTE: For Istio Gateway matching we only split by "/" (path-native structure).
   // Do NOT split by other characters, to avoid introducing noisy tokens.
@@ -269,12 +270,10 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       for (const r of ingressRoutes) {
         const svcNs = r.serviceNamespace ?? r.ingressNs;
         const skey = resourceKey(svcNs, r.serviceName);
-        // For ingress routing, the best keywords usually live in host + path.
-        const s = globalIngressTokensByGatewayServiceKey.get(skey) ?? new Set<string>();
-        addTokens(s, tokenize(r.host));
+        // For ingress -> gateway matching, use ONLY path-native tokens split by "/".
+        const s = globalIngressPathTokensByGatewayServiceKey.get(skey) ?? new Set<string>();
         addTokens(s, tokenize(r.path));
-        addTokens(s, tokenize(ing.name));
-        globalIngressTokensByGatewayServiceKey.set(skey, s);
+        globalIngressPathTokensByGatewayServiceKey.set(skey, s);
       }
     }
 
@@ -290,10 +289,8 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       const gwX = leftPad;
       let gwY = layoutOriginY + 6;
       const vsTokens = new Set<string>();
-      // VS keywords come from match prefixes / hosts / vs name.
-      addTokens(vsTokens, tokenize(ing.name));
       for (const rr of ingressRoutes) {
-        addTokens(vsTokens, tokenize(rr.host));
+        // Use ONLY path-native tokens split by "/".
         addTokens(vsTokens, tokenize(rr.path));
       }
       for (const ref of vsGatewayRefs) {
@@ -509,8 +506,9 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       const dri = drByServiceKey.get(s.skey);
       if (dri && (dri.subsets?.length || si?.istioSubsets?.length)) {
         const drId = `dr-${sanitizeId(`${iid}::${s.skey}`)}`;
-        const drY = Math.max(layoutOriginY, svcY - 96);
-        const drX = Math.max(leftPad, svcX - 240);
+        // Place DR under Service to avoid overlap with routes/endpoints.
+        const drY = svcY + 110;
+        const drX = svcX;
         nodes.push({
           id: drId,
           type: "destinationRule",
@@ -536,7 +534,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
           labelBgStyle: { fill: "#e0f2fe", fillOpacity: 0.92 },
         });
-        maxY = Math.max(maxY, drY);
+        maxY = Math.max(maxY, drY + 40);
       }
 
       // Record a global handle for cross-area edges.
@@ -639,7 +637,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   for (const [serviceKey, svc] of globalServiceNodeIdByKey.entries()) {
     const candidates = globalIstioGatewayCandidatesByServiceKey.get(serviceKey);
     if (!candidates?.length) continue;
-    const ingressTokens = globalIngressTokensByGatewayServiceKey.get(serviceKey) ?? new Set<string>();
+    const ingressTokens = globalIngressPathTokensByGatewayServiceKey.get(serviceKey) ?? new Set<string>();
 
     const score = (a: Set<string>, b: Set<string>): number => {
       if (!a.size || !b.size) return 0;
@@ -653,11 +651,9 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       .sort((x, y) => y.s - x.s);
 
     const bestScore = scored[0]?.s ?? 0;
-    const selected =
-      bestScore > 0
-        ? scored.filter((x) => x.s === bestScore).map((x) => x.c)
-        : [scored[0]!.c];
+    const selected = bestScore > 0 ? scored.filter((x) => x.s === bestScore).map((x) => x.c) : [];
 
+    // If no match at all, do not auto-wire (avoid wrong topology); user can add manual edge.
     for (const gw of selected) {
       edges.push({
         id: `e-${svc.nodeId}-${gw.nodeId}-istio-gateway-${edgeIdx++}`,
@@ -665,7 +661,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         target: gw.nodeId,
         sourceHandle: "s-right",
         type: edgeType,
-        label: bestScore > 0 ? "Istio Gateway" : "Istio Gateway（弱匹配）",
+        label: "Istio Gateway",
         style: { stroke: "#0ea5e9", strokeWidth: 2.25, strokeDasharray: "6 4" },
         labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
         labelBgStyle: { fill: "#e0f2fe", fillOpacity: 0.92 },

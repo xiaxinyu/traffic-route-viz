@@ -30,7 +30,7 @@ alwaysApply: false
 - Example tier lanes (must): if imported file paths contain `01-* / 02-* / 03-*` tier directories, lay Areas out in **three fixed columns** (01 left, 02 middle, 03 right), **one Area per row** per column; within a column, `Active01` must appear above `Active02`.
 - Contour Gateway principle (must): **Ingress → Service → Contour Gateway** must be represented.
 - Contour Gateway layout (must): inside its Area, keep strict left-to-right order: **Contour Gateway → HTTPProxy → Host → Route → Service → Endpoints**.
-- Istio Gateway principle (must): if Service name equals Istio Gateway name (same namespace), render a cross-area edge **Service → Istio Gateway**. If multiple VirtualServices reference the same gateway, match by **path-native tokens split ONLY by "/"** (Ingress path segments vs VS match path segments), and only connect to the best-matching VS/Gateway instance.
+- Istio Gateway principle (must): if Service name equals Istio Gateway name (same namespace), render a cross-area edge **Service → Istio Gateway**. If multiple VirtualServices reference the same gateway, match by **path-native tokens split ONLY by "/"** (Ingress path segments vs VS match path segments), connect only to the best match; if no match, do not auto-wire (user can add manual edge).
 
 ## Node content (must)
 

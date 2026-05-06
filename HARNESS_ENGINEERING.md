@@ -149,7 +149,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
  - `Service(gateway) → Istio Gateway`（必须）：当 Service 与 Istio Gateway 同 namespace/name 时，必须补跨 Area 连线；若存在多个引用同一 Gateway 的 VirtualService，则需要对 **Ingress 路由关键字** 与 **VirtualService 路由关键字** 做最小粒度匹配：
    - **仅按 `/` 切割**路径（path 的天然结构）作为 token（例如 `/rts/sales` → `rts`, `sales`）
    - 不再用空格/符号/正则等其它方式拆分（避免噪音 token 误匹配）
-   - 只连到匹配度最高的一组（无命中则标记“弱匹配”）。
+  - 只连到匹配度最高的一组；**无命中时不自动连线**（避免错误拓扑），用户可用手写边补充关联。
 
 ---
 
