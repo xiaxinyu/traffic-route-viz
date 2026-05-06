@@ -1,9 +1,18 @@
-# traffic-route-viz
+# Traffic Route Viz（流量路由可视化）/ traffic-route-viz
 
-把 YAML 里的“入口到后端”的真实链路画成可交互拓扑图，帮助快速理解流量路径与依赖关系。
+把 YAML 里的流量链路“看得见、拖得动、可导出”：从入口对象一路追踪到后端 Service 与 Endpoints（Pod IP），用一张图把路由关系讲清楚。
 
-- **主路径**：Ingress / VirtualService / Contour Gateway → Host → Route → Service → Endpoints（Pod IP）
-- **目标**：专业、可读、可拖拽、可导出、可保存会话、可在 K8s 发布（可选强制登录）
+- **适用场景**：排查线上路由、做变更评审、交接系统依赖、复盘事故影响面
+- **核心路径**：Ingress / VirtualService / Contour Gateway → Host → Route → Service → Endpoints
+- **开箱即用**：多文件/文件夹导入、区域分区（Area）、手写连线、PNG/Mermaid/draw.io 导出、会话保存/打开
+
+## Screenshots
+
+截图素材在 `docs/media/`。
+
+![Product overview](docs/media/product-overview.png)
+
+![Route drilldown](docs/media/route-drilldown.png)
 
 ## Features
 
@@ -46,25 +55,11 @@ npm run dev
 
 在页面左侧粘贴 YAML 或拖拽/选择多个 YAML 文件，图表会自动刷新。
 
-## Tech stack
+## Docs
 
-- **Frontend**：Vite + React + TypeScript
-- **Graph**：React Flow
-- **YAML parsing**：`yaml`
-- **Export**：`html-to-image`（PNG）+ Mermaid / draw.io exporter
-- **Runtime**：Nginx 静态托管（生产镜像）
-
-## Architecture (reverse-engineered entry points)
-
-这份项目结构是按“真实运行链路”整理的（建议从上到下读）：
-
-- **UI 宿主 / 导入 / 交互**：`web/src/App.tsx`
-- **YAML 解析**：`web/src/k8sParser.ts`
-- **构图与布局（Area/泳道/边语义）**：`web/src/buildGraph.ts`
-- **节点 UI（视觉系统与字段展示）**：`web/src/FlowNodes.tsx`
-- **导入合并**：`web/src/mergeYamlBundles.ts`
-- **会话保存/手写边合并**：`web/src/diagramPersist.ts`
-- **导出**：`web/src/diagramExportPng.ts`、`web/src/diagramExportMermaid.ts`、`web/src/diagramExportDrawio.ts`
+- **规格/验收（单一事实来源）**：`HARNESS_ENGINEERING.md`
+- **运行/协作手册**：`PROJECT_GUIDE.md`
+- **发布指南**：`DEPLOYMENT.md`
 
 ## Deploy
 
