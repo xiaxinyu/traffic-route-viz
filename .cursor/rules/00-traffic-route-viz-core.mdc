@@ -7,7 +7,7 @@ alwaysApply: true
 
 ## Must read (source of truth)
 
-- `ENGINEERING_REQUIREMENTS.md` (requirements, UX, layout, DoD)
+- `ENGINEERING_REQUIREMENTS.md`（需求、UX、**画布 Harness**、DoD）
 - `VIBE_CODING.md` (workflow, repo map, common commands)
 
 ## Working agreement

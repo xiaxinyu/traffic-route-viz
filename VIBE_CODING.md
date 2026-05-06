@@ -42,7 +42,7 @@
 - Vibe Coding 开始时建议直接贴这段：
 
 ```
-请先读 @ENGINEERING_REQUIREMENTS.md ，严格按其中的「核心信息」「Ingress 分区」「避免重叠」「导入体验」「验收标准」实现。
+请先读 @ENGINEERING_REQUIREMENTS.md ，严格按其中的「画布 Harness 规格」「核心信息」「导入体验」「验收标准」实现；画布相关条款一律以 Harness 小节为准。
 ```
 
 ---

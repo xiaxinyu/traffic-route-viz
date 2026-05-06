@@ -23,6 +23,78 @@ const meta = (s: CSSProperties = {}): CSSProperties => ({
   ...s,
 });
 
+/** 可拖拽的整块拓扑分区底板（Ingress 及以下子节点挂载在其下） */
+export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProps) {
+  const {
+    partitionIndex,
+    ingressName,
+    namespace,
+    sourceSummary,
+    hint,
+  } = props.data as {
+    partitionIndex?: number;
+    ingressName?: string;
+    namespace?: string;
+    sourceSummary?: string;
+    hint?: string;
+  };
+
+  const idx = partitionIndex ?? 1;
+
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        borderRadius: 16,
+        border: "1px solid rgba(79, 70, 229, 0.22)",
+        background:
+          "linear-gradient(165deg, rgba(79,70,229,0.10), rgba(79,70,229,0.03))",
+        boxSizing: "border-box",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        pointerEvents: "auto",
+      }}
+    >
+      <div
+        style={{
+          flexShrink: 0,
+          padding: "10px 14px",
+          background: "rgba(79, 70, 229, 0.14)",
+          borderBottom: "1px solid rgba(79, 70, 229, 0.2)",
+          cursor: "grab",
+          userSelect: "none",
+        }}
+      >
+        <div style={{ fontSize: 12, fontWeight: 800, color: "#312e81" }}>
+          入口流量拓扑分区 · 第 {idx} 视图
+        </div>
+        <div
+          style={{ fontSize: 11, marginTop: 4, color: "#4338ca", fontWeight: 700 }}
+        >
+          Kubernetes Ingress：{ingressName ?? "—"}
+        </div>
+        <div style={{ ...meta({ marginTop: 2 }), color: "#57534e" }}>
+          命名空间：{namespace ?? "—"}
+        </div>
+        {sourceSummary ? (
+          <div style={{ ...meta({ marginTop: 4 }), color: "#57534e" }}>
+            {sourceSummary}
+          </div>
+        ) : null}
+        {hint ? (
+          <div style={{ ...meta({ marginTop: 4 }), color: "#6b7280" }}>{hint}</div>
+        ) : (
+          <div style={{ ...meta({ marginTop: 4 }), color: "#6b7280" }}>
+            拖拽本分区标题栏或空白底板可整体平移画布中的本组资源
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
 export const IngressNode = memo(function IngressNode(props: NodeProps) {
   const { label, subtitle, className, tls, loadBalancerIps } = props.data as {
     label?: string;

@@ -13,9 +13,17 @@ import "reactflow/dist/style.css";
 
 import { buildFlowGraph } from "./buildGraph";
 import { parseK8sYaml, type ParseResult } from "./k8sParser";
-import { EndpointsNode, HostNode, IngressNode, RouteNode, ServiceNode } from "./FlowNodes";
+import {
+  EndpointsNode,
+  HostNode,
+  IngressNode,
+  IngressRegionNode,
+  RouteNode,
+  ServiceNode,
+} from "./FlowNodes";
 
 const nodeTypes = {
+  ingressRegion: IngressRegionNode,
   ingress: IngressNode,
   host: HostNode,
   route: RouteNode,
@@ -300,7 +308,7 @@ function AppInner() {
           解析并刷新图表
         </button>
         <span style={{ fontSize: 12, color: "#64748b" }}>
-          节点展示: Ingress/Host/Service/Endpoints + TLS + LB IP + Pod IP
+          画布: Ingress→Host→Route→Service→Endpoints；紫底分区与卡片均可拖拽（卡片限分区内）。
         </span>
       </header>
       {parsedMsg ? (

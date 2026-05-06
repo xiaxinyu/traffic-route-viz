@@ -13,8 +13,9 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   const hostGap = 170;
   const routeGap = 64;
   const serviceGap = 150;
-  const topY = 40;
   const baseX = 40;
+  /** 分区标题区（Ingress 名、命名空间、来源等）高度预留，避免子节点与标题文字重叠 */
+  const regionHeaderReserveY = 168;
   const ingressBlockW = col * 4;
   const sanitizeId = (v: string) => v.replace(/[^a-zA-Z0-9/_-]/g, "_");
   const edgeType: Edge["type"] = "smoothstep";
@@ -46,8 +47,8 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     routesByIngress.set(iid, list);
   }
 
-  const median = (nums: number[]): number => {
-    if (!nums.length) return topY;
+  const medianOf = (nums: number[], fallback: number): number => {
+    if (!nums.length) return fallback;
     const a = [...nums].sort((x, y) => x - y);
     const m = Math.floor(a.length / 2);
     return a.length % 2 ? a[m]! : (a[m - 1]! + a[m]!) / 2;
@@ -59,11 +60,55 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     const blockIdx = ingressIndexById.get(iid) ?? 0;
     const blockX = baseX + blockIdx * ingressBlockW;
 
-    // Ingress node
+    const sourceSummary =
+      ing.sourceFiles && ing.sourceFiles.length
+        ? `配置来源（YAML 文件）：${ing.sourceFiles.join("，")}`
+        : "配置来源：当前为编辑器内 YAML 文本（未绑定本地文件名）";
+
+    const ingressRoutes = routesByIngress.get(iid) ?? [];
+    // Order hosts by name for stability
+    const hosts = [...new Set(ingressRoutes.map((r) => r.host))].sort((a, b) =>
+      a.localeCompare(b),
+    );
+
+    // Region panel first: children use parentNode so dragging the panel moves everything.
+    const regionId = `region-${sanitizeId(iid)}`;
+    const regionPos = { x: blockX - 24, y: 20 };
+    /** 画布绝对 Y：整行拓扑起点，落在分区标题栏之下 */
+    const layoutOriginY = regionPos.y + regionHeaderReserveY;
+    const absToRel = (ax: number, ay: number) => ({
+      x: ax - regionPos.x,
+      y: ay - regionPos.y,
+    });
+
+    nodes.push({
+      id: regionId,
+      type: "ingressRegion",
+      position: regionPos,
+      data: {
+        partitionIndex: blockIdx + 1,
+        ingressName: ing.name,
+        namespace: ing.namespace ?? "—",
+        sourceSummary,
+      },
+      style: {
+        width: ingressBlockW - 24,
+        height: 760,
+        padding: 0,
+        borderRadius: 16,
+      },
+      selectable: true,
+      draggable: true,
+    });
+
+    // Ingress node (child of region — moves with partition drag)
     nodes.push({
       id: iid,
       type: "ingress",
-      position: { x: blockX, y: topY },
+      parentNode: regionId,
+      extent: "parent",
+      draggable: true,
+      position: absToRel(blockX, layoutOriginY),
       data: {
         label: ing.name,
         subtitle: ing.namespace ? `namespace: ${ing.namespace}` : undefined,
@@ -73,48 +118,19 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       },
     });
 
-    const files =
-      ing.sourceFiles && ing.sourceFiles.length
-        ? `文件: ${ing.sourceFiles.join(", ")}`
-        : "文件: （未标注来源）";
-
-    const ingressRoutes = routesByIngress.get(iid) ?? [];
-    // Order hosts by name for stability
-    const hosts = [...new Set(ingressRoutes.map((r) => r.host))].sort((a, b) =>
-      a.localeCompare(b),
-    );
-
-    // Decorative region (height computed after we place nodes)
-    const regionId = `region-${sanitizeId(iid)}`;
-    nodes.push({
-      id: regionId,
-      type: "group",
-      position: { x: blockX - 24, y: 20 },
-      data: { label: `Ingress 区域: ${ing.name}\n${files}` },
-      style: {
-        width: ingressBlockW - 24,
-        height: 760,
-        background: "rgba(79,70,229,0.06)",
-        border: "1px solid rgba(79,70,229,0.18)",
-        borderRadius: 16,
-      },
-      selectable: false,
-      draggable: false,
-    });
-
     const hostIdByHost = new Map<string, string>();
     const routeYsByService = new Map<string, number[]>();
     const serviceIdByKey = new Map<string, string>();
     const endpointIdByKey = new Map<string, string>();
 
-    let maxY = topY + 200;
+    let maxY = layoutOriginY + 200;
 
     // 1) Place hosts + routes (a clean vertical list per host)
     hosts.forEach((host, hostIdx) => {
       const hid = `host-${sanitizeId(iid)}-${sanitizeId(host)}-${hostIdx}`;
       hostIdByHost.set(host, hid);
 
-      const hostY = topY + 40 + hostIdx * hostGap;
+      const hostY = layoutOriginY + 40 + hostIdx * hostGap;
       maxY = Math.max(maxY, hostY);
 
       // Pick a representative TLS secret for the host (if multiple, first non-empty)
@@ -125,7 +141,10 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       nodes.push({
         id: hid,
         type: "host",
-        position: { x: blockX + col, y: hostY },
+        parentNode: regionId,
+        extent: "parent",
+        draggable: true,
+        position: absToRel(blockX + col, hostY),
         data: { label: host, tlsSecretName, ingressName: ing.name },
       });
 
@@ -151,7 +170,10 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         nodes.push({
           id: routeId,
           type: "route",
-          position: { x: blockX + col * 1.55, y: routeY },
+          parentNode: regionId,
+          extent: "parent",
+          draggable: true,
+          position: absToRel(blockX + col * 1.55, routeY),
           data: {
             path: r.path,
             pathType: r.pathType,
@@ -197,7 +219,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     const serviceEntries = [...serviceIdByKey.entries()].map(([svcScoped, sid]) => {
       const [, skey] = svcScoped.split("::");
       const [ns, name] = skey.includes("/") ? skey.split("/", 2) : [undefined, skey];
-      const desiredY = median(routeYsByService.get(svcScoped) ?? []);
+      const desiredY = medianOf(routeYsByService.get(svcScoped) ?? [], layoutOriginY);
       return { svcScoped, sid, skey, ns, name, desiredY };
     });
     serviceEntries.sort((a, b) => a.desiredY - b.desiredY);
@@ -211,7 +233,10 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       nodes.push({
         id: s.sid,
         type: "service",
-        position: { x: blockX + col * 2.35, y: svcY },
+        parentNode: regionId,
+        extent: "parent",
+        draggable: true,
+        position: absToRel(blockX + col * 2.35, svcY),
         data: {
           label: s.name,
           subtitle: s.ns ? `namespace: ${s.ns}` : undefined,
@@ -228,7 +253,10 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         nodes.push({
           id: eid,
           type: "endpoints",
-          position: { x: blockX + col * 3.15, y: svcY },
+          parentNode: regionId,
+          extent: "parent",
+          draggable: true,
+          position: absToRel(blockX + col * 3.15, svcY),
           data: {
             label: "Endpoints",
             serviceName: s.name,
