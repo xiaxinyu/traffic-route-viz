@@ -27,11 +27,13 @@ import {
 } from "./mergeYamlBundles";
 import { parseK8sYaml } from "./k8sParser";
 import {
+  DestinationRuleNode,
   EndpointsNode,
   HostNode,
   HttpProxyNode,
   IngressNode,
   IngressRegionNode,
+  IstioGatewayNode,
   RouteNode,
   ServiceNode,
 } from "./FlowNodes";
@@ -40,6 +42,8 @@ import { getRuntimeConfig } from "./runtimeConfig";
 const nodeTypes = {
   ingressRegion: IngressRegionNode,
   ingress: IngressNode,
+  istioGateway: IstioGatewayNode,
+  destinationRule: DestinationRuleNode,
   host: HostNode,
   httpProxy: HttpProxyNode,
   route: RouteNode,

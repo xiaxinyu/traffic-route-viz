@@ -27,6 +27,8 @@ export interface IngressRoute {
   ingressKind?: "Ingress" | "VirtualService" | "HTTPProxy";
   ingressNs?: string;
   ingressName: string;
+  /** Istio only: gateways referenced by VirtualService spec.gateways */
+  gateways?: string[];
   host: string;
   path: string;
   pathType?: string;
@@ -84,7 +86,27 @@ export interface ParseResult {
   routes: IngressRoute[];
   services: ServiceInfo[];
   endpoints: EndpointsInfo[];
+  gateways: IstioGatewayInfo[];
+  destinationRules: DestinationRuleInfo[];
   errors: string[];
+}
+
+export interface IstioGatewayInfo {
+  key: string; // ns/name
+  name: string;
+  namespace?: string;
+  selector?: Record<string, string>;
+  servers: { port?: number; name?: string; protocol?: string; hosts: string[] }[];
+  sourceFiles?: string[];
+}
+
+export interface DestinationRuleInfo {
+  key: string; // service key (ns/name) resolved from spec.host
+  name: string;
+  namespace?: string;
+  host?: string;
+  subsets: string[];
+  sourceFiles?: string[];
 }
 
 function resourceKey(ns: string | undefined, name: string): string {
@@ -177,6 +199,15 @@ function parseIstioHostToServiceKey(
   return { name, namespace };
 }
 
+function asStringMap(v: K8sDoc | null): Record<string, string> | null {
+  if (!v) return null;
+  const out: Record<string, string> = {};
+  for (const [k, val] of Object.entries(v)) {
+    if (typeof val === "string") out[k] = val;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 function baseNameNoExt(pathLike: string): string {
   const file = pathLike.split(/[/\\]/).pop() ?? pathLike;
   return file.replace(/\.(ya?ml)$/i, "");
@@ -190,6 +221,8 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
   const endpoints = new Map<string, EndpointsInfo>();
   // DestinationRule host -> subsets
   const istioSubsetsByKey = new Map<string, string[]>();
+  const destinationRuleByServiceKey = new Map<string, DestinationRuleInfo>();
+  const gatewayByKey = new Map<string, IstioGatewayInfo>();
 
   let docs: unknown[];
   try {
@@ -206,6 +239,8 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
       routes: [],
       services: [],
       endpoints: [],
+      gateways: [],
+      destinationRules: [],
       errors,
     };
   }
@@ -404,6 +439,9 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
       const hosts = Array.isArray(spec?.hosts)
         ? spec!.hosts!.filter((h): h is string => typeof h === "string")
         : ["*"];
+      const gateways = Array.isArray(spec?.gateways)
+        ? spec!.gateways!.filter((g): g is string => typeof g === "string")
+        : [];
 
       const ikey = `VirtualService:${resourceKey(vsNs, vsName)}`;
       const incoming: IngressSummary = {
@@ -452,6 +490,7 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
               ingressKind: "VirtualService",
               ingressNs: vsNs,
               ingressName: vsName,
+              gateways,
               host: h,
               path: mp.path,
               pathType: mp.pathType,
@@ -474,6 +513,7 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
     ) {
       const meta = getMeta(o);
       const drNs = meta.namespace;
+      const drName = meta.name ?? "(unnamed)";
       const spec = asRecord(o.spec);
       const host = typeof spec?.host === "string" ? spec.host : undefined;
       if (host) {
@@ -486,7 +526,48 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
           .map((s) => (typeof s!.name === "string" ? s!.name : null))
           .filter((x): x is string => !!x);
         if (subsetNames.length) istioSubsetsByKey.set(k, subsetNames);
+        destinationRuleByServiceKey.set(k, {
+          key: k,
+          name: drName,
+          namespace: drNs,
+          host,
+          subsets: subsetNames,
+          sourceFiles: sourceFile ? [sourceFile] : [],
+        });
       }
+      continue;
+    }
+
+    // Istio Gateway: render as an explicit node and link into VirtualService when referenced.
+    if (kind === "Gateway" && typeof api === "string" && api.startsWith("networking.istio.io/")) {
+      const meta = getMeta(o);
+      const gwName = meta.name ?? "(unnamed)";
+      const gwNs = meta.namespace;
+      const key = resourceKey(gwNs, gwName);
+      const spec = asRecord(o.spec);
+      const selector = asStringMap(asRecord(spec?.selector)) ?? undefined;
+      const serversRaw = Array.isArray(spec?.servers) ? spec!.servers! : [];
+      const servers = serversRaw
+        .map((s) => asRecord(s))
+        .filter(Boolean)
+        .map((s) => {
+          const portObj = asRecord(s!.port);
+          const hostsRaw = Array.isArray(s!.hosts) ? (s!.hosts as unknown[]) : [];
+          return {
+            port: typeof portObj?.number === "number" ? portObj.number : undefined,
+            name: typeof portObj?.name === "string" ? portObj.name : undefined,
+            protocol: typeof portObj?.protocol === "string" ? portObj.protocol : undefined,
+            hosts: hostsRaw.filter((h): h is string => typeof h === "string"),
+          };
+        });
+      gatewayByKey.set(key, {
+        key,
+        name: gwName,
+        namespace: gwNs,
+        selector,
+        servers,
+        sourceFiles: sourceFile ? [sourceFile] : [],
+      });
       continue;
     }
 
@@ -563,6 +644,8 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
     routes,
     services: [...services.values()],
     endpoints: [...endpoints.values()],
+    gateways: [...gatewayByKey.values()],
+    destinationRules: [...destinationRuleByServiceKey.values()],
     errors,
   };
 }

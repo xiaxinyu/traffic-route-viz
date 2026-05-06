@@ -9,6 +9,7 @@ alwaysApply: false
 ## Scope / resources
 
 - This tool targets traffic visualization for Kubernetes **Ingress / Service / Endpoints**, Istio **VirtualService / DestinationRule**, and Contour **Gateway (HTTPProxy)**.
+- If a VirtualService references `spec.gateways`, an Istio **Gateway** node must be rendered and linked (Gateway → VirtualService) to make the entry semantics explicit.
 - Adding new resource kinds must update: parser → graph → node UI → harness spec.
 
 ## Import experience
@@ -29,6 +30,7 @@ alwaysApply: false
 - Example tier lanes (must): if imported file paths contain `01-* / 02-* / 03-*` tier directories, lay Areas out in **three fixed columns** (01 left, 02 middle, 03 right), **one Area per row** per column; within a column, `Active01` must appear above `Active02`.
 - Contour Gateway principle (must): **Ingress → Service → Contour Gateway** must be represented.
 - Contour Gateway layout (must): inside its Area, keep strict left-to-right order: **Contour Gateway → HTTPProxy → Host → Route → Service → Endpoints**.
+- Istio Gateway principle (must): if Service name equals Istio Gateway name (same namespace), render a cross-area edge **Service → Istio Gateway**. If multiple VirtualServices reference the same gateway, match by **path-native tokens split ONLY by "/"** (Ingress path segments vs VS match path segments), and only connect to the best-matching VS/Gateway instance.
 
 ## Node content (must)
 
@@ -43,6 +45,7 @@ alwaysApply: false
 ## Canvas UX (must)
 
 - Manual edges: user can connect via handles; manual edges must be visually distinct (grey dashed) and survive YAML refresh when endpoints remain valid.
+- All node types that appear on canvas must expose visible handles (at least left+right) so users can manually connect nodes, including across Areas.
 - Toolbar: canvas operations (PNG/export/save/open) should be compact by default and must not obstruct the topology.
 
 ## Visual identity (must)

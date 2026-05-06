@@ -37,6 +37,8 @@ export function mergeParseResults(results: ParseResult[]): ParseResult {
 
   const svcByKey = new Map<string, ParseResult["services"][number]>();
   const epByKey = new Map<string, ParseResult["endpoints"][number]>();
+  const gwByKey = new Map<string, ParseResult["gateways"][number]>();
+  const drByKey = new Map<string, ParseResult["destinationRules"][number]>();
 
   const key = (ns: string | undefined, name: string) => (ns ? `${ns}/${name}` : name);
 
@@ -62,6 +64,7 @@ export function mergeParseResults(results: ParseResult[]): ParseResult {
         const loadBalancerIps = [...new Set([...prev.loadBalancerIps, ...ing.loadBalancerIps])];
         const sourceFiles = [...new Set([...(prev.sourceFiles ?? []), ...(ing.sourceFiles ?? [])])];
         ingressByKey.set(k, {
+          kind: prev.kind,
           name: prev.name,
           namespace: prev.namespace ?? ing.namespace,
           className: prev.className ?? ing.className,
@@ -73,6 +76,34 @@ export function mergeParseResults(results: ParseResult[]): ParseResult {
     }
 
     routes.push(...r.routes);
+
+    for (const g of r.gateways ?? []) {
+      const prev = gwByKey.get(g.key);
+      if (!prev) {
+        gwByKey.set(g.key, g);
+      } else {
+        gwByKey.set(g.key, {
+          ...prev,
+          selector: prev.selector ?? g.selector,
+          servers: prev.servers.length ? prev.servers : g.servers,
+          sourceFiles: [...new Set([...(prev.sourceFiles ?? []), ...(g.sourceFiles ?? [])])],
+        });
+      }
+    }
+
+    for (const d of r.destinationRules ?? []) {
+      const prev = drByKey.get(d.key);
+      if (!prev) {
+        drByKey.set(d.key, d);
+      } else {
+        drByKey.set(d.key, {
+          ...prev,
+          host: prev.host ?? d.host,
+          subsets: prev.subsets.length ? prev.subsets : d.subsets,
+          sourceFiles: [...new Set([...(prev.sourceFiles ?? []), ...(d.sourceFiles ?? [])])],
+        });
+      }
+    }
 
     for (const s of r.services) {
       const prev = svcByKey.get(s.key);
@@ -109,6 +140,8 @@ export function mergeParseResults(results: ParseResult[]): ParseResult {
     routes,
     services: [...svcByKey.values()],
     endpoints: [...epByKey.values()],
+    gateways: [...gwByKey.values()],
+    destinationRules: [...drByKey.values()],
     errors,
   };
 }

@@ -130,18 +130,26 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 
 1. **Ingress 分区底板**（`ingressRegion`，父节点）：视觉泳道/整块可拖
 2. **Ingress**
+3. **Istio Gateway**（当 VirtualService 引用了 `spec.gateways` 时渲染）
 3. **Host**
 4. **Route**（每条 `path` 一节点，避免边标签重叠）
 5. **Service**
 6. **Endpoints**
+7. **DestinationRule**（Istio：挂载到对应 Service，展示 subsets/策略入口）
 
 > 新增类型时必须同步：解析 → 构图 → 节点 UI → 宿主 `nodeTypes` → 本文档。
 
 ### 边的语义
 
 - `Ingress → Host`：入口域名规则（可 animated）
+- `Istio Gateway → VirtualService`：当 VirtualService 配置 gateways 时，Gateway 必须可视化并连入链路
 - `Host → Route → Service`：每条 path 一条路由，Route 节点承载信息避免边标签堆叠
 - `Service → Endpoints`：后端实例（Pod IP）
+ - `Service → DestinationRule`：策略/子集配置（虚线）
+ - `Service(gateway) → Istio Gateway`（必须）：当 Service 与 Istio Gateway 同 namespace/name 时，必须补跨 Area 连线；若存在多个引用同一 Gateway 的 VirtualService，则需要对 **Ingress 路由关键字** 与 **VirtualService 路由关键字** 做最小粒度匹配：
+   - **仅按 `/` 切割**路径（path 的天然结构）作为 token（例如 `/rts/sales` → `rts`, `sales`）
+   - 不再用空格/符号/正则等其它方式拆分（避免噪音 token 误匹配）
+   - 只连到匹配度最高的一组（无命中则标记“弱匹配”）。
 
 ---
 
@@ -201,6 +209,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
   - `Active01` 必须排在 `Active02` 上方（同一列内排序规则）
   - 页面与 Area 标题中展示“有效文件夹信息”时，不应把 `01/02/03` 这种数字前缀当作业务信息展示（可做成 Level 标识或隐藏前缀后的展示）
 - **手写边**：允许手柄拖线；手写边视觉区分（灰虚线）且在解析刷新后只要两端仍存在就应保留。
+  - **可连线性（必须）**：画布中所有业务节点（Ingress/VirtualService/Istio Gateway/HTTPProxy/Host/Route/Service/Endpoints/DestinationRule）都必须提供可见的连接手柄（至少左右各一），确保用户可手动关联任意两节点（含跨 Area）。
 - **第三方导出**：提供 PNG；并支持导出 Mermaid / draw.io 以便第三方工具打开（画图会话文件为 React Flow JSON）。
 - **Contour Gateway 强制原则**：
   - **链路**：Ingress → Service → Contour Gateway（跨 Area 连线也必须稳定出现，不能因构图顺序缺失）。

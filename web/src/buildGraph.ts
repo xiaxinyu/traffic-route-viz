@@ -32,6 +32,14 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   for (const s of parsed.services) {
     serviceByKey.set(s.key, s);
   }
+  const drByServiceKey = new Map<string, (typeof parsed.destinationRules)[0]>();
+  for (const d of parsed.destinationRules ?? []) {
+    drByServiceKey.set(d.key, d);
+  }
+  const gwByKey = new Map<string, (typeof parsed.gateways)[0]>();
+  for (const g of parsed.gateways ?? []) {
+    gwByKey.set(g.key, g);
+  }
   const epByKey = new Map<string, (typeof parsed.endpoints)[0]>();
   for (const e of parsed.endpoints) {
     epByKey.set(e.key, e);
@@ -128,6 +136,36 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   // Used for cross-area wiring like "Ingress Service -> Contour Gateway".
   const globalServiceNodeIdByKey = new Map<string, { nodeId: string; ownerKind: string }>();
   const pendingServiceToGatewayEdges: { serviceKey: string; gatewayNodeId: string }[] = [];
+  type IstioGatewayCandidate = {
+    nodeId: string;
+    vsId: string;
+    vsName: string;
+    vsTokens: Set<string>;
+  };
+  // serviceKey(ns/name) -> gateway candidates (since many VS may reference the same gateway)
+  const globalIstioGatewayCandidatesByServiceKey = new Map<string, IstioGatewayCandidate[]>();
+  // serviceKey(ns/name) -> aggregated ingress tokens that route to that gateway-service
+  const globalIngressTokensByGatewayServiceKey = new Map<string, Set<string>>();
+
+  // NOTE: For Istio Gateway matching we only split by "/" (path-native structure).
+  // Do NOT split by other characters, to avoid introducing noisy tokens.
+  const tokenize = (s: string): string[] => {
+    const v = (s ?? "").toLowerCase().trim();
+    if (!v) return [];
+    // If it looks like a path, use "/" segments. Otherwise keep it as a single token.
+    if (v.includes("/")) {
+      const segs = v
+        .split("/")
+        .map((x) => x.trim())
+        .filter((x) => x.length > 0 && x !== "*" && x !== ".");
+      return segs;
+    }
+    return [v];
+  };
+
+  const addTokens = (set: Set<string>, parts: string[]) => {
+    for (const p of parts) set.add(p);
+  };
   // Placement cursors:
   // - If files are imported as a tiered folder (01/02/03), use 3 fixed columns and stack vertically.
   // - Otherwise fall back to a simple multi-column grid.
@@ -153,6 +191,11 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         : "来源文件：当前为编辑器内 YAML 文本（未绑定本地文件名）";
 
     const ingressRoutes = routesByIngress.get(iid) ?? [];
+    const vsGatewayRefs =
+      ing.kind === "VirtualService"
+        ? [...new Set(ingressRoutes.flatMap((r) => r.gateways ?? []))].filter(Boolean)
+        : [];
+    const hasIstioGateway = ing.kind === "VirtualService" && vsGatewayRefs.length > 0;
     // Order hosts by name for stability
     const hosts = [...new Set(ingressRoutes.map((r) => r.host))].sort((a, b) =>
       a.localeCompare(b),
@@ -200,13 +243,17 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       endpointsX: leftPad + col * 5.20,
     };
 
+    const vsOffsetX = hasIstioGateway ? col * 0.85 : 0;
     nodes.push({
       id: iid,
       type: "ingress",
       parentNode: regionId,
       extent: "parent",
       draggable: true,
-      position: { x: isContourGateway ? contour.gatewayX : leftPad, y: layoutOriginY },
+      position: {
+        x: isContourGateway ? contour.gatewayX : leftPad + (ing.kind === "VirtualService" ? vsOffsetX : 0),
+        y: layoutOriginY,
+      },
       data: {
         label: ing.name,
         subtitle: ing.namespace ? `namespace: ${ing.namespace}` : undefined,
@@ -216,6 +263,79 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         loadBalancerIps: ing.loadBalancerIps,
       },
     });
+
+    // Collect "Ingress -> gateway service" tokens for later Service -> Istio Gateway matching.
+    if (ing.kind === "Ingress") {
+      for (const r of ingressRoutes) {
+        const svcNs = r.serviceNamespace ?? r.ingressNs;
+        const skey = resourceKey(svcNs, r.serviceName);
+        // For ingress routing, the best keywords usually live in host + path.
+        const s = globalIngressTokensByGatewayServiceKey.get(skey) ?? new Set<string>();
+        addTokens(s, tokenize(r.host));
+        addTokens(s, tokenize(r.path));
+        addTokens(s, tokenize(ing.name));
+        globalIngressTokensByGatewayServiceKey.set(skey, s);
+      }
+    }
+
+    let maxY = layoutOriginY + 200;
+    let maxX = leftPad + 260;
+    // Ensure region width always includes the whole Contour Gateway chain.
+    if (isContourGateway) {
+      maxX = Math.max(maxX, contour.httpProxyX + cardMaxW);
+    }
+
+    // Istio Gateway node(s): Gateway -> VirtualService -> Host...
+    if (hasIstioGateway) {
+      const gwX = leftPad;
+      let gwY = layoutOriginY + 6;
+      const vsTokens = new Set<string>();
+      // VS keywords come from match prefixes / hosts / vs name.
+      addTokens(vsTokens, tokenize(ing.name));
+      for (const rr of ingressRoutes) {
+        addTokens(vsTokens, tokenize(rr.host));
+        addTokens(vsTokens, tokenize(rr.path));
+      }
+      for (const ref of vsGatewayRefs) {
+        const [nsMaybe, nameMaybe] = ref.includes("/") ? ref.split("/", 2) : [ing.namespace ?? undefined, ref];
+        const gwKey = resourceKey(nsMaybe || undefined, nameMaybe || ref);
+        const gwi = gwByKey.get(gwKey);
+        const gid = `istio-gw-${sanitizeId(`${iid}::${gwKey}`)}`;
+        nodes.push({
+          id: gid,
+          type: "istioGateway",
+          parentNode: regionId,
+          extent: "parent",
+          draggable: true,
+          position: { x: gwX, y: gwY },
+          data: {
+            label: nameMaybe || ref,
+            subtitle: nsMaybe ? `namespace: ${nsMaybe}` : undefined,
+            servers: gwi?.servers,
+            selector: gwi?.selector,
+          },
+        });
+        // Record candidate for cross-area wiring: Service(gateway) -> Istio Gateway.
+        // Many VS may reference the same gateway; we will match by route keyword overlap.
+        const list = globalIstioGatewayCandidatesByServiceKey.get(gwKey) ?? [];
+        list.push({ nodeId: gid, vsId: iid, vsName: ing.name, vsTokens });
+        globalIstioGatewayCandidatesByServiceKey.set(gwKey, list);
+        edges.push({
+          id: `e-${gid}-${iid}-${edgeIdx++}`,
+          source: gid,
+          target: iid,
+          type: edgeType,
+          label: "Gateway",
+          style: { stroke: "#0ea5e9", strokeWidth: 2.25 },
+          markerEnd: arrow("#0ea5e9"),
+          labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
+          labelBgStyle: { fill: "#e0f2fe", fillOpacity: 0.92 },
+        });
+        gwY += 110;
+        maxY = Math.max(maxY, gwY);
+        maxX = Math.max(maxX, gwX + cardMaxW);
+      }
+    }
 
     // For Contour gateway regions: add an explicit HTTPProxy config node so the chain can be
     // Service(gateway) -> Contour Gateway -> HTTPProxy -> Host -> Route -> Service(upstream).
@@ -250,13 +370,6 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     const routeYsByService = new Map<string, number[]>();
     const serviceIdByKey = new Map<string, string>();
     const endpointIdByKey = new Map<string, string>();
-
-    let maxY = layoutOriginY + 200;
-    let maxX = leftPad + 260;
-    // Ensure region width always includes the whole Contour Gateway chain.
-    if (isContourGateway) {
-      maxX = Math.max(maxX, contour.httpProxyX + cardMaxW);
-    }
 
     // 1) Place hosts + routes (a clean vertical list per host)
     hosts.forEach((host, hostIdx) => {
@@ -392,6 +505,40 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         },
       });
 
+      // DestinationRule node (Istio): attach policy/subsets to Service for clarity
+      const dri = drByServiceKey.get(s.skey);
+      if (dri && (dri.subsets?.length || si?.istioSubsets?.length)) {
+        const drId = `dr-${sanitizeId(`${iid}::${s.skey}`)}`;
+        const drY = Math.max(layoutOriginY, svcY - 96);
+        const drX = Math.max(leftPad, svcX - 240);
+        nodes.push({
+          id: drId,
+          type: "destinationRule",
+          parentNode: regionId,
+          extent: "parent",
+          draggable: true,
+          position: { x: drX, y: drY },
+          data: {
+            label: dri.name,
+            subtitle: dri.namespace ? `namespace: ${dri.namespace}` : undefined,
+            host: dri.host,
+            subsets: dri.subsets ?? si?.istioSubsets ?? [],
+          },
+        });
+        edges.push({
+          id: `e-${s.sid}-${drId}-${edgeIdx++}`,
+          source: s.sid,
+          target: drId,
+          type: edgeType,
+          label: "DestinationRule",
+          style: { stroke: "#0ea5e9", strokeWidth: 2, strokeDasharray: "5 4" },
+          markerEnd: arrow("#0ea5e9"),
+          labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
+          labelBgStyle: { fill: "#e0f2fe", fillOpacity: 0.92 },
+        });
+        maxY = Math.max(maxY, drY);
+      }
+
       // Record a global handle for cross-area edges.
       // Prefer non-HTTPProxy owners so gateway service resolves to the "real" Service node.
       const prev = globalServiceNodeIdByKey.get(s.skey);
@@ -485,6 +632,46 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       labelBgStyle: { fill: "#ccfbf1", fillOpacity: 0.92 },
       markerEnd: arrow("#0f766e"),
     });
+  }
+
+  // Istio cross-area wiring (must): if a Service shares the same key (ns/name) with an Istio Gateway,
+  // add explicit edge(s): Service -> Istio Gateway, with keyword match between ingress routes and VS routes.
+  for (const [serviceKey, svc] of globalServiceNodeIdByKey.entries()) {
+    const candidates = globalIstioGatewayCandidatesByServiceKey.get(serviceKey);
+    if (!candidates?.length) continue;
+    const ingressTokens = globalIngressTokensByGatewayServiceKey.get(serviceKey) ?? new Set<string>();
+
+    const score = (a: Set<string>, b: Set<string>): number => {
+      if (!a.size || !b.size) return 0;
+      let n = 0;
+      for (const t of a) if (b.has(t)) n++;
+      return n;
+    };
+
+    const scored = candidates
+      .map((c) => ({ c, s: score(ingressTokens, c.vsTokens) }))
+      .sort((x, y) => y.s - x.s);
+
+    const bestScore = scored[0]?.s ?? 0;
+    const selected =
+      bestScore > 0
+        ? scored.filter((x) => x.s === bestScore).map((x) => x.c)
+        : [scored[0]!.c];
+
+    for (const gw of selected) {
+      edges.push({
+        id: `e-${svc.nodeId}-${gw.nodeId}-istio-gateway-${edgeIdx++}`,
+        source: svc.nodeId,
+        target: gw.nodeId,
+        sourceHandle: "s-right",
+        type: edgeType,
+        label: bestScore > 0 ? "Istio Gateway" : "Istio Gateway（弱匹配）",
+        style: { stroke: "#0ea5e9", strokeWidth: 2.25, strokeDasharray: "6 4" },
+        labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
+        labelBgStyle: { fill: "#e0f2fe", fillOpacity: 0.92 },
+        markerEnd: arrow("#0ea5e9"),
+      });
+    }
   }
 
   return { nodes, edges };
