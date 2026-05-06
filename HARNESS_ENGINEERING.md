@@ -151,6 +151,15 @@
   - 命名空间
   - **来源文件名列表**（导入时必须绑定；过长可省略但需可 hover 查看完整）
 
+### 7.4.1 Contour Gateway 原则（必须）
+
+对 Contour Gateway（`HTTPProxy`）的可视化必须遵循以下**强制链路与布局原则**：
+
+- **原则链路**：Ingress → Service → Contour Gateway  
+  - 解释：Ingress 分区中出现的 gateway Service（例如 `envoy-rbac-gateway-gtw`）必须通过一条边连接到 Contour Gateway 分区内的 Contour Gateway 节点。
+  - 该边为**跨 Area 连线**时必须稳定出现：构图顺序不能影响其生成（必要时延迟补边）。
+- **布局原则**：Contour Gateway 节点始终放在其 Area 的**最右侧**；其子节点（HTTPProxy/Host/Route/上游 Service/Endpoints）集中放在该 Area 的**最左侧**，以形成“右锚点”的阅读方向。
+
 ### 7.5 拖拽策略（必须）
 
 - 分区底板与业务卡片均可拖拽

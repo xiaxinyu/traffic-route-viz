@@ -64,6 +64,10 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   };
 
   let edgeIdx = 0;
+  // Global lookup: serviceKey(ns/name) -> a node id already rendered on canvas.
+  // Used for cross-area wiring like "Ingress Service -> Contour Gateway".
+  const globalServiceNodeIdByKey = new Map<string, { nodeId: string; ownerKind: string }>();
+  const pendingServiceToGatewayEdges: { serviceKey: string; gatewayNodeId: string }[] = [];
   // Grid placement cursors (avoid "flowing" infinite horizontal layout)
   let rowIdx = 0;
   let colIdx = 0;
@@ -75,6 +79,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     const iid = ingId(ing.kind, ing.namespace, ing.name);
     // We still use the stable ingressIndex for partitionIndex label, but placement is grid-based.
     const blockIdx = ingressIndexById.get(iid) ?? 0;
+    const isContourGateway = ing.kind === "HTTPProxy";
 
     const sourceFiles = ing.sourceFiles ?? [];
     const sourceSummary =
@@ -116,14 +121,24 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       draggable: true,
     }) as unknown as number) - 1;
 
-    // Ingress node (child of region — moves with partition drag)
+    // Ingress / VirtualService / Contour Gateway node (child of region — moves with partition drag)
+    // Principle: for Contour Gateway areas, gateway stays on the far right; its children stay on the left.
+    const contour = {
+      gatewayX: leftPad + col * 5.05,
+      httpProxyX: leftPad,
+      hostX: leftPad + col * 1.08,
+      routeX: leftPad + col * 2.10,
+      serviceX: leftPad + col * 3.10,
+      endpointsX: leftPad + col * 4.05,
+    };
+
     nodes.push({
       id: iid,
       type: "ingress",
       parentNode: regionId,
       extent: "parent",
       draggable: true,
-      position: { x: leftPad, y: layoutOriginY },
+      position: { x: isContourGateway ? contour.gatewayX : leftPad, y: layoutOriginY },
       data: {
         label: ing.name,
         subtitle: ing.namespace ? `namespace: ${ing.namespace}` : undefined,
@@ -144,7 +159,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         parentNode: regionId,
         extent: "parent",
         draggable: true,
-        position: { x: leftPad + col * 0.95, y: layoutOriginY + 6 },
+        position: { x: contour.httpProxyX, y: layoutOriginY + 6 },
         data: {
           label: "HTTPProxy Routes",
           subtitle: ing.namespace ? `namespace: ${ing.namespace}` : undefined,
@@ -183,7 +198,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         ingressRoutes.find((r) => r.host === host && r.tlsSecretName)?.tlsSecretName ??
         undefined;
 
-      const hostX = leftPad + col * 1.12;
+      const hostX = isContourGateway ? contour.hostX : leftPad + col * 1.12;
       maxX = Math.max(maxX, hostX + cardMaxW);
       nodes.push({
         id: hid,
@@ -214,7 +229,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           `${r.path}-${String(r.servicePort)}-${r.serviceName}`,
         )}-${routeIdx}`;
 
-        const routeX = leftPad + col * 2.05;
+        const routeX = isContourGateway ? contour.routeX : leftPad + col * 2.05;
         maxX = Math.max(maxX, routeX + cardMaxW);
         nodes.push({
           id: routeId,
@@ -281,7 +296,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       maxY = Math.max(maxY, svcY);
 
       const si = serviceByKey.get(s.skey);
-      const svcX = leftPad + col * 3.1;
+      const svcX = isContourGateway ? contour.serviceX : leftPad + col * 3.1;
       maxX = Math.max(maxX, svcX + cardMaxW);
       nodes.push({
         id: s.sid,
@@ -300,11 +315,18 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         },
       });
 
+      // Record a global handle for cross-area edges.
+      // Prefer non-HTTPProxy owners so gateway service resolves to the "real" Service node.
+      const prev = globalServiceNodeIdByKey.get(s.skey);
+      if (!prev || (prev.ownerKind === "HTTPProxy" && ing.kind !== "HTTPProxy")) {
+        globalServiceNodeIdByKey.set(s.skey, { nodeId: s.sid, ownerKind: ing.kind });
+      }
+
       const ep = epByKey.get(s.skey);
       if (ep?.addresses?.length) {
         const eid = `ep-${sanitizeId(`${iid}::${s.skey}`)}`;
         endpointIdByKey.set(s.skey, eid);
-        const epX = leftPad + col * 4.22;
+        const epX = isContourGateway ? contour.endpointsX : leftPad + col * 4.22;
         maxX = Math.max(maxX, epX + cardMaxW);
         nodes.push({
           id: eid,
@@ -333,55 +355,10 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
 
     // 2.5) For Contour Gateway: enforce Ingress -> Service(gateway) -> Contour Gateway -> HTTPProxy.
     if (ing.kind === "HTTPProxy") {
-      // Ensure gateway Service node exists even if no route directly targets it.
+      // IMPORTANT: do NOT create a duplicate gateway Service inside this Area.
+      // Instead, link from the already-rendered Service node (usually from an Ingress area).
       const gatewayServiceKey = resourceKey(ing.namespace, ing.name);
-      const gatewayScoped = `${iid}::${gatewayServiceKey}`;
-      if (!serviceIdByKey.has(gatewayScoped)) {
-        serviceIdByKey.set(gatewayScoped, `svc-${sanitizeId(gatewayScoped)}`);
-        routeYsByService.set(gatewayScoped, [layoutOriginY]);
-      }
-
-      // If serviceEntries were already placed above, the gateway service might be missing.
-      // Add it late if needed (with a reasonable y).
-      const gatewaySid = serviceIdByKey.get(gatewayScoped);
-      if (gatewaySid) {
-        // Create missing gateway service node if it wasn't rendered in step 2.
-        if (!nodes.some((n) => n.id === gatewaySid)) {
-          const y = layoutOriginY + 18;
-          const svcX = leftPad + col * 3.1;
-          const si = serviceByKey.get(gatewayServiceKey);
-          nodes.push({
-            id: gatewaySid,
-            type: "service",
-            parentNode: regionId,
-            extent: "parent",
-            draggable: true,
-            position: { x: svcX, y },
-            data: {
-              label: ing.name,
-              subtitle: ing.namespace ? `namespace: ${ing.namespace}` : undefined,
-              type: si?.type,
-              clusterIP: si?.clusterIP,
-              ports: si?.ports,
-              istioSubsets: si?.istioSubsets,
-            },
-          });
-          maxX = Math.max(maxX, svcX + cardMaxW);
-          maxY = Math.max(maxY, y);
-        }
-
-        // Service(gateway) -> Contour Gateway node
-        edges.push({
-          id: `e-${gatewaySid}-${iid}-gateway-${edgeIdx++}`,
-          source: gatewaySid,
-          target: iid,
-          type: edgeType,
-          label: "Contour Gateway",
-          style: { stroke: "#0f766e", strokeDasharray: "6 4" },
-          labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
-          labelBgStyle: { fill: "#ccfbf1", fillOpacity: 0.92 },
-        });
-      }
+      pendingServiceToGatewayEdges.push({ serviceKey: gatewayServiceKey, gatewayNodeId: iid });
     }
 
     // 3) Resize region to fit content
@@ -404,6 +381,24 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         rowMaxH = 0;
       }
     }
+  }
+
+  // Resolve cross-area edges after all nodes exist (order-independent).
+  for (const { serviceKey, gatewayNodeId } of pendingServiceToGatewayEdges) {
+    const svc = globalServiceNodeIdByKey.get(serviceKey);
+    if (!svc) continue;
+    edges.push({
+      id: `e-${svc.nodeId}-${gatewayNodeId}-gateway-${edgeIdx++}`,
+      source: svc.nodeId,
+      target: gatewayNodeId,
+      sourceHandle: "s-right",
+      targetHandle: "t-left",
+      type: edgeType,
+      label: "Contour Gateway",
+      style: { stroke: "#0f766e", strokeDasharray: "6 4" },
+      labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
+      labelBgStyle: { fill: "#ccfbf1", fillOpacity: 0.92 },
+    });
   }
 
   return { nodes, edges };

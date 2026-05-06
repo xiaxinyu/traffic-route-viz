@@ -133,6 +133,8 @@ export const IngressNode = memo(function IngressNode(props: NodeProps) {
   const hasTls = tls && tls.length > 0;
   return (
     <div style={{ ...cardStyle, borderLeft: "4px solid #4f46e5" }}>
+      <Handle type="target" position={Position.Left} id="t-left" />
+      <Handle type="target" position={Position.Right} id="t-right" />
       <div style={{ fontWeight: 700, color: "#1e293b" }}>
         {kind === "VirtualService"
           ? "VirtualService"
@@ -237,6 +239,7 @@ export const ServiceNode = memo(function ServiceNode(props: NodeProps) {
   return (
     <div style={{ ...cardStyle, borderLeft: "4px solid #6366f1" }}>
       <Handle type="target" position={Position.Left} />
+      <Handle type="source" position={Position.Left} id="s-left" />
       <div style={{ fontWeight: 700, color: "#4338ca", fontSize: 12 }}>Service</div>
       <div style={{ marginTop: 4, fontWeight: 700, color: "#312e81" }}>{label}</div>
       {subtitle ? <div style={meta()}>{subtitle}</div> : null}
@@ -258,7 +261,7 @@ export const ServiceNode = memo(function ServiceNode(props: NodeProps) {
           {ports.map((p) => `${p.port}→${p.targetPort ?? "?"}`).join(", ")}
         </div>
       ) : null}
-      <Handle type="source" position={Position.Right} />
+      <Handle type="source" position={Position.Right} id="s-right" />
     </div>
   );
 });
