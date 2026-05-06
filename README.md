@@ -68,9 +68,9 @@ npm run dev
 
 ## Deploy
 
-- **Docker**：`web/Dockerfile`（多阶段构建，产物由 Nginx 托管；SPA fallback 已配置）
-- **K8s**：本地可维护 `k8s/` 清单（默认已在 `.gitignore` 中忽略，不上传 GitHub）
-- 详细命令与注意事项见：`HARNESS_ENGINEERING.md`（“登录与发布”章节）
+- 发布入口见：`DEPLOYMENT.md`
+  - Docker：`web/Dockerfile`（多阶段构建，Nginx 托管；SPA fallback + `/config.json` no-store）
+  - K8s：参考 `DEPLOYMENT.md` 与 `HARNESS_ENGINEERING.md`（“登录与发布”章节）
 
 ## Tools
 
