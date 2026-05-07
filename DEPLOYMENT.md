@@ -82,11 +82,12 @@ docker run --rm -p 8080:80 traffic-route-viz:local
 docker login harbor.ms5-sit.aswatson.net:8080
 
 # 例：用日期 + git 短 sha 作为版本 tag（你也可以改成 v1.2.3）
-TAG="2026.05.07-$(git rev-parse --short HEAD)"
+# 注意：TAG 不能为空；如果你没先设置 TAG，下面会给一个默认值。
+TAG="${TAG:-"$(date +%Y.%m.%d)-$(git rev-parse --short HEAD 2>/dev/null || echo nogit)"}"
+echo "Using TAG=$TAG"
 
 docker buildx build --platform linux/amd64 \
   -t harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz:"$TAG" \
-  -t harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz:latest \
   -f web/Dockerfile web --push
 ```
 
