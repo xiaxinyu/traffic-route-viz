@@ -49,8 +49,8 @@
 
 ```bash
 cd web
-npm install
-npm run dev
+pnpm install --ignore-scripts
+pnpm run dev
 ```
 
 在页面左侧粘贴 YAML 或拖拽/选择多个 YAML 文件，图表会自动刷新。

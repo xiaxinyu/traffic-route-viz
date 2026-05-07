@@ -6,7 +6,7 @@
 - User-visible behavior change: Yes / No
 
 ## Test plan
-- [ ] `cd web && npm run ci`
+- [ ] `cd web && pnpm run ci`
 - [ ] Manual UX checks (per `CONTRIBUTING.md`)
 - [ ] If layout/semantic changes: verify against `HARNESS_ENGINEERING.md` DoD
 

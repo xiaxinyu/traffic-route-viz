@@ -29,9 +29,9 @@
 
 ```bash
 cd web
-npm install
-npm run dev
-npm run build
+pnpm install --ignore-scripts
+pnpm run dev
+pnpm run build
 ```
 
 ## Agent 切换建议（给下一位 Agent 的短提示）
@@ -40,7 +40,7 @@ npm run build
 
 ```
 请先读 @AGENTS.md @HARNESS_ENGINEERING.md @PROJECT_GUIDE.md 。
-目标是实现/修复 <你的目标>，并确保 web/ 下 npm run build 通过且不引入新 lints。
+目标是实现/修复 <你的目标>，并确保 web/ 下 pnpm run build 通过且不引入新 lints。
 画布相关行为以 HARNESS_ENGINEERING.md 为准。
 ```
 

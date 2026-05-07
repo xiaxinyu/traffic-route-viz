@@ -64,7 +64,7 @@ pnpm run preview
 
 - 仅 Ingress YAML：若缺少 Service/Endpoints，图只能画到 Service 名（不会凭空补资源）
 - 跨 namespace 引用当前不建模（除非扩展并同步规格/验收）
-- `npm install` 失败常见原因：网络超时或 `node_modules` 被占用/权限问题；可删除 `node_modules` 重装
+- `pnpm install` 失败常见原因：网络超时或 `node_modules` 被占用/权限问题；可删除 `node_modules` 重装
 
 ---
 
@@ -72,7 +72,7 @@ pnpm run preview
 
 ```
 请先读 @AGENTS.md @HARNESS_ENGINEERING.md @PROJECT_GUIDE.md 。
-目标是实现/修复 <你的目标>，并确保 web/ 下 npm run build 通过且不引入新 lints。
+目标是实现/修复 <你的目标>，并确保 web/ 下 pnpm run build 通过且不引入新 lints。
 画布相关行为以 HARNESS_ENGINEERING.md 为准。
 ```
 

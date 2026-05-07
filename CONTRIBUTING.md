@@ -6,8 +6,8 @@
 
 ```bash
 cd web
-npm install
-npm run dev
+pnpm install --ignore-scripts
+pnpm run dev
 ```
 
 ## 需求与验收

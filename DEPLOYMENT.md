@@ -18,9 +18,9 @@
 
 ```bash
 cd web
-npm install
-npm run build
-npm run preview
+pnpm install --ignore-scripts
+pnpm run build
+pnpm run preview
 ```
 
 ---
@@ -40,7 +40,7 @@ cp public/config.example.json public/config.json
 
 ```bash
 cd web
-npm run dev
+pnpm run dev
 ```
 
 ---
@@ -66,21 +66,52 @@ docker run --rm -p 8080:80 traffic-route-viz:local
 
 ---
 
-## 4. 推送镜像到镜像仓库（示例）
+## 4. 推送镜像到 Harbor（你的地址）
 
-把下面的 `<REGISTRY>/<NAMESPACE>/<IMAGE>:<TAG>` 替换为你的实际仓库地址：
+你最终要推送到：
+
+- `harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz:latest`
+
+### 4.1 推荐做法：同时推“可追溯版本 tag”+ `latest`
+
+理由：`latest` 方便部署与对接，但不利于回滚/审计；因此建议每次发布都带一个**可追溯 tag**，并额外更新 `latest` 指向同一份镜像。
+
+在仓库根目录执行（使用 `web/Dockerfile`，构建上下文为 `web/`）：
 
 ```bash
-docker login <REGISTRY>
+docker login harbor.ms5-sit.aswatson.net:8080
+
+# 例：用日期 + git 短 sha 作为版本 tag（你也可以改成 v1.2.3）
+TAG="2026.05.07-$(git rev-parse --short HEAD)"
+
 docker buildx build --platform linux/amd64 \
-  -t <REGISTRY>/<NAMESPACE>/traffic-route-viz:<TAG> \
+  -t harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz:"$TAG" \
+  -t harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz:latest \
   -f web/Dockerfile web --push
 ```
 
-说明：
+### 4.2 只推 `latest`（不推荐，但可用）
 
-- `--push`：直接推送到仓库（不要求在本机保留镜像）
-- 如需本地先验证再推送，用 `--load` 替代 `--push`
+```bash
+docker login harbor.ms5-sit.aswatson.net:8080
+docker buildx build --platform linux/amd64 \
+  -t harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz:latest \
+  -f web/Dockerfile web --push
+```
+
+### 4.3 推送后获取 digest（推荐用于 K8s 锁定）
+
+> 目的：在 Kubernetes 中用 `@sha256:<digest>` 固定镜像，避免 `latest` 被覆盖导致“同名不同物”。
+
+```bash
+docker buildx imagetools inspect harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz:latest
+```
+
+输出里会有 `Digest: sha256:...`。部署时可写成：
+
+```yaml
+image: harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz@sha256:<digest>
+```
 
 ---
 
