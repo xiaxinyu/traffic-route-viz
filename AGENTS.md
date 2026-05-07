@@ -18,6 +18,7 @@
 - 解析：`web/src/k8sParser.ts`
 - 多文件合并：`web/src/mergeYamlBundles.ts`
 - 构图/布局：`web/src/buildGraph.ts`
+- Ingress ↔ Istio URI 相交判定：`web/src/istioIngressPathMatch.ts`（由 `buildGraph` 调用）
 - 节点 UI：`web/src/FlowNodes.tsx`
 - 画布宿主：`web/src/App.tsx`
 - 手写边/会话文件：`web/src/diagramPersist.ts`

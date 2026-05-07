@@ -107,8 +107,7 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
         height: "100%",
         borderRadius: 16,
         border: "1px solid rgba(79, 70, 229, 0.22)",
-        background:
-          "linear-gradient(165deg, rgba(79,70,229,0.10), rgba(79,70,229,0.03))",
+        background: "linear-gradient(165deg, rgba(79,70,229,0.10), rgba(79,70,229,0.03))",
         boxSizing: "border-box",
         overflow: "hidden",
         display: "flex",
@@ -129,9 +128,7 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
         <div style={{ fontSize: 12, fontWeight: 800, color: "#312e81" }}>
           入口流量拓扑分区 · 第 {idx} 视图
         </div>
-        <div
-          style={{ fontSize: 11, marginTop: 4, color: "#4338ca", fontWeight: 700 }}
-        >
+        <div style={{ fontSize: 11, marginTop: 4, color: "#4338ca", fontWeight: 700 }}>
           {kindLabel2}：{ingressName ?? "—"}
         </div>
         {tierCode ? (
@@ -206,7 +203,12 @@ export const IngressNode = memo(function IngressNode(props: NodeProps) {
   return (
     <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}` }}>
       <Handle type="target" position={Position.Left} id="t-left" style={handle(accent, "left")} />
-      <Handle type="target" position={Position.Right} id="t-right" style={handle(accent, "right")} />
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="t-right"
+        style={handle(accent, "right")}
+      />
       <div style={titleRow()}>
         <span style={iconDot(accent)} />
         <span>
@@ -230,9 +232,7 @@ export const IngressNode = memo(function IngressNode(props: NodeProps) {
           LB / status IP: {loadBalancerIps.join(", ")}
         </div>
       ) : null}
-      <div style={{ ...meta(), marginTop: 6, fontWeight: 600, color: "#334155" }}>
-        TLS
-      </div>
+      <div style={{ ...meta(), marginTop: 6, fontWeight: 600, color: "#334155" }}>TLS</div>
       {hasTls ? (
         tls!.map((t, i) => (
           <div key={i} style={meta({ marginTop: 2 })}>
@@ -242,9 +242,7 @@ export const IngressNode = memo(function IngressNode(props: NodeProps) {
               <span>（无 secret 名）</span>
             )}
             {t.hosts?.length ? (
-              <div style={{ marginTop: 2 }}>
-                hosts: {t.hosts.join(", ")}
-              </div>
+              <div style={{ marginTop: 2 }}>hosts: {t.hosts.join(", ")}</div>
             ) : null}
           </div>
         ))
@@ -274,7 +272,12 @@ export const HostNode = memo(function HostNode(props: NodeProps) {
   return (
     <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}` }}>
       <Handle type="target" position={Position.Left} style={handle(accent, "left")} />
-      <Handle type="target" position={Position.Right} id="t-right" style={handle(accent, "right")} />
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="t-right"
+        style={handle(accent, "right")}
+      />
       <div style={titleRow()}>
         <span style={iconDot(accent)} />
         <span>Host</span>
@@ -290,16 +293,12 @@ export const HostNode = memo(function HostNode(props: NodeProps) {
       >
         {label}
       </div>
-      {ingressName ? (
-        <div style={meta()}>ingress: {ingressName}</div>
-      ) : null}
+      {ingressName ? <div style={meta()}>ingress: {ingressName}</div> : null}
       <div style={{ ...meta(), marginTop: 4, fontWeight: 600, color: "#334155" }}>
         TLS（此 Host）
       </div>
       {tlsSecretName ? (
-        <div style={{ ...meta(), color: "#1e40af", fontWeight: 600 }}>
-          secret: {tlsSecretName}
-        </div>
+        <div style={{ ...meta(), color: "#1e40af", fontWeight: 600 }}>secret: {tlsSecretName}</div>
       ) : (
         <div style={meta()}>
           {entryKind === "HTTPProxy"
@@ -314,7 +313,15 @@ export const HostNode = memo(function HostNode(props: NodeProps) {
 });
 
 export const ServiceNode = memo(function ServiceNode(props: NodeProps) {
-  const { label, subtitle, type: st, clusterIP, ports, backendPort, istioSubsets } = props.data as {
+  const {
+    label,
+    subtitle,
+    type: st,
+    clusterIP,
+    ports,
+    backendPort,
+    istioSubsets,
+  } = props.data as {
     label?: string;
     subtitle?: string;
     type?: string;
@@ -327,7 +334,12 @@ export const ServiceNode = memo(function ServiceNode(props: NodeProps) {
   return (
     <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}` }}>
       <Handle type="target" position={Position.Left} style={handle(accent, "left")} />
-      <Handle type="target" position={Position.Right} id="t-right" style={handle(accent, "right")} />
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="t-right"
+        style={handle(accent, "right")}
+      />
       <Handle type="source" position={Position.Left} id="s-left" style={handle(accent, "left")} />
       <div style={titleRow()}>
         <span style={iconDot(accent)} />
@@ -351,11 +363,15 @@ export const ServiceNode = memo(function ServiceNode(props: NodeProps) {
       ) : null}
       {ports?.length ? (
         <div style={{ fontSize: 11, marginTop: 4, color: "#475569" }}>
-          spec ports:{" "}
-          {ports.map((p) => `${p.port}→${p.targetPort ?? "?"}`).join(", ")}
+          spec ports: {ports.map((p) => `${p.port}→${p.targetPort ?? "?"}`).join(", ")}
         </div>
       ) : null}
-      <Handle type="source" position={Position.Right} id="s-right" style={handle(accent, "right")} />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="s-right"
+        style={handle(accent, "right")}
+      />
     </div>
   );
 });
@@ -366,7 +382,12 @@ export const HttpProxyNode = memo(function HttpProxyNode(props: NodeProps) {
   return (
     <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}`, background: "#f0fdfa" }}>
       <Handle type="target" position={Position.Left} style={handle(accent, "left")} />
-      <Handle type="target" position={Position.Right} id="t-right" style={handle(accent, "right")} />
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="t-right"
+        style={handle(accent, "right")}
+      />
       <div style={titleRow()}>
         <span style={iconDot(accent)} />
         <span>HTTPProxy</span>
@@ -391,7 +412,12 @@ export const IstioGatewayNode = memo(function IstioGatewayNode(props: NodeProps)
   return (
     <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}`, background: "#f0f9ff" }}>
       <Handle type="target" position={Position.Left} style={handle(accent, "left")} />
-      <Handle type="target" position={Position.Right} id="t-right" style={handle(accent, "right")} />
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="t-right"
+        style={handle(accent, "right")}
+      />
       <div style={titleRow()}>
         <span style={iconDot(accent)} />
         <span>Istio Gateway</span>
@@ -410,13 +436,18 @@ export const IstioGatewayNode = memo(function IstioGatewayNode(props: NodeProps)
                 {(s.hosts?.length ?? 0) > 2 ? ` (+${(s.hosts?.length ?? 0) - 2})` : ""}
               </div>
             ))}
-            {servers.length > 3 ? <div style={meta({ marginTop: 2 })}>…(+{servers.length - 3})</div> : null}
+            {servers.length > 3 ? (
+              <div style={meta({ marginTop: 2 })}>…(+{servers.length - 3})</div>
+            ) : null}
           </div>
         </div>
       ) : null}
       {selector && Object.keys(selector).length ? (
         <div style={{ ...meta({ marginTop: 6 }), color: "#334155" }}>
-          selector: {Object.entries(selector).map(([k, v]) => `${k}=${v}`).join(", ")}
+          selector:{" "}
+          {Object.entries(selector)
+            .map(([k, v]) => `${k}=${v}`)
+            .join(", ")}
         </div>
       ) : null}
       <Handle type="source" position={Position.Right} style={handle(accent, "right")} />
@@ -436,7 +467,12 @@ export const DestinationRuleNode = memo(function DestinationRuleNode(props: Node
   return (
     <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}`, background: "#f8fbff" }}>
       <Handle type="target" position={Position.Left} style={handle(accent, "left")} />
-      <Handle type="target" position={Position.Right} id="t-right" style={handle(accent, "right")} />
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="t-right"
+        style={handle(accent, "right")}
+      />
       <Handle type="source" position={Position.Right} style={handle(accent, "right")} />
       <div style={titleRow()}>
         <span style={iconDot(accent)} />
@@ -460,13 +496,13 @@ export const DestinationRuleNode = memo(function DestinationRuleNode(props: Node
 export const RouteNode = memo(function RouteNode(props: NodeProps) {
   const { path, pathType, serviceName, servicePort, upstreamServiceName, upstreamServicePort } =
     props.data as {
-    path?: string;
-    pathType?: string;
-    serviceName?: string;
-    servicePort?: number | string;
-    upstreamServiceName?: string;
-    upstreamServicePort?: number | string;
-  };
+      path?: string;
+      pathType?: string;
+      serviceName?: string;
+      servicePort?: number | string;
+      upstreamServiceName?: string;
+      upstreamServicePort?: number | string;
+    };
   const accent = "#6d28d9";
   return (
     <div
@@ -480,15 +516,18 @@ export const RouteNode = memo(function RouteNode(props: NodeProps) {
       }}
     >
       <Handle type="target" position={Position.Left} style={handle(accent, "left")} />
-      <Handle type="target" position={Position.Right} id="t-right" style={handle(accent, "right")} />
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="t-right"
+        style={handle(accent, "right")}
+      />
       <div style={titleRow()}>
         <span style={iconDot(accent)} />
         <span>Route</span>
         {pathType ? <span style={pill("#f3e8ff", "#6d28d9")}>{pathType}</span> : null}
       </div>
-      <div style={{ marginTop: 4, fontWeight: 800, color: "#0f172a" }}>
-        {path ?? "/"}
-      </div>
+      <div style={{ marginTop: 4, fontWeight: 800, color: "#0f172a" }}>{path ?? "/"}</div>
       <div style={{ ...meta(), marginTop: 4, color: "#4338ca", fontWeight: 700 }}>
         backend: {serviceName} :{String(servicePort ?? "?")}
       </div>
@@ -513,7 +552,12 @@ export const EndpointsNode = memo(function EndpointsNode(props: NodeProps) {
   return (
     <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}` }}>
       <Handle type="target" position={Position.Left} style={handle(accent, "left")} />
-      <Handle type="target" position={Position.Right} id="t-right" style={handle(accent, "right")} />
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="t-right"
+        style={handle(accent, "right")}
+      />
       <Handle type="source" position={Position.Right} style={handle(accent, "right")} />
       <div style={titleRow()}>
         <span style={iconDot(accent)} />
@@ -521,9 +565,7 @@ export const EndpointsNode = memo(function EndpointsNode(props: NodeProps) {
         <span style={pill("#ccfbf1", "#0f766e")}>Pod IP</span>
       </div>
       {serviceName ? (
-        <div style={{ ...meta(), fontWeight: 600, color: "#115e59" }}>
-          service: {serviceName}
-        </div>
+        <div style={{ ...meta(), fontWeight: 600, color: "#115e59" }}>service: {serviceName}</div>
       ) : null}
       <ul
         style={{
@@ -540,8 +582,7 @@ export const EndpointsNode = memo(function EndpointsNode(props: NodeProps) {
       </ul>
       {ports?.length ? (
         <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
-          端口:{" "}
-          {ports.map((p) => `${p.port}/${p.protocol ?? "TCP"}`).join(", ")}
+          端口: {ports.map((p) => `${p.port}/${p.protocol ?? "TCP"}`).join(", ")}
         </div>
       ) : null}
     </div>

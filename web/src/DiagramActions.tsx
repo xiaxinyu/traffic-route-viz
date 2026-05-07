@@ -15,11 +15,7 @@ import { exportDiagramToPng } from "./diagramExportPng";
 import { exportToDrawioXml } from "./diagramExportDrawio";
 import { exportToMermaid } from "./diagramExportMermaid";
 import type { DiagramFileV1, ImportedFilePersist } from "./diagramPersist";
-import {
-  DIAGRAM_FILE_EXTENSION,
-  parseDiagramFileJson,
-  serializeDiagram,
-} from "./diagramPersist";
+import { DIAGRAM_FILE_EXTENSION, parseDiagramFileJson, serializeDiagram } from "./diagramPersist";
 import { mergeParseResults, type ImportedYamlFile } from "./mergeYamlBundles";
 import { parseK8sYaml } from "./k8sParser";
 
@@ -152,7 +148,11 @@ export function DiagramActions(props: Props) {
 
   const onExportDrawio = useCallback(() => {
     const xml = exportToDrawioXml(nodes, edges, "traffic-route-viz");
-    downloadText(`traffic-route-viz-${Date.now()}.drawio.xml`, xml, "application/xml;charset=utf-8");
+    downloadText(
+      `traffic-route-viz-${Date.now()}.drawio.xml`,
+      xml,
+      "application/xml;charset=utf-8",
+    );
   }, [nodes, edges]);
 
   const applyLoadedDiagram = useCallback(
@@ -174,7 +174,15 @@ export function DiagramActions(props: Props) {
         setViewport(data.viewport);
       });
     },
-    [setYamlText, setImportedFiles, setActiveFileIndex, setNodes, setEdges, setParsedMsg, setViewport],
+    [
+      setYamlText,
+      setImportedFiles,
+      setActiveFileIndex,
+      setNodes,
+      setEdges,
+      setParsedMsg,
+      setViewport,
+    ],
   );
 
   const onDiagramFileChosen = useCallback(
@@ -202,6 +210,7 @@ export function DiagramActions(props: Props) {
     <Panel position="top-right" style={{ marginRight: 8, marginTop: 8 }}>
       <div
         data-save-png-hide="true"
+        data-testid="diagram-toolbar"
         className="diagram-toolbar-panel"
         style={{
           display: "flex",
@@ -220,6 +229,7 @@ export function DiagramActions(props: Props) {
           type="button"
           style={btnCompact}
           onClick={() => setOpen((v) => !v)}
+          data-testid="diagram-actions-toggle"
           aria-expanded={open}
           title="画布操作"
         >
@@ -247,6 +257,7 @@ export function DiagramActions(props: Props) {
                 await onExportPng();
                 setOpen(false);
               }}
+              data-testid="export-png"
             >
               导出 PNG
             </button>
@@ -257,6 +268,7 @@ export function DiagramActions(props: Props) {
                 onExportMermaid();
                 setOpen(false);
               }}
+              data-testid="export-mermaid"
             >
               导出 Mermaid
             </button>
@@ -267,6 +279,7 @@ export function DiagramActions(props: Props) {
                 onExportDrawio();
                 setOpen(false);
               }}
+              data-testid="export-drawio"
             >
               导出 draw.io
             </button>
@@ -277,6 +290,7 @@ export function DiagramActions(props: Props) {
                 onSaveDiagramJson();
                 setOpen(false);
               }}
+              data-testid="save-diagram"
             >
               保存画图文件
             </button>
@@ -284,6 +298,7 @@ export function DiagramActions(props: Props) {
               type="button"
               style={btnGhost}
               onClick={() => loadInputRef.current?.click()}
+              data-testid="open-diagram"
             >
               打开画图文件…
             </button>
@@ -295,7 +310,8 @@ export function DiagramActions(props: Props) {
               onChange={onDiagramFileChosen}
             />
             <div style={{ fontSize: 10, color: "#94a3b8", lineHeight: 1.35 }}>
-              画图文件（React Flow JSON）：可用 VS Code/Cursor 打开；可导出 Mermaid / draw.io 供第三方工具打开。
+              画图文件（React Flow JSON）：可用 VS Code/Cursor 打开；可导出 Mermaid / draw.io
+              供第三方工具打开。
             </div>
           </>
         ) : null}

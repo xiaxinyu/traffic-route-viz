@@ -21,7 +21,19 @@ npm run dev
 
 ```bash
 cd web
-npm run build
+pnpm install --ignore-scripts
+pnpm run ci
+```
+
+或单独执行（便于定位失败项）：
+
+```bash
+cd web
+pnpm run format:check
+pnpm run lint
+pnpm run typecheck
+pnpm test
+pnpm run build
 ```
 
 并且在 UI 上验证：

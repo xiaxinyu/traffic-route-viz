@@ -47,4 +47,3 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
   }
   return getRuntimeConfig();
 }
-

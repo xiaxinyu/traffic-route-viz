@@ -45,4 +45,3 @@ export function exportToMermaid(nodes: Node[], edges: Edge[]): string {
 
   return lines.join("\n") + "\n";
 }
-

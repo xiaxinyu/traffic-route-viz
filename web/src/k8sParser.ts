@@ -3,9 +3,7 @@ import { parseAllDocuments } from "yaml";
 export type K8sDoc = Record<string, unknown>;
 
 function asRecord(v: unknown): K8sDoc | null {
-  return v !== null && typeof v === "object" && !Array.isArray(v)
-    ? (v as K8sDoc)
-    : null;
+  return v !== null && typeof v === "object" && !Array.isArray(v) ? (v as K8sDoc) : null;
 }
 
 function getMeta(doc: K8sDoc): { name?: string; namespace?: string } {
@@ -124,8 +122,7 @@ function parseIngressTls(spec: Record<string, unknown> | null): IngressTlsEntry[
     const hosts = Array.isArray(t.hosts)
       ? t.hosts.filter((h): h is string => typeof h === "string")
       : [];
-    const secretName =
-      typeof t.secretName === "string" ? t.secretName : undefined;
+    const secretName = typeof t.secretName === "string" ? t.secretName : undefined;
     out.push({ hosts, secretName });
   }
   return out;
@@ -158,10 +155,7 @@ function tlsKey(t: IngressTlsEntry): string {
   return `${t.secretName ?? ""}|${t.hosts.join(",")}`;
 }
 
-function mergeIngressSummary(
-  a: IngressSummary | undefined,
-  b: IngressSummary,
-): IngressSummary {
+function mergeIngressSummary(a: IngressSummary | undefined, b: IngressSummary): IngressSummary {
   if (!a) return b;
   // Kind should be stable for the same key (we key by kind+ns+name).
   const tlsSeen = new Set(a.tls.map(tlsKey));
@@ -228,7 +222,9 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
   try {
     docs = parseAllDocuments(text).map((d) => {
       if (d.errors.length) {
-        d.errors.forEach((e) => errors.push(e.message));
+        d.errors.forEach((e) => {
+          errors.push(e.message);
+        });
       }
       return d.toJS();
     });
@@ -258,9 +254,7 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
       const ingressNs = meta.namespace;
       const spec = asRecord(o.spec);
       const className =
-        typeof spec?.ingressClassName === "string"
-          ? spec.ingressClassName
-          : undefined;
+        typeof spec?.ingressClassName === "string" ? spec.ingressClassName : undefined;
       const tlsBlocks = parseIngressTls(spec);
       const loadBalancerIps = parseIngressLbIps(o.status);
       const ikey = `Ingress:${resourceKey(ingressNs, ingressName)}`;
@@ -273,10 +267,7 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
         loadBalancerIps,
         sourceFiles: sourceFile ? [sourceFile] : [],
       };
-      ingressByKey.set(
-        ikey,
-        mergeIngressSummary(ingressByKey.get(ikey), incoming),
-      );
+      ingressByKey.set(ikey, mergeIngressSummary(ingressByKey.get(ikey), incoming));
 
       const tlsByHost = hostToTlsSecret(tlsBlocks);
 
@@ -291,20 +282,15 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
           const backend = asRecord(pathObj?.backend);
           const svc = asRecord(backend?.service);
           const portObj = asRecord(svc?.port);
-          const serviceName =
-            typeof svc?.name === "string" ? svc.name : "?";
-          let servicePort: number | string =
+          const serviceName = typeof svc?.name === "string" ? svc.name : "?";
+          const servicePort: number | string =
             typeof portObj?.number === "number"
               ? portObj.number
               : typeof portObj?.name === "string"
                 ? portObj.name
                 : "?";
-          const path =
-            typeof pathObj?.path === "string" ? pathObj.path : "/";
-          const pathType =
-            typeof pathObj?.pathType === "string"
-              ? pathObj.pathType
-              : undefined;
+          const path = typeof pathObj?.path === "string" ? pathObj.path : "/";
+          const pathType = typeof pathObj?.pathType === "string" ? pathObj.pathType : undefined;
           const tlsSecretName = tlsByHost.get(host);
           routes.push({
             ingressKind: "Ingress",
@@ -325,28 +311,20 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
     }
 
     // Contour HTTPProxy (minimal modeling as "Ingress-like" entry)
-    if (
-      kind === "HTTPProxy" &&
-      typeof api === "string" &&
-      api.startsWith("projectcontour.io/")
-    ) {
+    if (kind === "HTTPProxy" && typeof api === "string" && api.startsWith("projectcontour.io/")) {
       const meta = getMeta(o);
       const proxyName = meta.name ?? "(unnamed)";
       const proxyNs = meta.namespace;
       const spec = asRecord(o.spec);
       const className =
-        typeof spec?.ingressClassName === "string"
-          ? spec.ingressClassName
-          : undefined;
+        typeof spec?.ingressClassName === "string" ? spec.ingressClassName : undefined;
 
       // Host from metadata annotations (observed in your rbac-gateway.yaml)
       const metadataObj = asRecord(o.metadata);
       const annotations = asRecord(metadataObj?.annotations);
       const fqdnKey = "app.projectsesame.io/fqdn";
       const hostFromAnn =
-        typeof (annotations as Record<string, unknown> | undefined)?.[
-          fqdnKey
-        ] === "string"
+        typeof (annotations as Record<string, unknown> | undefined)?.[fqdnKey] === "string"
           ? ((annotations as Record<string, unknown>)[fqdnKey] as string)
           : undefined;
       const host = hostFromAnn ?? "*";
@@ -384,8 +362,7 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
         for (const svc of servicesArr) {
           const ss = asRecord(svc);
           const svcName = typeof ss?.name === "string" ? ss!.name : "?";
-          const portRaw = (ss as unknown as Record<string, unknown> | undefined)
-            ?.port;
+          const portRaw = (ss as unknown as Record<string, unknown> | undefined)?.port;
           let svcPort: number | string = "?";
           if (typeof portRaw === "number") svcPort = portRaw;
           else if (typeof portRaw === "string") svcPort = portRaw;
@@ -477,9 +454,12 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
           const mr = asRecord(m);
           const uri = asRecord(mr?.uri);
           if (uri) {
-            if (typeof uri.prefix === "string") matchPaths.push({ path: uri.prefix, pathType: "Prefix" });
-            else if (typeof uri.exact === "string") matchPaths.push({ path: uri.exact, pathType: "Exact" });
-            else if (typeof uri.regex === "string") matchPaths.push({ path: uri.regex, pathType: "Regex" });
+            if (typeof uri.prefix === "string")
+              matchPaths.push({ path: uri.prefix, pathType: "Prefix" });
+            else if (typeof uri.exact === "string")
+              matchPaths.push({ path: uri.exact, pathType: "Exact" });
+            else if (typeof uri.regex === "string")
+              matchPaths.push({ path: uri.regex, pathType: "Regex" });
           }
         }
         if (!matchPaths.length) matchPaths.push({ path: "*", pathType: undefined });
@@ -578,16 +558,14 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
       const key = resourceKey(ns, name);
       const spec = asRecord(o.spec);
       const type = typeof spec?.type === "string" ? spec.type : undefined;
-      const clusterIP =
-        typeof spec?.clusterIP === "string" ? spec.clusterIP : undefined;
+      const clusterIP = typeof spec?.clusterIP === "string" ? spec.clusterIP : undefined;
       const portList = Array.isArray(spec?.ports) ? spec.ports : [];
       const ports = portList.map((pp) => {
         const pr = asRecord(pp);
         return {
           port: typeof pr?.port === "number" ? pr.port : 0,
           targetPort: pr?.targetPort as number | string | undefined,
-          protocol:
-            typeof pr?.protocol === "string" ? pr.protocol : undefined,
+          protocol: typeof pr?.protocol === "string" ? pr.protocol : undefined,
         };
       });
       services.set(key, {
@@ -623,8 +601,7 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
           const por = asRecord(po);
           epPorts.push({
             port: typeof por?.port === "number" ? por.port : 0,
-            protocol:
-              typeof por?.protocol === "string" ? por.protocol : undefined,
+            protocol: typeof por?.protocol === "string" ? por.protocol : undefined,
           });
         }
       }

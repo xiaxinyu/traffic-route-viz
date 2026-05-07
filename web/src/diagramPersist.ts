@@ -48,8 +48,15 @@ export function mergeComputedEdgesKeepingManual(
 
 /** 手写连线样式：虚线以示与 YAML 拓扑区别 */
 export function manualEdgeFromConnection(connection: Connection): Edge {
+  if (!connection.source || !connection.target) {
+    // React Flow types allow null, but we only persist valid edges.
+    throw new Error("Invalid connection: missing source or target");
+  }
   return {
-    ...connection,
+    source: connection.source,
+    target: connection.target,
+    sourceHandle: connection.sourceHandle ?? null,
+    targetHandle: connection.targetHandle ?? null,
     id: `manual-${crypto.randomUUID()}`,
     type: "smoothstep",
     animated: false,
@@ -68,7 +75,9 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-export function serializeDiagram(payload: Omit<DiagramFileV1, "schemaVersion" | "savedAt">): string {
+export function serializeDiagram(
+  payload: Omit<DiagramFileV1, "schemaVersion" | "savedAt">,
+): string {
   const doc: DiagramFileV1 = {
     schemaVersion: DIAGRAM_FILE_VERSION,
     savedAt: new Date().toISOString(),

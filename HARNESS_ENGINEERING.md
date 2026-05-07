@@ -27,7 +27,8 @@
 
 - Gateway API（`HTTPRoute` 等）
 - `EndpointSlice`
-- 跨 namespace 引用（除非明确建模并同步更新解析/构图/验收）
+- **资源级跨 namespace 依赖**的系统性建模（例如把任意跨 ns 的后端解析成一条完整、可校验的调用图）
+  - **例外（仅可视化连线）**：`Service(gateway) → Istio Gateway` 的自动连线**只比较名称**，不按 namespace 对齐；这不等同于「已完成跨 namespace 引用的语义建模」，见下文 **§5.x**。
 
 ---
 
@@ -37,6 +38,7 @@
 - **分区 / Area / Region**：每个入口对象（Ingress / VirtualService / Contour Gateway）对应一个父节点 `ingressRegion`（紫色底板）
 - **手写边 / Manual Edge**：用户通过拖拽手柄添加的边，`edge.data.manual === true`
 - **画图文件 / Diagram File**：`*.traffic-viz.json`，用于保存/恢复会话
+- **路由 / Route（匹配语义）**：画布上每条 `path`/`http` 规则对应的 Route 节点；在对比 Ingress 与 Istio VirtualService 是否表述**同一类入口流量规则**时，**以路由条目为最小匹配单元**，**不按 Host 分层聚合后再做一套独立匹配**（Host 仍是拓扑展示挂点，不承载「匹配分桶」职责）。
 
 ---
 
@@ -146,10 +148,24 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 - `Host → Route → Service`：每条 path 一条路由，Route 节点承载信息避免边标签堆叠
 - `Service → Endpoints`：后端实例（Pod IP）
  - `Service → DestinationRule`：策略/子集配置（虚线）
- - `Service(gateway) → Istio Gateway`（必须）：当 Service 与 Istio Gateway 同 namespace/name 时，必须补跨 Area 连线；若存在多个引用同一 Gateway 的 VirtualService，则需要对 **Ingress 路由关键字** 与 **VirtualService 路由关键字** 做最小粒度匹配：
-   - **仅按 `/` 切割**路径（path 的天然结构）作为 token（例如 `/rts/sales` → `rts`, `sales`）
-   - 不再用空格/符号/正则等其它方式拆分（避免噪音 token 误匹配）
-  - 只连到匹配度最高的一组；**无命中时不自动连线**（避免错误拓扑），用户可用手写边补充关联。
+ - `Service(gateway) → Istio Gateway`（必须）：**Ingress backend Service 短名 ≡ Gateway CR 短名**，且两侧 **Ingress path 规则与 Istio VS HTTP URI 规则（Prefix/Exact/Regex）存在语义相交**；见 **§5.1**（**P1、P6、P5**，不按 namespace）。
+
+---
+
+### 5.1 原则沉淀：Ingress 侧 Service 与 Istio Gateway（跨 Area 自动连线）
+
+以下为本项目在 **Ingress（或等价入口）backend → 网关 workload** 与 **Istio VirtualService 所挂载 Gateway** 之间自动连线的 **唯一口径**（评审 / 验收 / 用户预期均以此为准）：
+
+| 编号 | 原则 | 说明 |
+| --- | --- | --- |
+| P1 | **同名前提（必要）** | **Kubernetes Service `metadata.name`** 与 **`spec.gateways` 中 Gateway 资源名**（`ns/gateway-name` 取 **`gateway-name`**；无 `/` 时整段为名）在 **忽略大小写** 下须相等；**仅靠同名不足以连线**，尚需 **P6**。 |
+| P2 | **不设 namespace 前提** | **不得**将 Service 与 Gateway CR 是否处于 **同一 namespace** 作为连线条件；**不存在**「必须同 namespace 才连」等与 **P6** 并列的备选策略。 |
+| P3 | **路由是匹配语义的最小单元** | **P6** 中路径比对以 **Ingress 每条 path / VirtualService 每条 HTTP URI 规则** 为粒度；**不按 Host 分层聚合后再匹配**。Host 仍为拓扑展示挂点。 |
+| P4 | **Service 节点与清单对齐（展示用）** | Ingress backend 推断 namespace 与真实 `Service` 不一致时：若导入清单中 **同名仅出现一次**，归并到该 `ns/name` 以对齐 ClusterIP / Endpoints；**P6** 中「指向该网关 backend」的规则仍按归并后的 `serviceKey` 收集。 |
+| P5 | **多 Ingress × 多 Istio Gateway（M×N）** | 在满足 **P1 + P6** 的前提下，对 **每一个** Ingress 分区内指向该 `serviceKey` 的 **Service 节点实例**，与 **每一个** Istio Gateway 节点（其名与 backend 同名）所在 **VirtualService 分区** 逐个判定；**通过者全连线**，不因「已有代表节点」而省略。VirtualService 分区内下游业务 Service 不参与此自动边。 |
+| P6 | **URI 规则相交（充分·路径维）** | 对候选 **Ingress 分区** × **VS 分区**：取 Ingress 侧 **凡 backend 为该 `serviceKey` 的规则**（`spec.rules[].http.paths[].path` + `pathType`）；取 VS 侧 **该分区全部 HTTP URI 匹配**（`spec.http[].match[].uri.prefix|exact|regex` 映射为 **Prefix / Exact / Regex**）。若存在 **任意一对** Ingress 规则与 VS 规则，二者在路径上 **`Exact`/`Prefix`/`Regex` 语义下可能同时命中某一请求路径**，则判定相交并允许连线。**ImplementationSpecific**：Ingress 侧按 **Prefix 近似** 处理（与实现一致）。**URI 省略或 Istio `"*"`**：视为匹配任意路径（与单侧全线相交）。Regex 侧使用 `RegExp` 及对 Ingress Prefix 的 **采样路径** 做保守检测；无法解析的正则则不判相交。判定实现见 **`web/src/istioIngressPathMatch.ts`**，`buildGraph.ts` 负责分区与路由收集。 |
+
+> **实现注意**：`Service → Istio Gateway` 在 `web/src/buildGraph.ts` 中仅在 **P1 ∧ P6**（及 **P5** 的 M×N 展开）成立时绘制；**P3** 仍约束「不写 Host 分桶匹配」。若需关联但自动规则未命中，用手写边补充。
 
 ---
 
@@ -200,6 +216,13 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 
 - **通用 Traffic 可视化定位**：面向 Kubernetes / Istio / Contour 的流量拓扑，不局限于 Ingress。
 - **Area（分区）呈现**：一行最多 4 个 Area，超出自动换行；Area 宽高应按内容动态扩展，避免内容溢出遮挡。
+- **防重叠初始布局（必须）**：自动构图时同一 `ingressRegion` 内 **禁止** Ingress/VirtualService 卡、Host、Route、Gateway、Service、DestinationRule、Endpoints 等卡片在初始坐标上互相压盖。
+  - **Route 不得在 Host 卡内部起笔**：首张 Route 的 `y` 必须位于为该 Host **预留的整块卡片估算高度之下**再加间隙（不得再使用 Host 顶端 + 极小偏移的旧模式）。
+  - **多 Host 纵向串联**：下一个 Host 的顶边必须在前一 Host **子树底边**（该 Host 下最后一条 Route 的底边，或「无 Route 时」Host 卡底边）**再加块间留白**之后开始；**禁止**仅用固定常量 `hostGap` 推导而不考虑上一 Host **实际路由条数**。
+  - **Istio Gateway 多实例**：多块 Gateway 卡须 **显式垂直栈间距**，并参与计算「顶端内容区下限」，以便 Host 带与左侧 Gateway 栈在纵向上 **取较高者 cleared 后再下放 Host**（与 Ingress/VS 头条估算底边一同取 **max**）。
+  - **多 Service**：在按 Route `y` median 初值对齐后，须按 **预估 Service 卡高 + gap** 做纵向碰撞-resolve，并保持 **DestinationRule** 占位在对应 Service **估算高度之下的独立留白带**。
+  - **常量与节点 UI 同步**：估高常量定义于 `web/src/buildGraph.ts`（`LAYOUT_EST_*`）；若 **`FlowNodes.tsx`** 卡片内边距/字体/可选字段显著变高或变矮，须在 **同一 MR** 内调整估算并在此处更新本条说明意图（避免再次出现结构性重叠）。
+  - **边线视觉**：初始布局以降低节点重叠为第一目标；多层边仍可共用出口点，但通过 **拉大列距与纵向间距** 减轻「糊成一束」的阅读问题（进一步拆 **sourceHandle / targetHandle** 为多条出口属增强项，按需另开任务）。
 - **文件名绑定**：导入文件后，Area 页眉必须展示来源文件名（不可出现“未绑定”状态）。
 - **Example 分层布局（必须）**：当导入的文件路径中存在 `01-*/02-*/03-*` 这样的 tier 目录时，Area 必须按层级固定到三列泳道：
   - `01-*`：最左列
@@ -208,8 +231,23 @@ kubectl apply -f k8s/traffic-route-viz.yaml
   - 同一列：**每行最多 1 个 Area**（超出则纵向堆叠）
   - `Active01` 必须排在 `Active02` 上方（同一列内排序规则）
   - 页面与 Area 标题中展示“有效文件夹信息”时，不应把 `01/02/03` 这种数字前缀当作业务信息展示（可做成 Level 标识或隐藏前缀后的展示）
+- **可编辑性（必须）**：画布是“可操作的工作台”，不是只读报表。用户能通过拖拽与手写边对拓扑进行补全与整理。
+  - **Area 可拖拽**：`ingressRegion`（分区底板）必须可拖拽；拖拽分区会带动其下所有子节点一起移动（保持相对布局）。
+  - **节点可拖拽**：分区内所有业务节点（Ingress/VirtualService/Istio Gateway/HTTPProxy/Host/Route/Service/Endpoints/DestinationRule）必须可单独拖拽（允许用户整理布局、避免遮挡）。
+  - **手写连线**：所有业务节点必须提供可见连接手柄（至少左右各一），允许用户在任意两节点之间手动拉线建立关联。
+  - **手写边可持续**：解析刷新/重新构图后，只要两端节点仍存在，手写边必须保留（丢失会破坏用户工作成果）；若端点消失则对应手写边应自动剔除。
+  - **手写边契约（必须，供持久化/合并）**：
+    - **数据标记**：手写边必须满足 `edge.data.manual === true`（用于在自动重算边时保留/去重）。
+    - **ID 约定**：手写边 `id` 推荐以 `manual-` 前缀生成（便于排查与区分来源）。
+    - **视觉样式**：手写边必须与系统自动边可视化区分，至少包含：
+      - 灰色描边（例：`stroke: #475569`）
+      - 虚线（例：`strokeDasharray: "6 4"`）
+      - 末端箭头（例：`markerEnd` 颜色与 stroke 一致）
+    - **连接线预览**：拖拽连线时的连接线（connection line）应为中性灰色，避免与业务语义边颜色混淆。
 - **手写边**：允许手柄拖线；手写边视觉区分（灰虚线）且在解析刷新后只要两端仍存在就应保留。
   - **可连线性（必须）**：画布中所有业务节点（Ingress/VirtualService/Istio Gateway/HTTPProxy/Host/Route/Service/Endpoints/DestinationRule）都必须提供可见的连接手柄（至少左右各一），确保用户可手动关联任意两节点（含跨 Area）。
+  - **Istio 网关跨区连线（必须与 §5.1 一致）**：**同名（P1）** + **URI 规则相交（P6）**；**禁止**仅以 namespace / Host 分桶决定是否连线。**M×N（P5）** 只对通过 **P6** 的 **（Ingress Service 结点 × Istio Gateway 结点）** 对连线。
+  - **路由粒度（语义）**：**P6** 的比对落在 **Ingress path + pathType** 与 **VS `uri.prefix|exact|regex`**；不按 Host 做匹配分桶。
 - **第三方导出**：提供 PNG；并支持导出 Mermaid / draw.io 以便第三方工具打开（画图会话文件为 React Flow JSON）。
 - **Contour Gateway 强制原则**：
   - **链路**：Ingress → Service → Contour Gateway（跨 Area 连线也必须稳定出现，不能因构图顺序缺失）。

@@ -32,9 +32,13 @@ export function AuthGate(props: { children: ReactNode; onAuthedChange?: (v: bool
   const auth = cfg.auth ?? {};
   const required = auth.enabled !== false;
   const hasCreds = typeof auth.username === "string" && typeof auth.password === "string";
-  const ttlHours = typeof auth.ttlHours === "number" && Number.isFinite(auth.ttlHours) ? auth.ttlHours : 8;
+  const ttlHours =
+    typeof auth.ttlHours === "number" && Number.isFinite(auth.ttlHours) ? auth.ttlHours : 8;
 
-  const initialAuthed = useMemo(() => (required && hasCreds ? !!readSession() : !required), [required, hasCreds]);
+  const initialAuthed = useMemo(
+    () => (required && hasCreds ? !!readSession() : !required),
+    [required, hasCreds],
+  );
   const [authed, setAuthed] = useState<boolean>(initialAuthed);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -58,7 +62,16 @@ export function AuthGate(props: { children: ReactNode; onAuthedChange?: (v: bool
     setErr(null);
     writeSession(ttlHours);
     setAuthedSafe(true);
-  }, [required, hasCreds, username, password, auth.username, auth.password, ttlHours, setAuthedSafe]);
+  }, [
+    required,
+    hasCreds,
+    username,
+    password,
+    auth.username,
+    auth.password,
+    ttlHours,
+    setAuthedSafe,
+  ]);
 
   if (!required) return <>{props.children}</>;
   if (!hasCreds) {
@@ -78,11 +91,13 @@ export function AuthGate(props: { children: ReactNode; onAuthedChange?: (v: bool
           <div style={{ fontWeight: 900, fontSize: 18, color: "#fff", letterSpacing: 0.2 }}>
             Traffic Route Viz
           </div>
-          <div style={{ marginTop: 8, color: "rgba(226,232,240,0.82)", fontSize: 13, lineHeight: 1.6 }}>
+          <div
+            style={{ marginTop: 8, color: "rgba(226,232,240,0.82)", fontSize: 13, lineHeight: 1.6 }}
+          >
             系统已开启<strong>强制登录</strong>，但未检测到账号密码配置。
             <br />
-            请在站点根目录提供{" "}
-            <code style={{ color: "#c7d2fe" }}>/config.json</code>（K8s 推荐用 ConfigMap 挂载），或在构建时设置{" "}
+            请在站点根目录提供 <code style={{ color: "#c7d2fe" }}>/config.json</code>（K8s 推荐用
+            ConfigMap 挂载），或在构建时设置{" "}
             <code style={{ color: "#c7d2fe" }}>VITE_AUTH_USER</code> /{" "}
             <code style={{ color: "#c7d2fe" }}>VITE_AUTH_PASS</code>。
           </div>
@@ -142,8 +157,11 @@ export function AuthGate(props: { children: ReactNode; onAuthedChange?: (v: bool
         <div style={{ fontWeight: 900, fontSize: 18, color: "#fff", letterSpacing: 0.2 }}>
           Traffic Route Viz
         </div>
-        <div style={{ marginTop: 6, color: "rgba(226,232,240,0.76)", fontSize: 13, lineHeight: 1.5 }}>
-          请输入账号密码进入系统。该登录配置来自运行时 <code style={{ color: "#c7d2fe" }}>/config.json</code>（K8s 可用 ConfigMap 注入）。
+        <div
+          style={{ marginTop: 6, color: "rgba(226,232,240,0.76)", fontSize: 13, lineHeight: 1.5 }}
+        >
+          请输入账号密码进入系统。该登录配置来自运行时{" "}
+          <code style={{ color: "#c7d2fe" }}>/config.json</code>（K8s 可用 ConfigMap 注入）。
         </div>
 
         <div
@@ -232,7 +250,14 @@ export function AuthGate(props: { children: ReactNode; onAuthedChange?: (v: bool
             登录
           </button>
 
-          <div style={{ marginTop: 10, fontSize: 11, color: "rgba(226,232,240,0.65)", lineHeight: 1.45 }}>
+          <div
+            style={{
+              marginTop: 10,
+              fontSize: 11,
+              color: "rgba(226,232,240,0.65)",
+              lineHeight: 1.45,
+            }}
+          >
             会话有效期：约 {ttlHours} 小时（可在 config 中调整）。
           </div>
         </div>
@@ -240,4 +265,3 @@ export function AuthGate(props: { children: ReactNode; onAuthedChange?: (v: bool
     </div>
   );
 }
-

@@ -7,3 +7,6 @@ k8s/
 # 常见系统文件
 .DS_Store
 Thumbs.db
+
+# pnpm store/cache (must not commit)
+.pnpm-store/

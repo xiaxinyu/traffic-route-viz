@@ -15,10 +15,7 @@ import "reactflow/dist/style.css";
 import { AuthGate, clearSession } from "./AuthGate";
 import { DiagramActions } from "./DiagramActions";
 import { buildFlowGraph } from "./buildGraph";
-import {
-  manualEdgeFromConnection,
-  mergeComputedEdgesKeepingManual,
-} from "./diagramPersist";
+import { manualEdgeFromConnection, mergeComputedEdgesKeepingManual } from "./diagramPersist";
 import {
   mergeParseResults,
   mergeYamlFiles,
@@ -179,9 +176,7 @@ function AppInner() {
       const src = overrideText ?? yamlText;
       const effectiveFiles = importedFilesOverride ?? importedFiles;
       const p = effectiveFiles?.length
-        ? mergeParseResults(
-            effectiveFiles.map((f) => parseK8sYaml(f.text, f.relPath ?? f.name)),
-          )
+        ? mergeParseResults(effectiveFiles.map((f) => parseK8sYaml(f.text, f.relPath ?? f.name)))
         : parseK8sYaml(src);
       const err = p.errors.length ? p.errors.join("\n") : null;
       setParsedMsg(err);
@@ -286,14 +281,14 @@ function AppInner() {
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 260 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-            <strong style={{ color: "#0f172a", fontSize: 14 }}>
-              Traffic Route Viz
-            </strong>
+            <strong style={{ color: "#0f172a", fontSize: 14 }}>Traffic Route Viz</strong>
             <span style={{ fontSize: 12, color: "#475569", fontWeight: 700 }}>
               通用 Traffic 拓扑可视化（Kubernetes / Istio / Contour）
             </span>
           </div>
-          <span style={{ fontSize: 11, color: "#64748b" }}>Entry → Host → Route → Service → Endpoints</span>
+          <span style={{ fontSize: 11, color: "#64748b" }}>
+            Entry → Host → Route → Service → Endpoints
+          </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           {getRuntimeConfig().auth?.enabled !== false ? (
@@ -361,11 +356,20 @@ function AppInner() {
           }}
         >
           <div style={{ padding: 12, borderBottom: "1px solid #f1f5f9" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 900 }}>输入</div>
                 <div style={{ fontSize: 11, color: "#64748b" }}>
-                  {importedFiles?.length ? `已导入 ${importedFiles.length} 个文件` : "可直接粘贴 YAML 或导入文件/文件夹"}
+                  {importedFiles?.length
+                    ? `已导入 ${importedFiles.length} 个文件`
+                    : "可直接粘贴 YAML 或导入文件/文件夹"}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 6 }}>
@@ -407,6 +411,7 @@ function AppInner() {
             </div>
 
             <div
+              data-testid="import-dropzone"
               onDragOver={(ev) => ev.preventDefault()}
               onDrop={async (ev) => {
                 ev.preventDefault();
@@ -547,9 +552,7 @@ function AppInner() {
                       background: "#fff",
                     }}
                   >
-                    <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>
-                      文件列表
-                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>文件列表</div>
                     <div style={{ fontSize: 11, color: "#64748b" }}>
                       点击仅切换左侧内容；图表以“合并视图”解析
                     </div>
@@ -646,6 +649,7 @@ function AppInner() {
           ) : (
             <textarea
               value={yamlText}
+              data-testid="yaml-textarea"
               onChange={(e) => {
                 const next = e.target.value;
                 setYamlText(next);
@@ -678,6 +682,7 @@ function AppInner() {
         </aside>
         <div ref={flowContainerRef} style={{ flex: 1, minWidth: 0 }}>
           <ReactFlow
+            data-testid="react-flow"
             nodes={nodes}
             edges={edges}
             onNodesChange={onNodesChange}
@@ -694,10 +699,7 @@ function AppInner() {
           >
             <Background gap={14} />
             <Controls />
-            <MiniMap
-              nodeStrokeWidth={2}
-              maskColor="rgba(15,23,42,0.08)"
-            />
+            <MiniMap nodeStrokeWidth={2} maskColor="rgba(15,23,42,0.08)" />
             <DiagramActions
               yamlText={yamlText}
               setYamlText={setYamlText}

@@ -45,10 +45,11 @@ traffic-route-viz/
 
 ```bash
 cd web
-npm install
-npm run dev
-npm run build
-npm run preview
+pnpm install --ignore-scripts
+pnpm run dev
+pnpm run ci
+pnpm run build
+pnpm run preview
 ```
 
 ---

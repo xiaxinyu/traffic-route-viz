@@ -21,8 +21,8 @@ function nodeTitle(n: Node): string {
 }
 
 function absPos(n: Node, byId: Map<string, Node>): { x: number; y: number } {
-  let x = (n.position?.x ?? 0);
-  let y = (n.position?.y ?? 0);
+  let x = n.position?.x ?? 0;
+  let y = n.position?.y ?? 0;
   let p = n.parentNode ? byId.get(n.parentNode) : undefined;
   while (p) {
     x += p.position?.x ?? 0;
@@ -37,7 +37,11 @@ function absPos(n: Node, byId: Map<string, Node>): { x: number; y: number } {
  * - Uses nodes' current positions (absolute) as geometry.
  * - Imports into draw.io via File -> Import From -> Device (or open the .drawio.xml).
  */
-export function exportToDrawioXml(nodes: Node[], edges: Edge[], diagramName = "traffic-route-viz"): string {
+export function exportToDrawioXml(
+  nodes: Node[],
+  edges: Edge[],
+  diagramName = "traffic-route-viz",
+): string {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const realNodes = nodes.filter((n) => n.type !== "ingressRegion");
   const realIds = new Set(realNodes.map((n) => n.id));
@@ -47,9 +51,13 @@ export function exportToDrawioXml(nodes: Node[], edges: Edge[], diagramName = "t
 
   const parts: string[] = [];
   parts.push('<?xml version="1.0" encoding="UTF-8"?>');
-  parts.push(`<mxfile host="app.diagrams.net" modified="${new Date().toISOString()}" agent="traffic-route-viz">`);
+  parts.push(
+    `<mxfile host="app.diagrams.net" modified="${new Date().toISOString()}" agent="traffic-route-viz">`,
+  );
   parts.push(`  <diagram name="${esc(diagramName)}">`);
-  parts.push('    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">');
+  parts.push(
+    '    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">',
+  );
   parts.push("      <root>");
   parts.push('        <mxCell id="0"/>');
   parts.push('        <mxCell id="1" parent="0"/>');
@@ -62,8 +70,12 @@ export function exportToDrawioXml(nodes: Node[], edges: Edge[], diagramName = "t
     const value = esc(nodeTitle(n));
     const style =
       "rounded=1;whiteSpace=wrap;html=1;strokeColor=#94a3b8;fillColor=#ffffff;fontSize=12;spacing=10;";
-    parts.push(`        <mxCell id="${esc(id)}" value="${value}" style="${style}" vertex="1" parent="1">`);
-    parts.push(`          <mxGeometry x="${x}" y="${y}" width="${w}" height="${h}" as="geometry"/>`);
+    parts.push(
+      `        <mxCell id="${esc(id)}" value="${value}" style="${style}" vertex="1" parent="1">`,
+    );
+    parts.push(
+      `          <mxGeometry x="${x}" y="${y}" width="${w}" height="${h}" as="geometry"/>`,
+    );
     parts.push("        </mxCell>");
   }
 
@@ -89,4 +101,3 @@ export function exportToDrawioXml(nodes: Node[], edges: Edge[], diagramName = "t
 
   return parts.join("\n");
 }
-
