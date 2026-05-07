@@ -55,11 +55,11 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   const LAYOUT_AFTER_SERVICE_PLUS_DR_GAP = 32; // DestinationRule stacked under Service
   const LAYOUT_EST_DR_CARD_H = 120;
   const baseX = 40;
-  const baseY = 20;
+  const baseY = 8;
   const areaGapX = 80;
   const areaGapY = 90;
   /** 分区标题区（Ingress 名、命名空间、来源等）高度预留，避免子节点与标题文字重叠 */
-  const regionHeaderReserveY = 168;
+  const regionHeaderReserveY = 140;
   const ingressBlockMinW = Math.round(col * 4.2);
   /** 右侧 Endpoints 卡片宽度上界（用于估算区域宽度） */
   const cardMaxW = 360;
@@ -650,7 +650,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     // 3) Resize region to fit content
     const region = nodes[regionNodeIdx];
     if (region) {
-      const h = Math.max(760, maxY + 44);
+      const h = Math.max(620, maxY + 36);
       const w = Math.max(ingressBlockMinW, Math.ceil(maxX + leftPad));
       region.style = { ...(region.style ?? {}), height: h, width: w };
 
