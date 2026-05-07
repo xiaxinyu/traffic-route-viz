@@ -38,7 +38,7 @@ const btnPrimary: CSSProperties = {
   padding: "6px 10px",
   borderRadius: 8,
   border: "none",
-  background: "#4f46e5",
+  background: "#0f766e",
   color: "#fff",
   fontWeight: 600,
   fontSize: 12,
@@ -215,19 +215,19 @@ export function DiagramActions(props: Props) {
         data-save-png-hide="true"
         data-testid="diagram-toolbar"
         className="diagram-toolbar-panel"
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 6,
-          padding: open ? "8px 10px" : 0,
-          background: open ? "rgba(255,255,255,0.96)" : "transparent",
-          borderRadius: open ? 12 : 999,
-          border: open ? "1px solid #e2e8f0" : "none",
-          boxShadow: open ? "0 2px 12px rgba(15,23,42,0.08)" : "none",
-          minWidth: open ? 156 : undefined,
-          fontFamily: 'system-ui, "Segoe UI", sans-serif',
-        }}
-      >
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            padding: open ? "8px 10px" : 0,
+            background: open ? "rgba(255,255,255,0.96)" : "transparent",
+            borderRadius: open ? 12 : 999,
+            border: open ? "1px solid #dbe4ea" : "none",
+            boxShadow: open ? "0 2px 12px rgba(15,23,42,0.08)" : "none",
+            minWidth: open ? 156 : undefined,
+            fontFamily: '"Avenir Next", "Segoe UI", "PingFang SC", sans-serif',
+          }}
+        >
         <button
           type="button"
           style={btnCompact}
@@ -246,7 +246,7 @@ export function DiagramActions(props: Props) {
               style={{
                 fontSize: 10,
                 fontWeight: 700,
-                color: "#64748b",
+                color: "#4b5563",
                 letterSpacing: 0.3,
                 marginTop: 2,
               }}

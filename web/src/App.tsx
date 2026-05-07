@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, {
   Background,
   ConnectionMode,
@@ -8,15 +8,24 @@ import ReactFlow, {
   applyEdgeChanges,
   useEdgesState,
   useNodesState,
+  useReactFlow,
   type Connection,
-  type EdgeChange,
   type Edge,
+  type EdgeChange,
 } from "reactflow";
 import "reactflow/dist/style.css";
 
 import { AuthGate, clearSession } from "./AuthGate";
 import { DiagramActions } from "./DiagramActions";
 import { buildFlowGraph } from "./buildGraph";
+import {
+  buildGraphMetrics,
+  buildGraphPresentation,
+  formatClockTime,
+  NODE_TYPE_ORDER,
+  nodeTypeLabel,
+  type NodeTypeFilter,
+} from "./graphViewState";
 import {
   manualEdgeFromConnection,
   mergeComputedEdgesKeepingManual,
@@ -158,11 +167,16 @@ function AppInner() {
   const [yamlText, setYamlText] = useState(SAMPLE);
   const [parsedMsg, setParsedMsg] = useState<string | null>(null);
   const [importedFiles, setImportedFiles] = useState<ImportedYamlFile[] | null>(null);
-  // null means "merged view"; otherwise index into importedFiles
   const [activeFileIndex, setActiveFileIndex] = useState<number | null>(null);
   const [leftMode, setLeftMode] = useState<"files" | "yaml">("files");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<NodeTypeFilter>("all");
+  const [matchCursor, setMatchCursor] = useState(0);
+  const [lastAppliedAt, setLastAppliedAt] = useState(() => Date.now());
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const flowContainerRef = useRef<HTMLDivElement | null>(null);
+  const { fitView, setCenter } = useReactFlow();
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
     const p = parseK8sYaml(SAMPLE);
@@ -171,6 +185,19 @@ function AppInner() {
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges] = useEdgesState(initialEdges);
+
+  const graphMetrics = useMemo(() => buildGraphMetrics(nodes, edges), [nodes, edges]);
+
+  const graphPresentation = useMemo(
+    () =>
+      buildGraphPresentation(nodes, edges, {
+        query: searchQuery,
+        typeFilter,
+      }),
+    [nodes, edges, searchQuery, typeFilter],
+  );
+
+  const selectedNode = useMemo(() => nodes.find((n) => n.selected), [nodes]);
 
   const onConnect = useCallback(
     (c: Connection) =>
@@ -189,10 +216,12 @@ function AppInner() {
       }),
     [setEdges],
   );
+
   const onReconnect = useCallback(
     (oldEdge: Edge, c: Connection) => setEdges((eds) => reconnectEdgeAsManual(oldEdge, c, eds)),
     [setEdges],
   );
+
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)),
     [setEdges],
@@ -205,14 +234,17 @@ function AppInner() {
       const p = effectiveFiles?.length
         ? mergeParseResults(effectiveFiles.map((f) => parseK8sYaml(f.text, f.relPath ?? f.name)))
         : parseK8sYaml(src);
+
       const err = p.errors.length ? p.errors.join("\n") : null;
       setParsedMsg(err);
+
       const { nodes: n, edges: e } = buildFlowGraph(p);
       const ids = new Set(n.map((x) => x.id));
       setNodes(n);
       setEdges((prev) => mergeComputedEdgesKeepingManual(prev, e, ids));
+      setLastAppliedAt(Date.now());
     },
-    [yamlText, importedFiles, setNodes, setEdges, setParsedMsg],
+    [yamlText, importedFiles, setNodes, setEdges],
   );
 
   const mergedImportedText = useMemo(() => {
@@ -220,8 +252,8 @@ function AppInner() {
   }, [importedFiles]);
 
   const displayPath = useCallback((f: ImportedYamlFile) => f.relPath ?? f.name, []);
+
   const displayFolderHint = useCallback((p: string) => {
-    // remove "01/02/03" numeric prefix from segments like "01-foo-bar"
     return p
       .split("/")
       .filter(Boolean)
@@ -230,11 +262,38 @@ function AppInner() {
       .join(" / ");
   }, []);
 
+  const focusNodeById = useCallback(
+    (id: string) => {
+      const n = nodes.find((x) => x.id === id);
+      if (!n) return;
+      const pos = n.positionAbsolute ?? n.position;
+      const w = n.width ?? 220;
+      const h = n.height ?? 80;
+      setCenter(pos.x + w / 2, pos.y + h / 2, { zoom: 1.06, duration: 260 });
+    },
+    [nodes, setCenter],
+  );
+
+  const jumpToMatch = useCallback(
+    (nextCursor: number) => {
+      const total = graphPresentation.matchedNodeIds.length;
+      if (!total) return;
+      const normalized = ((nextCursor % total) + total) % total;
+      setMatchCursor(normalized);
+      const nodeId = graphPresentation.matchedNodeIds[normalized];
+      if (nodeId) focusNodeById(nodeId);
+    },
+    [graphPresentation.matchedNodeIds, focusNodeById],
+  );
+
+  useEffect(() => {
+    setMatchCursor(0);
+  }, [searchQuery, typeFilter]);
+
   const readDroppedFiles = useCallback(async (dt: DataTransfer): Promise<ImportedYamlFile[]> => {
     const items = Array.from(dt.items ?? []);
     const hasEntryApi = items.some((it) => typeof (it as any).webkitGetAsEntry === "function");
     if (!hasEntryApi) {
-      // Fallback: plain file drop (no folder structure)
       return await readImportedYamlFiles(dt.files);
     }
 
@@ -250,7 +309,7 @@ function AppInner() {
     const out: ImportedYamlFile[] = [];
     const visit = async (entry: Entry): Promise<void> => {
       if (entry.isFile && entry.file) {
-        const file = await new Promise<File>((resolve) => entry.file!(resolve));
+        const file = await new Promise<File>((resolve) => entry.file?.(resolve));
         const name = file.name;
         const relPath =
           typeof entry.fullPath === "string"
@@ -285,152 +344,131 @@ function AppInner() {
       const keyOf = (f: ImportedYamlFile) => f.relPath ?? f.name;
       const m = new Map<string, ImportedYamlFile>();
       for (const f of prev ?? []) m.set(keyOf(f), f);
-      for (const f of next) m.set(keyOf(f), f); // next wins (refresh/overwrite)
+      for (const f of next) m.set(keyOf(f), f);
       return [...m.values()].sort((a, b) => keyOf(a).localeCompare(keyOf(b)));
     },
     [],
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      <header
-        style={{
-          flexShrink: 0,
-          padding: "10px 14px",
-          borderBottom: "1px solid #e2e8f0",
-          background: "rgba(248,250,252,0.92)",
-          backdropFilter: "blur(8px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-        }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 260 }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-            <strong style={{ color: "#0f172a", fontSize: 14 }}>Traffic Route Viz</strong>
-            <span style={{ fontSize: 12, color: "#475569", fontWeight: 700 }}>
-              通用 Traffic 拓扑可视化（Kubernetes / Istio / Contour）
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="header-title-wrap">
+          <h1>Traffic Route Viz</h1>
+          <p>专业化流量拓扑工作台：导入、解析、筛选、定位、导出一体化</p>
+        </div>
+
+        <div className="header-main-controls">
+          <input
+            className="search-input"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") jumpToMatch(matchCursor + 1);
+            }}
+            placeholder="搜索节点（name / host / path / service）"
+            aria-label="搜索节点"
+          />
+
+          <div className="search-nav">
+            <button
+              type="button"
+              onClick={() => jumpToMatch(matchCursor - 1)}
+              disabled={!graphPresentation.matchedNodeIds.length}
+            >
+              上一个
+            </button>
+            <button
+              type="button"
+              onClick={() => jumpToMatch(matchCursor + 1)}
+              disabled={!graphPresentation.matchedNodeIds.length}
+            >
+              下一个
+            </button>
+            <span>
+              {graphPresentation.matchedNodeIds.length
+                ? `${matchCursor + 1}/${graphPresentation.matchedNodeIds.length}`
+                : "0/0"}
             </span>
           </div>
-          <span style={{ fontSize: 11, color: "#64748b" }}>
-            Entry → Host → Route → Service → Endpoints
-          </span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => applyYaml(mergedImportedText ?? yamlText)}
+            title="重新解析 YAML 并刷新拓扑"
+          >
+            刷新拓扑
+          </button>
+
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => fitView({ padding: 0.18, duration: 240 })}
+            title="将拓扑重新适配到当前画布"
+          >
+            适配视图
+          </button>
+
           {getRuntimeConfig().auth?.enabled !== false ? (
             <button
               type="button"
+              className="btn-secondary"
               onClick={() => {
                 clearSession();
                 window.location.reload();
-              }}
-              style={{
-                padding: "8px 10px",
-                borderRadius: 999,
-                border: "1px solid #e2e8f0",
-                background: "#fff",
-                color: "#334155",
-                fontWeight: 800,
-                cursor: "pointer",
               }}
               title="退出登录"
             >
               退出
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={() => applyYaml(mergedImportedText ?? yamlText)}
-            style={{
-              padding: "8px 12px",
-              borderRadius: 999,
-              border: "none",
-              background: "#4f46e5",
-              color: "#fff",
-              fontWeight: 700,
-              cursor: "pointer",
-              boxShadow: "0 2px 10px rgba(15,23,42,0.12)",
-            }}
-            title="重新解析 YAML 并刷新拓扑"
-          >
-            刷新拓扑
-          </button>
+        </div>
+
+        <div className="header-status-strip" data-testid="top-status-strip">
+          <span className="status-pill">节点 {graphMetrics.nodeCount}</span>
+          <span className="status-pill">边 {graphMetrics.edgeCount}</span>
+          <span className="status-pill">自动边 {graphMetrics.autoEdgeCount}</span>
+          <span className="status-pill">手写边 {graphMetrics.manualEdgeCount}</span>
+          <span className="status-pill">
+            最近刷新 {formatClockTime(lastAppliedAt)}
+            {parsedMsg ? "（有告警）" : "（正常）"}
+          </span>
         </div>
       </header>
+
       {parsedMsg ? (
-        <div
-          style={{
-            padding: "8px 16px",
-            background: "#fef2f2",
-            color: "#b91c1c",
-            fontSize: 12,
-            whiteSpace: "pre-wrap",
-          }}
-        >
-          解析告警: {parsedMsg}
+        <div className="parse-warning" data-testid="parse-warning">
+          <strong>解析告警：</strong>
+          <pre>{parsedMsg}</pre>
         </div>
       ) : null}
-      <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
-        <aside
-          style={{
-            width: 380,
-            flexShrink: 0,
-            borderRight: "1px solid #e2e8f0",
-            display: "flex",
-            flexDirection: "column",
-            background: "#fff",
-          }}
-        >
-          <div style={{ padding: 12, borderBottom: "1px solid #f1f5f9" }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <div style={{ fontSize: 13, color: "#0f172a", fontWeight: 900 }}>输入</div>
-                <div style={{ fontSize: 11, color: "#64748b" }}>
+
+      <div className="main-body">
+        <aside className="left-panel">
+          <section className="left-panel-block">
+            <div className="block-title-row">
+              <div>
+                <div className="block-title">输入与数据源</div>
+                <div className="block-subtitle">
                   {importedFiles?.length
-                    ? `已导入 ${importedFiles.length} 个文件`
-                    : "可直接粘贴 YAML 或导入文件/文件夹"}
+                    ? `已导入 ${importedFiles.length} 个文件（默认合并解析）`
+                    : "可粘贴 YAML，或导入多文件/文件夹进行合并解析"}
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 6 }}>
+
+              <div className="mode-switch">
                 <button
                   type="button"
+                  className={leftMode === "files" ? "active" : ""}
                   onClick={() => setLeftMode("files")}
-                  style={{
-                    padding: "6px 10px",
-                    borderRadius: 999,
-                    border: "1px solid " + (leftMode === "files" ? "#4f46e5" : "#e2e8f0"),
-                    background: leftMode === "files" ? "#eef2ff" : "#fff",
-                    color: leftMode === "files" ? "#3730a3" : "#334155",
-                    cursor: "pointer",
-                    fontSize: 12,
-                    fontWeight: 800,
-                  }}
-                  title="查看已导入文件列表"
                 >
                   文件
                 </button>
                 <button
                   type="button"
+                  className={leftMode === "yaml" ? "active" : ""}
                   onClick={() => setLeftMode("yaml")}
-                  style={{
-                    padding: "6px 10px",
-                    borderRadius: 999,
-                    border: "1px solid " + (leftMode === "yaml" ? "#4f46e5" : "#e2e8f0"),
-                    background: leftMode === "yaml" ? "#eef2ff" : "#fff",
-                    color: leftMode === "yaml" ? "#3730a3" : "#334155",
-                    cursor: "pointer",
-                    fontSize: 12,
-                    fontWeight: 800,
-                  }}
-                  title="查看/编辑 YAML 文本"
                 >
                   YAML
                 </button>
@@ -439,6 +477,7 @@ function AppInner() {
 
             <div
               data-testid="import-dropzone"
+              className="import-dropzone"
               onDragOver={(ev) => ev.preventDefault()}
               onDrop={async (ev) => {
                 ev.preventDefault();
@@ -452,31 +491,21 @@ function AppInner() {
                 setYamlText(merged);
                 applyYaml(merged, combined);
               }}
-              style={{
-                marginTop: 10,
-                padding: "12px 12px",
-                borderRadius: 12,
-                border: "1.5px dashed rgba(79,70,229,0.35)",
-                background: "#f5f3ff",
-                color: "#3730a3",
-                fontSize: 12,
-                cursor: "pointer",
-              }}
               onClick={() => fileInputRef.current?.click()}
               role="button"
               tabIndex={0}
             >
-              <div style={{ fontWeight: 900 }}>导入 YAML 文件 / 文件夹</div>
-              <div style={{ fontSize: 11, color: "#6d28d9", marginTop: 6, lineHeight: 1.35 }}>
-                支持多选文件夹（追加导入、按相对路径去重），多文件会用 <code>---</code> 合并解析
+              <div className="dropzone-title">导入 YAML 文件 / 文件夹</div>
+              <div className="dropzone-desc">
+                支持多文件夹追加导入、相对路径去重；导入后自动解析并刷新画布。
               </div>
               {importedFiles?.length ? (
-                <div style={{ fontSize: 11, color: "#5b21b6", marginTop: 6 }}>
+                <div className="dropzone-files">
                   {importedFiles
                     .slice(0, 3)
                     .map((f) => displayPath(f))
                     .join(", ")}
-                  {importedFiles.length > 3 ? `...(+${importedFiles.length - 3})` : ""}
+                  {importedFiles.length > 3 ? ` ...(+${importedFiles.length - 3})` : ""}
                 </div>
               ) : null}
             </div>
@@ -504,32 +533,22 @@ function AppInner() {
             />
 
             {importedFiles?.length ? (
-              <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
+              <div className="inline-actions">
                 <button
                   type="button"
+                  className="btn-secondary"
                   onClick={() => {
                     setActiveFileIndex(null);
                     const merged = mergeYamlFiles(importedFiles);
                     setYamlText(merged);
                     setLeftMode("yaml");
                   }}
-                  style={{
-                    padding: "7px 10px",
-                    borderRadius: 10,
-                    border: "1px solid #e2e8f0",
-                    background: "#fff",
-                    color: "#334155",
-                    cursor: "pointer",
-                    fontSize: 12,
-                    fontWeight: 800,
-                    flex: 1,
-                  }}
-                  title="图表解析默认按合并视图；这里可快速切换到合并后的 YAML"
                 >
                   查看合并 YAML
                 </button>
                 <button
                   type="button"
+                  className="btn-danger"
                   onClick={() => {
                     setImportedFiles(null);
                     setActiveFileIndex(null);
@@ -538,180 +557,105 @@ function AppInner() {
                     setLeftMode("yaml");
                     applyYaml(SAMPLE, null);
                   }}
-                  style={{
-                    padding: "7px 10px",
-                    borderRadius: 10,
-                    border: "1px solid rgba(239,68,68,0.25)",
-                    background: "rgba(254,242,242,0.9)",
-                    color: "#b91c1c",
-                    cursor: "pointer",
-                    fontSize: 12,
-                    fontWeight: 900,
-                  }}
-                  title="清空导入并恢复示例"
                 >
                   清空
                 </button>
               </div>
             ) : null}
-          </div>
-          {leftMode === "files" ? (
-            <div style={{ flex: 1, minHeight: 0, padding: 10 }}>
-              {importedFiles?.length ? (
-                <div
-                  style={{
-                    height: "100%",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: 12,
-                    overflow: "hidden",
-                    display: "flex",
-                    flexDirection: "column",
-                  }}
+          </section>
+
+          <section className="left-panel-block compact">
+            <div className="block-title">图谱筛选</div>
+            <div className="type-filter-wrap">
+              {NODE_TYPE_ORDER.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className={typeFilter === t ? "active" : ""}
+                  onClick={() => setTypeFilter(t)}
                 >
-                  <div
-                    style={{
-                      padding: "10px 10px",
-                      borderBottom: "1px solid #f1f5f9",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 10,
-                      background: "#fff",
-                    }}
-                  >
-                    <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>文件列表</div>
-                    <div style={{ fontSize: 11, color: "#64748b" }}>
-                      点击仅切换左侧内容；图表以“合并视图”解析
-                    </div>
-                  </div>
-                  <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "#fff" }}>
-                    {importedFiles.map((f, idx) => {
-                      const active = activeFileIndex === idx;
-                      const p = displayPath(f);
-                      const folderHint = f.relPath ? displayFolderHint(f.relPath) : "";
-                      return (
-                        <div
-                          key={p + idx}
-                          onClick={() => {
-                            setActiveFileIndex(idx);
-                            setYamlText(f.text);
-                            setLeftMode("yaml");
-                          }}
-                          role="button"
-                          tabIndex={0}
-                          title={p}
-                          style={{
-                            padding: "10px 10px",
-                            borderBottom: "1px solid #f1f5f9",
-                            cursor: "pointer",
-                            background: active ? "#eef2ff" : "#fff",
-                            display: "flex",
-                            alignItems: "baseline",
-                            gap: 8,
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: 999,
-                              background: active ? "#4f46e5" : "#cbd5e1",
-                              flexShrink: 0,
-                              marginTop: 4,
-                            }}
-                          />
-                          <div style={{ minWidth: 0 }}>
-                            <div
-                              style={{
-                                fontSize: 12,
-                                fontWeight: 900,
-                                color: "#0f172a",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                                maxWidth: 320,
-                              }}
-                            >
-                              {f.name}
-                            </div>
-                            {folderHint ? (
-                              <div
-                                style={{
-                                  fontSize: 11,
-                                  color: "#64748b",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                  maxWidth: 320,
-                                }}
-                              >
-                                {folderHint}
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  {nodeTypeLabel(t)}
+                  <span>{graphMetrics.typeCounts[t]}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="left-panel-block grow">
+            {leftMode === "files" ? (
+              importedFiles?.length ? (
+                <div className="file-list">
+                  {importedFiles.map((f, idx) => {
+                    const active = activeFileIndex === idx;
+                    const p = displayPath(f);
+                    const folderHint = f.relPath ? displayFolderHint(f.relPath) : "";
+                    return (
+                      <div
+                        key={p + idx}
+                        onClick={() => {
+                          setActiveFileIndex(idx);
+                          setYamlText(f.text);
+                          setLeftMode("yaml");
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        title={p}
+                        className={active ? "file-item active" : "file-item"}
+                      >
+                        <div className="file-item-title">{f.name}</div>
+                        {folderHint ? <div className="file-item-hint">{folderHint}</div> : null}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
-                <div
-                  style={{
-                    height: "100%",
-                    border: "1px dashed #e2e8f0",
-                    borderRadius: 12,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#64748b",
-                    fontSize: 12,
-                    padding: 12,
-                    textAlign: "center",
-                  }}
-                >
-                  尚未导入文件。你可以直接粘贴 YAML，或导入文件/文件夹。
+                <div className="empty-box">
+                  尚未导入文件。可直接粘贴 YAML，或拖入文件/目录后自动解析。
                 </div>
-              )}
-            </div>
-          ) : (
-            <textarea
-              value={yamlText}
-              data-testid="yaml-textarea"
-              onChange={(e) => {
-                const next = e.target.value;
-                setYamlText(next);
-                // If user is editing a specific imported file tab, keep it in sync so merged parse is correct.
-                if (importedFiles && activeFileIndex !== null) {
-                  setImportedFiles((prev) => {
-                    if (!prev) return prev;
-                    if (activeFileIndex < 0 || activeFileIndex >= prev.length) return prev;
-                    const copy = [...prev];
-                    copy[activeFileIndex] = { ...copy[activeFileIndex]!, text: next };
-                    return copy;
-                  });
-                }
-              }}
-              spellCheck={false}
-              style={{
-                flex: 1,
-                minHeight: 200,
-                width: "100%",
-                padding: 12,
-                border: "none",
-                resize: "none",
-                fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
-                fontSize: 12,
-                lineHeight: 1.45,
-                outline: "none",
-              }}
-            />
-          )}
+              )
+            ) : (
+              <textarea
+                value={yamlText}
+                data-testid="yaml-textarea"
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setYamlText(next);
+                  if (importedFiles && activeFileIndex !== null) {
+                    setImportedFiles((prev) => {
+                      if (!prev) return prev;
+                      if (activeFileIndex < 0 || activeFileIndex >= prev.length) return prev;
+                      const copy = [...prev];
+                      const current = copy[activeFileIndex];
+                      if (!current) return prev;
+                      copy[activeFileIndex] = { ...current, text: next };
+                      return copy;
+                    });
+                  }
+                }}
+                spellCheck={false}
+                className="yaml-editor"
+              />
+            )}
+          </section>
+
+          <section className="left-panel-block compact">
+            <div className="block-title">当前选中</div>
+            {selectedNode ? (
+              <div className="selection-card">
+                <div>id: {selectedNode.id}</div>
+                <div>type: {selectedNode.type ?? "-"}</div>
+              </div>
+            ) : (
+              <div className="block-subtitle">未选中节点。点击画布节点可查看当前对象。</div>
+            )}
+          </section>
         </aside>
-        <div ref={flowContainerRef} style={{ flex: 1, minWidth: 0 }}>
+
+        <div ref={flowContainerRef} className="flow-stage">
           <ReactFlow
             data-testid="react-flow"
-            nodes={nodes}
-            edges={edges}
+            nodes={graphPresentation.nodes}
+            edges={graphPresentation.edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
@@ -729,9 +673,9 @@ function AppInner() {
             deleteKeyCode={["Backspace", "Delete"]}
             defaultEdgeOptions={{ interactionWidth: 36 }}
             connectionMode={ConnectionMode.Loose}
-            connectionLineStyle={{ stroke: "#64748b", strokeWidth: 1.75 }}
+            connectionLineStyle={{ stroke: "#334155", strokeWidth: 1.7 }}
           >
-            <Background gap={14} />
+            <Background gap={14} color="rgba(15,23,42,0.08)" />
             <Controls />
             <MiniMap nodeStrokeWidth={2} maskColor="rgba(15,23,42,0.08)" />
             <DiagramActions

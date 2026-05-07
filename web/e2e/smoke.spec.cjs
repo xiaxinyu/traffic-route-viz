@@ -12,6 +12,12 @@ test("smoke: loads app and can refresh topology", async ({ page }) => {
 
   await expect(page.getByText("Traffic Route Viz")).toBeVisible();
   await expect(page.getByTestId("import-dropzone")).toBeVisible();
+  await expect(page.getByTestId("top-status-strip")).toBeVisible();
+
+  await page.getByRole("textbox", { name: "搜索节点" }).fill("rbac");
+  await page.getByRole("button", { name: "下一个" }).click();
+
+  await page.getByRole("button", { name: /Service/ }).first().click();
   await page.getByRole("button", { name: "YAML", exact: true }).first().click();
   await expect(page.getByTestId("yaml-textarea")).toBeVisible();
 

@@ -66,6 +66,13 @@ pnpm run preview
 - 跨 namespace 引用当前不建模（除非扩展并同步规格/验收）
 - `pnpm install` 失败常见原因：网络超时或 `node_modules` 被占用/权限问题；可删除 `node_modules` 重装
 
+## 近期交互优化（2026-05）
+
+- 顶部状态条：节点/边/手写边统计 + 最近刷新时间 + 解析状态
+- 节点搜索定位：支持关键字检索并“上一个/下一个”跳转到目标节点
+- 类型筛选高亮：支持按节点类型聚焦，非命中节点自动降噪
+- 详细设计与测试沉淀：`docs/UX_OPTIMIZATION_2026-05.md`
+
 ---
 
 ## 给 Agent 的短提示（复制用）
@@ -75,4 +82,3 @@ pnpm run preview
 目标是实现/修复 <你的目标>，并确保 web/ 下 pnpm run build 通过且不引入新 lints。
 画布相关行为以 HARNESS_ENGINEERING.md 为准。
 ```
-
