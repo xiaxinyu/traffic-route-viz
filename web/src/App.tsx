@@ -5,10 +5,11 @@ import ReactFlow, {
   Controls,
   MiniMap,
   ReactFlowProvider,
-  addEdge,
+  applyEdgeChanges,
   useEdgesState,
   useNodesState,
   type Connection,
+  type EdgeChange,
   type Edge,
 } from "reactflow";
 import "reactflow/dist/style.css";
@@ -169,14 +170,31 @@ function AppInner() {
   }, []);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [edges, setEdges] = useEdgesState(initialEdges);
 
   const onConnect = useCallback(
-    (c: Connection) => setEdges((eds) => addEdge(manualEdgeFromConnection(c), eds)),
+    (c: Connection) =>
+      setEdges((eds) => {
+        if (!c.source || !c.target) return eds;
+        const sameManualExists = eds.some(
+          (e) =>
+            e.data?.manual === true &&
+            e.source === c.source &&
+            e.target === c.target &&
+            (e.sourceHandle ?? null) === (c.sourceHandle ?? null) &&
+            (e.targetHandle ?? null) === (c.targetHandle ?? null),
+        );
+        if (sameManualExists) return eds;
+        return [...eds, manualEdgeFromConnection(c)];
+      }),
     [setEdges],
   );
   const onReconnect = useCallback(
     (oldEdge: Edge, c: Connection) => setEdges((eds) => reconnectEdgeAsManual(oldEdge, c, eds)),
+    [setEdges],
+  );
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)),
     [setEdges],
   );
 
@@ -708,6 +726,8 @@ function AppInner() {
             nodesConnectable={true}
             edgesUpdatable={true}
             elementsSelectable={true}
+            deleteKeyCode={["Backspace", "Delete"]}
+            defaultEdgeOptions={{ interactionWidth: 36 }}
             connectionMode={ConnectionMode.Loose}
             connectionLineStyle={{ stroke: "#64748b", strokeWidth: 1.75 }}
           >

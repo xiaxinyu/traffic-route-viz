@@ -205,6 +205,9 @@ export function DiagramActions(props: Props) {
     },
     [applyLoadedDiagram],
   );
+  const onDeleteSelectedEdges = useCallback(() => {
+    setEdges((prev) => prev.filter((e) => !e.selected));
+  }, [setEdges]);
 
   return (
     <Panel position="top-right" style={{ marginRight: 8, marginTop: 8 }}>
@@ -293,6 +296,17 @@ export function DiagramActions(props: Props) {
               data-testid="save-diagram"
             >
               保存画图文件
+            </button>
+            <button
+              type="button"
+              style={btnGhost}
+              onClick={() => {
+                onDeleteSelectedEdges();
+              }}
+              data-testid="delete-selected-edges"
+              title="先点击选中连线，再点此按钮删除；也支持键盘 Delete/Backspace"
+            >
+              删除选中连线
             </button>
             <button
               type="button"
