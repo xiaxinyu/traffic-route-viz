@@ -1,4 +1,11 @@
-import { MarkerType, type Connection, type Edge, type Node, type Viewport } from "reactflow";
+import {
+  MarkerType,
+  reconnectEdge,
+  type Connection,
+  type Edge,
+  type Node,
+  type Viewport,
+} from "reactflow";
 
 export const DIAGRAM_FILE_VERSION = 1 as const;
 
@@ -20,6 +27,27 @@ export type DiagramFileV1 = {
 
 export function isManualEdge(e: Edge): boolean {
   return e.data?.manual === true;
+}
+
+const MANUAL_EDGE_COLOR = "#475569";
+const MANUAL_EDGE_DASH = "6 4";
+
+function toManualEdge(edge: Edge): Edge {
+  return {
+    ...edge,
+    id: edge.id.startsWith("manual-") ? edge.id : `manual-${crypto.randomUUID()}`,
+    type: "smoothstep",
+    animated: false,
+    data: { ...(edge.data ?? {}), manual: true },
+    style: {
+      ...(edge.style ?? {}),
+      stroke: MANUAL_EDGE_COLOR,
+      strokeWidth: 2,
+      strokeDasharray: MANUAL_EDGE_DASH,
+    },
+    labelStyle: { ...(edge.labelStyle ?? {}), fontSize: 11, fill: "#334155", fontWeight: 500 },
+    markerEnd: { type: MarkerType.ArrowClosed, color: MANUAL_EDGE_COLOR },
+  };
 }
 
 function edgeConnectionKey(e: Pick<Edge, "source" | "target" | "sourceHandle" | "targetHandle">) {
@@ -52,23 +80,21 @@ export function manualEdgeFromConnection(connection: Connection): Edge {
     // React Flow types allow null, but we only persist valid edges.
     throw new Error("Invalid connection: missing source or target");
   }
-  return {
+  return toManualEdge({
     source: connection.source,
     target: connection.target,
     sourceHandle: connection.sourceHandle ?? null,
     targetHandle: connection.targetHandle ?? null,
     id: `manual-${crypto.randomUUID()}`,
-    type: "smoothstep",
-    animated: false,
-    data: { manual: true },
-    style: {
-      stroke: "#475569",
-      strokeWidth: 2,
-      strokeDasharray: "6 4",
-    },
-    labelStyle: { fontSize: 11, fill: "#334155", fontWeight: 500 },
-    markerEnd: { type: MarkerType.ArrowClosed, color: "#475569" },
-  };
+  });
+}
+
+/**
+ * 用户重连任意边后，统一按“手写边”持久化，避免解析刷新时丢失人工调整。
+ */
+export function reconnectEdgeAsManual(oldEdge: Edge, connection: Connection, edges: Edge[]): Edge[] {
+  const reconnected = reconnectEdge(oldEdge, connection, edges, { shouldReplaceId: false });
+  return reconnected.map((e) => (e.id === oldEdge.id ? toManualEdge(e) : e));
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {

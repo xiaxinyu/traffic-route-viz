@@ -9,13 +9,18 @@ import ReactFlow, {
   useEdgesState,
   useNodesState,
   type Connection,
+  type Edge,
 } from "reactflow";
 import "reactflow/dist/style.css";
 
 import { AuthGate, clearSession } from "./AuthGate";
 import { DiagramActions } from "./DiagramActions";
 import { buildFlowGraph } from "./buildGraph";
-import { manualEdgeFromConnection, mergeComputedEdgesKeepingManual } from "./diagramPersist";
+import {
+  manualEdgeFromConnection,
+  mergeComputedEdgesKeepingManual,
+  reconnectEdgeAsManual,
+} from "./diagramPersist";
 import {
   mergeParseResults,
   mergeYamlFiles,
@@ -168,6 +173,10 @@ function AppInner() {
 
   const onConnect = useCallback(
     (c: Connection) => setEdges((eds) => addEdge(manualEdgeFromConnection(c), eds)),
+    [setEdges],
+  );
+  const onReconnect = useCallback(
+    (oldEdge: Edge, c: Connection) => setEdges((eds) => reconnectEdgeAsManual(oldEdge, c, eds)),
     [setEdges],
   );
 
@@ -688,12 +697,17 @@ function AppInner() {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onReconnect={onReconnect}
             nodeTypes={nodeTypes}
             onInit={(instance) => {
               requestAnimationFrame(() => instance.fitView({ padding: 0.18 }));
             }}
             minZoom={0.2}
             maxZoom={1.8}
+            nodesDraggable={true}
+            nodesConnectable={true}
+            edgesUpdatable={true}
+            elementsSelectable={true}
             connectionMode={ConnectionMode.Loose}
             connectionLineStyle={{ stroke: "#64748b", strokeWidth: 1.75 }}
           >
