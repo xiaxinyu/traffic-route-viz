@@ -106,6 +106,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
 
   const ingId = (kind: string, ns: string | undefined, name: string) =>
     `ing-${kind.toLowerCase()}-${resourceKey(ns, name).replace(/[^a-zA-Z0-9/_-]/g, "_")}`;
+  const nodeKey = (...parts: string[]): string => parts.join("::");
 
   // ---- Layout: partition by ingress, then by host, then by route list ----
   // Area ordering must be stable and user-friendly: business entries first, gateway config last.
@@ -323,6 +324,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         type: "ingressRegion",
         position: { x: 0, y: 0 }, // set later by grid placement
         data: {
+          nodeKey: nodeKey("region", iid),
           partitionIndex: blockIdx + 1,
           entryKind: ing.kind,
           ingressName: ing.name,
@@ -368,6 +370,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         y: layoutOriginY,
       },
       data: {
+        nodeKey: nodeKey("entry", iid),
         label: ing.name,
         subtitle: ing.namespace ? `namespace: ${ing.namespace}` : undefined,
         className: ing.className,
@@ -404,6 +407,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           draggable: true,
           position: { x: gwX, y: gwY },
           data: {
+            nodeKey: nodeKey("istioGateway", iid, gwKey),
             label: nameMaybe || ref,
             subtitle: nsMaybe ? `namespace: ${nsMaybe}` : undefined,
             servers: gwi?.servers,
@@ -452,6 +456,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         draggable: true,
         position: { x: contour.httpProxyX, y: layoutOriginY + 6 },
         data: {
+          nodeKey: nodeKey("httpProxy", iid),
           label: "HTTPProxy Routes",
           subtitle: ing.namespace ? `namespace: ${ing.namespace}` : undefined,
         },
@@ -498,7 +503,13 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         extent: "parent",
         draggable: true,
         position: { x: hostX, y: hostY },
-        data: { label: host, tlsSecretName, ingressName: ing.name, entryKind: ing.kind },
+        data: {
+          nodeKey: nodeKey("host", iid, host),
+          label: host,
+          tlsSecretName,
+          ingressName: ing.name,
+          entryKind: ing.kind,
+        },
       });
 
       edges.push({
@@ -539,6 +550,15 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
             draggable: true,
             position: { x: routeX, y: routeY },
             data: {
+              nodeKey: nodeKey(
+                "route",
+                iid,
+                host,
+                r.path,
+                String(r.pathType ?? ""),
+                r.serviceName,
+                String(r.servicePort ?? ""),
+              ),
               path: r.path,
               pathType: r.pathType,
               serviceName: r.serviceName,
@@ -618,6 +638,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         draggable: true,
         position: { x: svcX, y: svcY },
         data: {
+          nodeKey: nodeKey("service", iid, s.skey),
           label: s.name,
           subtitle: s.ns ? `namespace: ${s.ns}` : undefined,
           type: si?.type,
@@ -642,6 +663,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           draggable: true,
           position: { x: drX, y: drY },
           data: {
+            nodeKey: nodeKey("destinationRule", iid, s.skey),
             label: dri.name,
             subtitle: dri.namespace ? `namespace: ${dri.namespace}` : undefined,
             host: dri.host,
@@ -688,6 +710,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           draggable: true,
           position: { x: epX, y: svcY },
           data: {
+            nodeKey: nodeKey("endpoints", iid, s.skey),
             label: "Endpoints",
             serviceName: s.name,
             ips: ep.addresses,
