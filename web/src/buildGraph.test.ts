@@ -129,6 +129,29 @@ describe("buildFlowGraph ingress forwarding", () => {
   });
 });
 
+describe("buildFlowGraph ingress forwarding (non-tiered)", () => {
+  it("renders only one Nginx 转发 edge for an overlapping ingress pair", () => {
+    const parsed = mergeParseResults([
+      parseK8sYaml(INGRESS_01, "edge.yaml"),
+      parseK8sYaml(INGRESS_02, "core.yaml"),
+    ]);
+    const { nodes, edges } = buildFlowGraph(parsed);
+
+    const src = nodes.find((n) => n.type === "ingress" && n.data?.label === "edge-global");
+    const dst = nodes.find((n) => n.type === "ingress" && n.data?.label === "core-ingress");
+    expect(src).toBeTruthy();
+    expect(dst).toBeTruthy();
+
+    const forwards = edges.filter(
+      (e) =>
+        e.label === "Nginx 转发" &&
+        ((e.source === src!.id && e.target === dst!.id) ||
+          (e.source === dst!.id && e.target === src!.id)),
+    );
+    expect(forwards).toHaveLength(1);
+  });
+});
+
 describe("buildFlowGraph Istio global gateway + weighted routes", () => {
   it("merges Istio Gateway globally and labels Route→Service edges with subset and weight", () => {
     const parsed = parseK8sYaml(GATEWAY_AND_VS, "istio.yaml");

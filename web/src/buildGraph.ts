@@ -901,6 +901,12 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       const dstMeta = ingressPartitionMeta.get(dst);
       if (hasTieredExample && srcMeta?.tierIndex && dstMeta?.tierIndex) {
         if (dstMeta.tierIndex !== srcMeta.tierIndex + 1) continue;
+      } else {
+        // In non-tiered mode, the overlap predicate is symmetric; avoid rendering two edges in opposite
+        // directions between the same pair of ingress partitions by forcing a stable ordering.
+        const srcIdx = ingressIndexById.get(src) ?? 0;
+        const dstIdx = ingressIndexById.get(dst) ?? 0;
+        if (dstIdx <= srcIdx) continue;
       }
       const pair = `${src}>${dst}`;
       if (seenIngressForward.has(pair)) continue;
