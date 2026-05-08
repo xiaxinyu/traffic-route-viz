@@ -20,6 +20,14 @@ export interface IngressTlsEntry {
   secretName?: string;
 }
 
+/** One Istio HTTP/TLS/TCP route destination (VirtualService `route[].destination` + `route[].weight`). */
+export interface IstioRouteDestination {
+  host: string;
+  subset?: string;
+  weight?: number;
+  port?: number | string;
+}
+
 export interface IngressRoute {
   /** Origin kind: Ingress / Istio VirtualService / Contour HTTPProxy. */
   ingressKind?: "Ingress" | "VirtualService" | "HTTPProxy";
@@ -43,6 +51,8 @@ export interface IngressRoute {
   tlsSecretName?: string;
   /** Source file name (if parsed per-file). */
   sourceFile?: string;
+  /** Istio VirtualService: all weighted destinations for this match (subset / weight). */
+  istioDestinations?: IstioRouteDestination[];
 }
 
 export interface ServiceInfo {
@@ -109,6 +119,23 @@ export interface DestinationRuleInfo {
 
 function resourceKey(ns: string | undefined, name: string): string {
   return ns ? `${ns}/${name}` : name;
+}
+
+function extractIstioRouteDestinations(routeArr: unknown[]): IstioRouteDestination[] {
+  const out: IstioRouteDestination[] = [];
+  for (const item of routeArr) {
+    const r = asRecord(item);
+    const dest = asRecord(r?.destination);
+    const host = typeof dest?.host === "string" ? dest.host : "?";
+    const subset = typeof dest?.subset === "string" ? dest.subset : undefined;
+    const weight = typeof r?.weight === "number" ? r.weight : undefined;
+    const destPortObj = asRecord(dest?.port);
+    let port: number | string = "?";
+    if (typeof destPortObj?.number === "number") port = destPortObj.number;
+    else if (typeof destPortObj?.name === "string") port = destPortObj.name;
+    out.push({ host, subset, weight, port });
+  }
+  return out;
 }
 
 function parseIngressTls(spec: Record<string, unknown> | null): IngressTlsEntry[] {
@@ -179,7 +206,7 @@ function mergeIngressSummary(a: IngressSummary | undefined, b: IngressSummary): 
   };
 }
 
-function parseIstioHostToServiceKey(
+export function parseIstioHostToServiceKey(
   rawHost: string,
   fallbackNs: string | undefined,
 ): { name: string; namespace: string | undefined } {
@@ -437,16 +464,20 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
         const hr = asRecord(httpRule);
         const matches = Array.isArray(hr?.match) ? (hr!.match! as unknown[]) : [];
         const routesArr = Array.isArray(hr?.route) ? (hr!.route! as unknown[]) : [];
+        const istioDestinations = extractIstioRouteDestinations(routesArr);
         const firstRoute = routesArr.length ? asRecord(routesArr[0]) : null;
         const dest = asRecord(firstRoute?.destination);
-        const destHost = typeof dest?.host === "string" ? dest.host : "?";
+        const destHost =
+          typeof dest?.host === "string" ? dest.host : (istioDestinations[0]?.host ?? "?");
         const destPortObj = asRecord(dest?.port);
         const servicePort: number | string =
           typeof destPortObj?.number === "number"
             ? destPortObj.number
             : typeof destPortObj?.name === "string"
               ? destPortObj.name
-              : "?";
+              : istioDestinations[0]?.port !== undefined
+                ? istioDestinations[0]!.port
+                : "?";
         const { name: svcName, namespace: svcNs } = parseIstioHostToServiceKey(destHost, vsNs);
 
         const matchPaths: { path: string; pathType?: string }[] = [];
@@ -478,6 +509,7 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
               servicePort,
               serviceNamespace: svcNs,
               sourceFile,
+              istioDestinations: istioDestinations.length > 0 ? istioDestinations : undefined,
             });
           }
         }

@@ -1,6 +1,10 @@
 import { MarkerType, type Edge as ReactFlowEdge, type Node } from "reactflow";
 import { ingressVsPathOverlaps } from "./istioIngressPathMatch";
-import type { ParseResult } from "./k8sParser";
+import {
+  parseIstioHostToServiceKey,
+  type IstioRouteDestination,
+  type ParseResult,
+} from "./k8sParser";
 
 type Edge = ReactFlowEdge<any> & {
   // React Flow supports these flags at runtime; some typings omit them depending on edge base type.
@@ -182,6 +186,62 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     routesByIngress.set(iid, list);
   }
 
+  const normalizedIstioGatewayWireName = (ref: string): string | null => {
+    if (!ref || ref === "mesh" || ref === "istio:mesh") return null;
+    const nameMaybe = ref.includes("/") ? ref.split("/", 2)[1]! : ref;
+    const n = nameMaybe.trim().toLowerCase();
+    return n || null;
+  };
+
+  const formatRouteToServiceEdgeLabel = (d: IstioRouteDestination): string => {
+    const port = d.port !== undefined && d.port !== "?" && d.port !== "" ? String(d.port) : "?";
+    let s = `→ :${port}`;
+    if (d.subset) s += ` · subset=${d.subset}`;
+    if (typeof d.weight === "number") s += ` · w=${d.weight}`;
+    return s;
+  };
+
+  const globalGwWireNames = new Set<string>();
+  for (const ing of parsed.ingresses) {
+    if (ing.kind !== "VirtualService") continue;
+    const iid = ingId(ing.kind, ing.namespace, ing.name);
+    for (const route of routesByIngress.get(iid) ?? []) {
+      for (const g of route.gateways ?? []) {
+        const w = normalizedIstioGatewayWireName(g);
+        if (w) globalGwWireNames.add(w);
+      }
+    }
+  }
+
+  const GLOBAL_GW_LANE_W = 320;
+  const sortedGlobalGwWireNames = [...globalGwWireNames].sort();
+  const layoutOffsetX = sortedGlobalGwWireNames.length ? GLOBAL_GW_LANE_W : 0;
+
+  const globalIstioGatewayNodeIdByWireName = new Map<string, string>();
+  sortedGlobalGwWireNames.forEach((gwWire, idx) => {
+    const gwi = [...gwByKey.values()].find((g) => g.name.trim().toLowerCase() === gwWire) ?? null;
+    const gid = `istio-gw-global-${sanitizeId(gwWire)}`;
+    globalIstioGatewayNodeIdByWireName.set(gwWire, gid);
+    nodes.push({
+      id: gid,
+      type: "istioGateway",
+      position: {
+        x: baseX,
+        y: baseY + idx * (LAYOUT_EST_ISTIO_GW_H + LAYOUT_ISTIO_GW_STACK_GAP),
+      },
+      data: {
+        nodeKey: nodeKey("istioGateway", "global", gwWire),
+        label: gwi?.name ?? gwWire,
+        subtitle: gwi?.namespace ? `namespace: ${gwi.namespace}` : undefined,
+        servers: gwi?.servers,
+        selector: gwi?.selector,
+        globalGateway: true,
+      },
+      selectable: true,
+      draggable: true,
+    });
+  });
+
   const medianOf = (nums: number[], fallback: number): number => {
     if (!nums.length) return fallback;
     const a = [...nums].sort((x, y) => x - y);
@@ -284,9 +344,11 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   const laneY: Record<1 | 2 | 3, number> = { 1: baseY, 2: baseY, 3: baseY };
   const fallbackMaxAreasPerRow = 4;
   let fallbackColIdx = 0;
-  let fallbackCursorX = baseX;
+  let fallbackCursorX = baseX + layoutOffsetX;
   let fallbackCursorY = baseY;
   let fallbackRowMaxH = 0;
+
+  const seenGlobalGwToVs = new Set<string>();
 
   for (const ing of orderedIngresses) {
     const iid = ingId(ing.kind, ing.namespace, ing.name);
@@ -356,7 +418,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       endpointsX: leftPad + col * 5.2,
     };
 
-    const vsOffsetX = hasIstioGateway ? col * 0.85 : 0;
+    const vsOffsetX = 0;
     nodes.push({
       id: iid,
       type: "ingress",
@@ -387,41 +449,23 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       maxX = Math.max(maxX, contour.httpProxyX + cardMaxW);
     }
 
-    // Istio Gateway node(s): stack with explicit spacing; bottom informs where Host blocks may start vertically.
+    // Istio Gateway: single global node(s) to the left of all regions; wire VS entry here.
     let istioGatewaysStackBottom = layoutOriginY;
     if (hasIstioGateway) {
-      const gwX = leftPad;
-      let gwY = layoutOriginY + 6;
-      for (const ref of vsGatewayRefs) {
-        const [nsMaybe, nameMaybe] = ref.includes("/")
-          ? ref.split("/", 2)
-          : [ing.namespace ?? undefined, ref];
-        const gwKey = resourceKey(nsMaybe || undefined, nameMaybe || ref);
-        const gwi = gwByKey.get(gwKey);
-        const gid = `istio-gw-${sanitizeId(`${iid}::${gwKey}`)}`;
-        nodes.push({
-          id: gid,
-          type: "istioGateway",
-          parentNode: regionId,
-          extent: "parent",
-          draggable: true,
-          position: { x: gwX, y: gwY },
-          data: {
-            nodeKey: nodeKey("istioGateway", iid, gwKey),
-            label: nameMaybe || ref,
-            subtitle: nsMaybe ? `namespace: ${nsMaybe}` : undefined,
-            servers: gwi?.servers,
-            selector: gwi?.selector,
-          },
-        });
-        const gwWireName = (nameMaybe ?? ref ?? "").trim().toLowerCase();
-        if (gwWireName) {
-          const acc = globalIstioGatewayTargetsByGatewayName.get(gwWireName) ?? [];
-          acc.push({ nodeId: gid, vsPartitionId: iid });
-          globalIstioGatewayTargetsByGatewayName.set(gwWireName, acc);
-        }
+      const uniqRefs = [...new Set(vsGatewayRefs)];
+      for (const ref of uniqRefs) {
+        const gwWireName = normalizedIstioGatewayWireName(ref);
+        if (!gwWireName) continue;
+        const gid = globalIstioGatewayNodeIdByWireName.get(gwWireName);
+        if (!gid) continue;
+        const acc = globalIstioGatewayTargetsByGatewayName.get(gwWireName) ?? [];
+        acc.push({ nodeId: gid, vsPartitionId: iid });
+        globalIstioGatewayTargetsByGatewayName.set(gwWireName, acc);
+        const dedupeKey = `${gid}>${iid}`;
+        if (seenGlobalGwToVs.has(dedupeKey)) continue;
+        seenGlobalGwToVs.add(dedupeKey);
         edges.push({
-          id: `e-${gid}-${iid}-${edgeIdx++}`,
+          id: `e-${gid}-${iid}-gw-${edgeIdx++}`,
           source: gid,
           target: iid,
           sourceHandle: "s-right",
@@ -433,10 +477,6 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
           labelBgStyle: { fill: "#e0f2fe", fillOpacity: 0.92 },
         });
-        istioGatewaysStackBottom = gwY + LAYOUT_EST_ISTIO_GW_H;
-        gwY = istioGatewaysStackBottom + LAYOUT_ISTIO_GW_STACK_GAP;
-        maxY = Math.max(maxY, istioGatewaysStackBottom);
-        maxX = Math.max(maxX, gwX + cardMaxW);
       }
     }
 
@@ -565,6 +605,8 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
               servicePort: r.servicePort,
               upstreamServiceName: r.upstreamServiceName,
               upstreamServicePort: r.upstreamServicePort,
+              ingressKind: r.ingressKind,
+              istioDestinations: r.istioDestinations,
             },
           });
 
@@ -580,30 +622,51 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           });
 
           const svcNs = r.serviceNamespace ?? r.ingressNs;
-          const skey = resolveCanonicalServiceKey(svcNs, r.serviceName, serviceByKey);
-          const svcScoped = `${iid}::${skey}`;
-          const list = routeYsByService.get(svcScoped) ?? [];
-          list.push(routeY);
-          routeYsByService.set(svcScoped, list);
 
-          // Create service id mapping (node created later with computed y)
-          if (!serviceIdByKey.has(svcScoped)) {
-            serviceIdByKey.set(svcScoped, `svc-${sanitizeId(svcScoped)}`);
+          const wireRouteToService = (dest: IstioRouteDestination, skey: string) => {
+            const svcScoped = `${iid}::${skey}`;
+            const list = routeYsByService.get(svcScoped) ?? [];
+            list.push(routeY);
+            routeYsByService.set(svcScoped, list);
+            if (!serviceIdByKey.has(svcScoped)) {
+              serviceIdByKey.set(svcScoped, `svc-${sanitizeId(svcScoped)}`);
+            }
+            const sid = serviceIdByKey.get(svcScoped)!;
+            edges.push({
+              id: `e-${routeId}-${sid}-${edgeIdx}`,
+              source: routeId,
+              target: sid,
+              sourceHandle: "s-right",
+              targetHandle: "t-left",
+              type: edgeType,
+              label: formatRouteToServiceEdgeLabel(dest),
+              style: { stroke: "#4f46e5", strokeWidth: 2.25 },
+              labelStyle: { fontSize: 11, fill: "#334155", fontWeight: 500 },
+              labelBgStyle: { fill: "#e0e7ff", fillOpacity: 0.95 },
+              markerEnd: arrow("#4f46e5"),
+            });
+            edgeIdx++;
+          };
+
+          if (r.ingressKind === "VirtualService" && r.istioDestinations?.length) {
+            for (const dest of r.istioDestinations) {
+              const { name: dn, namespace: dns } = parseIstioHostToServiceKey(
+                dest.host,
+                r.ingressNs,
+              );
+              const skey = resolveCanonicalServiceKey(dns ?? svcNs, dn, serviceByKey);
+              wireRouteToService(dest, skey);
+            }
+          } else {
+            const skey = resolveCanonicalServiceKey(svcNs, r.serviceName, serviceByKey);
+            wireRouteToService(
+              {
+                host: r.serviceName,
+                port: r.servicePort,
+              },
+              skey,
+            );
           }
-
-          edges.push({
-            id: `e-${routeId}-${serviceIdByKey.get(svcScoped)!}-${edgeIdx++}`,
-            source: routeId,
-            target: serviceIdByKey.get(svcScoped)!,
-            sourceHandle: "s-right",
-            targetHandle: "t-left",
-            type: edgeType,
-            label: `→ :${String(r.servicePort)}`,
-            style: { stroke: "#4f46e5", strokeWidth: 2.25 },
-            labelStyle: { fontSize: 11, fill: "#334155", fontWeight: 500 },
-            labelBgStyle: { fill: "#e0e7ff", fillOpacity: 0.95 },
-            markerEnd: arrow("#4f46e5"),
-          });
         });
 
         hostCursorY = routeYCursor + LAYOUT_AFTER_HOST_GROUP;
@@ -749,7 +812,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
 
       if (hasTieredExample && tier) {
         // ---- Tier lanes: 01 -> left, 02 -> middle, 03 -> right; one area per row in each lane ----
-        const x = baseX + (tier.tierIndex - 1) * lanePitchX;
+        const x = baseX + layoutOffsetX + (tier.tierIndex - 1) * lanePitchX;
         const y = laneY[tier.tierIndex];
         region.position = { x, y };
         laneY[tier.tierIndex] += h + areaGapY;
@@ -761,7 +824,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         fallbackColIdx += 1;
         if (fallbackColIdx >= fallbackMaxAreasPerRow) {
           fallbackColIdx = 0;
-          fallbackCursorX = baseX;
+          fallbackCursorX = baseX + layoutOffsetX;
           fallbackCursorY += fallbackRowMaxH + areaGapY;
           fallbackRowMaxH = 0;
         }

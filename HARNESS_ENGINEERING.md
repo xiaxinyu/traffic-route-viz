@@ -136,12 +136,12 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 
 1. **Ingress 分区底板**（`ingressRegion`，父节点）：视觉泳道/整块可拖
 2. **Ingress**
-3. **Istio Gateway**（当 VirtualService 引用了 `spec.gateways` 时渲染）
-3. **Host**
-4. **Route**（每条 `path` 一节点，避免边标签重叠）
-5. **Service**
-6. **Endpoints**
-7. **DestinationRule**（Istio：挂载到对应 Service，展示 subsets/策略入口）
+3. **Istio Gateway**（当 VirtualService 引用了 `spec.gateways` 时渲染；**同名 Gateway 合并为画布左侧全局节点**，标记 **Global**，并为每个 VirtualService 分区连入）
+4. **Host**
+5. **Route**（每条 `path` 一节点，避免边标签重叠；Istio HTTP **多 destination** 时在 Route 卡列出 **subset / weight**，并在 Route→Service 边上摘要）
+6. **Service**
+7. **Endpoints**
+8. **DestinationRule**（Istio：挂载到对应 Service，展示 subsets/策略入口）
 
 > 新增类型时必须同步：解析 → 构图 → 节点 UI → 宿主 `nodeTypes` → 本文档。
 
@@ -149,7 +149,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 
 - `Ingress → Host`：入口域名规则（可 animated）
 - `Ingress → Ingress`（新增）：当两侧均为 `ingressClassName: nginx` 的入口层，且 Host/Path 规则存在语义相交时，允许自动绘制「Nginx 转发」边（用于 01/02 等分层入口转发链路展示）
-- `Istio Gateway → VirtualService`：当 VirtualService 配置 gateways 时，Gateway 必须可视化并连入链路
+- `Istio Gateway → VirtualService`：当 VirtualService 配置 gateways 时，须存在 **全局 Istio Gateway** 节点（按 Gateway **名称**合并），并由该节点连入对应 VirtualService 入口卡；分区内 **不再**重复堆叠多块同名 Gateway 卡
 - `Host → Route → Service`：每条 path 一条路由，Route 节点承载信息避免边标签堆叠
 - `Service → Endpoints`：后端实例（Pod IP）
  - `Service → DestinationRule`：策略/子集配置（虚线）
@@ -195,6 +195,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 - path
 - pathType
 - backend：Service 名称 + 端口
+- Istio VirtualService：**全部 `route[].destination`** 的 host / port / **subset** / **weight**（Route 卡列表 + Route→Service 边摘要）
 
 ### Service
 
@@ -224,7 +225,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 - **防重叠初始布局（必须）**：自动构图时同一 `ingressRegion` 内 **禁止** Ingress/VirtualService 卡、Host、Route、Gateway、Service、DestinationRule、Endpoints 等卡片在初始坐标上互相压盖。
   - **Route 不得在 Host 卡内部起笔**：首张 Route 的 `y` 必须位于为该 Host **预留的整块卡片估算高度之下**再加间隙（不得再使用 Host 顶端 + 极小偏移的旧模式）。
   - **多 Host 纵向串联**：下一个 Host 的顶边必须在前一 Host **子树底边**（该 Host 下最后一条 Route 的底边，或「无 Route 时」Host 卡底边）**再加块间留白**之后开始；**禁止**仅用固定常量 `hostGap` 推导而不考虑上一 Host **实际路由条数**。
-  - **Istio Gateway 多实例**：多块 Gateway 卡须 **显式垂直栈间距**，并参与计算「顶端内容区下限」，以便 Host 带与左侧 Gateway 栈在纵向上 **取较高者 cleared 后再下放 Host**（与 Ingress/VS 头条估算底边一同取 **max**）。
+  - **Istio Gateway（全局合并）**：凡 VirtualService 引用的 Gateway（过滤 `mesh`）在画布 **左侧独立列**按名称合并为全局节点（垂直栈间距）；**分区宽度预留**左侧 Gateway 列，避免与分区重叠；Host 带起始高度仍与 **Ingress/VirtualService 头条 + 估算底边**对齐（分区内不再叠放多块 Gateway 卡）。
   - **多 Service**：在按 Route `y` median 初值对齐后，须按 **预估 Service 卡高 + gap** 做纵向碰撞-resolve，并保持 **DestinationRule** 占位在对应 Service **估算高度之下的独立留白带**。
   - **常量与节点 UI 同步**：估高常量定义于 `web/src/buildGraph.ts`（`LAYOUT_EST_*`）；若 **`FlowNodes.tsx`** 卡片内边距/字体/可选字段显著变高或变矮，须在 **同一 MR** 内调整估算并在此处更新本条说明意图（避免再次出现结构性重叠）。
   - **边线视觉**：初始布局以降低节点重叠为第一目标；多层边仍可共用出口点，但通过 **拉大列距与纵向间距** 减轻「糊成一束」的阅读问题（进一步拆 **sourceHandle / targetHandle** 为多条出口属增强项，按需另开任务）。
