@@ -32,7 +32,11 @@ describe("createEdgeNonce", () => {
 describe("reconnectEdgeAsManual", () => {
   it("reconnects any edge and converts it to manual edge", () => {
     const autoEdge: Edge = { id: "e-1", source: "ing", target: "svc", type: "smoothstep" };
-    const next = reconnectEdgeAsManual(autoEdge, { source: "ing", target: "ep" }, [autoEdge]);
+    const next = reconnectEdgeAsManual(
+      autoEdge,
+      { source: "ing", target: "ep", sourceHandle: null, targetHandle: null },
+      [autoEdge],
+    );
 
     expect(next).toHaveLength(1);
     expect(next[0]!.source).toBe("ing");
@@ -44,7 +48,14 @@ describe("reconnectEdgeAsManual", () => {
 
 describe("mergeComputedEdgesKeepingManual", () => {
   it("keeps valid manual edge when it does not duplicate computed edge", () => {
-    const prev: Edge[] = [manualEdgeFromConnection({ source: "a", target: "b" })];
+    const prev: Edge[] = [
+      manualEdgeFromConnection({
+        source: "a",
+        target: "b",
+        sourceHandle: null,
+        targetHandle: null,
+      }),
+    ];
     const computed: Edge[] = [{ id: "c-1", source: "b", target: "c" }];
     const merged = mergeComputedEdgesKeepingManual(prev, computed, new Set(["a", "b", "c"]));
 
@@ -53,7 +64,12 @@ describe("mergeComputedEdgesKeepingManual", () => {
   });
 
   it("drops manual edge when computed edge has same connection", () => {
-    const manual = manualEdgeFromConnection({ source: "a", target: "b" });
+    const manual = manualEdgeFromConnection({
+      source: "a",
+      target: "b",
+      sourceHandle: null,
+      targetHandle: null,
+    });
     const computed: Edge[] = [{ id: "c-1", source: "a", target: "b" }];
     const merged = mergeComputedEdgesKeepingManual([manual], computed, new Set(["a", "b"]));
 

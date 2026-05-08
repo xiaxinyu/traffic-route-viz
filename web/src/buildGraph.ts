@@ -1,6 +1,16 @@
-import { MarkerType, type Edge, type Node } from "reactflow";
+import { MarkerType, type Edge as ReactFlowEdge, type Node } from "reactflow";
 import { ingressVsPathOverlaps } from "./istioIngressPathMatch";
 import type { ParseResult } from "./k8sParser";
+
+type Edge = ReactFlowEdge<any> & {
+  // React Flow supports these flags at runtime; some typings omit them depending on edge base type.
+  selectable?: boolean;
+  focusable?: boolean;
+  interactionWidth?: number;
+  updatable?: boolean;
+  reconnectable?: boolean;
+  pathOptions?: unknown;
+};
 
 function resourceKey(ns: string | undefined, name: string): string {
   return ns ? `${ns}/${name}` : name;
@@ -246,7 +256,10 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     return false;
   };
 
-  const ingressPairPathMayOverlap = (leftPartitionId: string, rightPartitionId: string): boolean => {
+  const ingressPairPathMayOverlap = (
+    leftPartitionId: string,
+    rightPartitionId: string,
+  ): boolean => {
     const leftRoutes = (routesByIngress.get(leftPartitionId) ?? []).filter(
       (r) => r.ingressKind === "Ingress",
     );
@@ -824,5 +837,14 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     }
   }
 
-  return { nodes, edges: edges.map(makeEditableEdge) };
+  const edgesWithReadableLabels = edges.map((e) => {
+    if (!e.label) return e;
+    return {
+      ...e,
+      type: "readableLabel",
+      data: { ...(e.data ?? {}), baseType: e.type ?? edgeType },
+    };
+  });
+
+  return { nodes, edges: edgesWithReadableLabels.map(makeEditableEdge) };
 }

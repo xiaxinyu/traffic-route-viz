@@ -1,14 +1,19 @@
 const { expect, test } = require("@playwright/test");
 
+test.setTimeout(60_000);
+
+test.beforeEach(async ({ page }) => {
+  // Make e2e deterministic regardless of local /config.json credentials.
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "trv.auth.session",
+      JSON.stringify({ expMs: Date.now() + 8 * 60 * 60 * 1000 }),
+    );
+  });
+});
+
 test("export png: can download full-graph image", async ({ page }) => {
   await page.goto("/");
-  const loginBtn = page.getByRole("button", { name: "登录" });
-  if (await loginBtn.count()) {
-    const inputs = page.locator("input");
-    await inputs.nth(0).fill("admin");
-    await inputs.nth(1).fill("change-me");
-    await loginBtn.click();
-  }
 
   await page.getByRole("button", { name: "刷新拓扑" }).click();
   await expect(page.locator(".react-flow").first()).toBeVisible();

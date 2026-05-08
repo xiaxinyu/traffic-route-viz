@@ -62,5 +62,14 @@ describe("buildFlowGraph ingress forwarding", () => {
     );
     expect(forwarding).toBeTruthy();
     expect(forwarding?.style).toMatchObject({ stroke: "#6366f1" });
+    expect(forwarding?.type).toBe("readableLabel");
+    expect(forwarding?.data).toMatchObject({ baseType: "step" });
+
+    const portLabelEdge = edges.find(
+      (e) => typeof e.label === "string" && e.label.startsWith("→ :"),
+    );
+    expect(portLabelEdge).toBeTruthy();
+    expect(portLabelEdge?.type).toBe("readableLabel");
+    expect(portLabelEdge?.data).toMatchObject({ baseType: "smoothstep" });
   });
 });
