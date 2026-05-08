@@ -201,3 +201,53 @@ describe("buildFlowGraph edge dedupe", () => {
     expect(gwEdges).toHaveLength(1);
   });
 });
+
+const VS_B = `apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: vs-b
+  namespace: demo
+spec:
+  gateways:
+    - istio-system/rts-istio-ingress-gateway
+  hosts:
+    - other.example.com
+  http:
+    - match:
+        - uri:
+            prefix: /api
+      route:
+        - destination:
+            host: reviews.demo.svc.cluster.local
+            port:
+              number: 9080
+`;
+
+const LAYOUT_EST_ISTIO_GW_H = 136;
+
+describe("buildFlowGraph VirtualService column + gateway vertical center", () => {
+  it("stacks two VirtualService regions in the same x and centers global gateway", () => {
+    const p1 = parseK8sYaml(GATEWAY_AND_VS, "03-dce5-active01-istio/vs-app.yaml");
+    const p2 = parseK8sYaml(VS_B, "03-dce5-active01-istio/vs-b.yaml");
+    const parsed = mergeParseResults([p1, p2]);
+    const { nodes, edges } = buildFlowGraph(parsed);
+
+    const regA = nodes.find((n) => n.type === "ingressRegion" && n.data?.ingressName === "vs-app");
+    const regB = nodes.find((n) => n.type === "ingressRegion" && n.data?.ingressName === "vs-b");
+    const globalGw = nodes.find((n) => n.type === "istioGateway" && n.data?.globalGateway === true);
+
+    expect(regA).toBeTruthy();
+    expect(regB).toBeTruthy();
+    expect(globalGw).toBeTruthy();
+    expect(regA!.position?.x).toBe(regB!.position?.x);
+    expect(regA!.position?.y ?? 0).toBeLessThan(regB!.position?.y ?? 0);
+
+    const hA = Number((regA!.style as { height?: number })?.height ?? 0);
+    const hB = Number((regB!.style as { height?: number })?.height ?? 0);
+    const midY = (regA!.position!.y + hA / 2 + regB!.position!.y + hB / 2) / 2;
+    const gwCenterY = (globalGw!.position?.y ?? 0) + LAYOUT_EST_ISTIO_GW_H / 2;
+    expect(Math.abs(gwCenterY - midY)).toBeLessThan(1.5);
+
+    expect(edges.filter((e) => e.source === globalGw!.id && e.label === "Gateway").length).toBe(2);
+  });
+});

@@ -5,6 +5,11 @@ import {
   type IstioRouteDestination,
   type ParseResult,
 } from "./k8sParser";
+import {
+  inferSwimlaneBand,
+  parseExampleTierFromFiles,
+  type SwimlaneBandKind,
+} from "./swimlaneInfer";
 
 type Edge = ReactFlowEdge<any> & {
   // React Flow supports these flags at runtime; some typings omit them depending on edge base type.
@@ -72,8 +77,8 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   const baseY = 8;
   const areaGapX = 80;
   const areaGapY = 90;
-  /** 分区标题区（Ingress 名、命名空间、来源等）高度预留，避免子节点与标题文字重叠 */
-  const regionHeaderReserveY = 140;
+  /** 分区标题区（Ingress 名、命名空间、来源、泳道标签等）高度预留，避免子节点与标题文字重叠 */
+  const regionHeaderReserveY = 156;
   const ingressBlockMinW = Math.round(col * 4.2);
   /** 右侧 Endpoints 卡片宽度上界（用于估算区域宽度） */
   const cardMaxW = 360;
@@ -121,35 +126,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     return 50;
   };
 
-  const parseExampleTier = (
-    sourceFiles: string[] | undefined,
-  ): {
-    tierCode: "01" | "02" | "03";
-    tierIndex: 1 | 2 | 3;
-    /** A human-friendly folder hint without 01/02/03 prefix, e.g. "dce5-global / active01" */
-    effectiveFolderHint: string;
-    activeWeight: number;
-  } | null => {
-    const files = sourceFiles ?? [];
-    const pick = files.find(Boolean) ?? "";
-    const segs = pick.split("/").filter(Boolean);
-    const tierSeg = segs.find((s) => /^(0[1-3])[-_]/.test(s));
-    const m = tierSeg?.match(/^(0[1-3])[-_](.+)$/);
-    if (!m) return null;
-    const tierCode = m[1] as "01" | "02" | "03";
-    const tierIndex = (tierCode === "01" ? 1 : tierCode === "02" ? 2 : 3) as 1 | 2 | 3;
-
-    const lower = segs.map((s) => s.toLowerCase());
-    const activeWeight = lower.some((s) => s.includes("active01"))
-      ? 10
-      : lower.some((s) => s.includes("active02"))
-        ? 20
-        : 50;
-
-    const folderSegs = segs.slice(0, -1).map((s) => s.replace(/^(0[1-3])[-_]/, ""));
-    const effectiveFolderHint = folderSegs.join(" / ");
-    return { tierCode, tierIndex, effectiveFolderHint, activeWeight };
-  };
+  const parseExampleTier = parseExampleTierFromFiles;
 
   const hasTieredExample = parsed.ingresses.some((ing) => !!parseExampleTier(ing.sourceFiles));
 
@@ -348,6 +325,23 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   let fallbackCursorY = baseY;
   let fallbackRowMaxH = 0;
 
+  /** Extra vertical gap when swimlane band switches within the same Example tier column. */
+  const SWIMLANE_BAND_GAP = 100;
+  /** Fourth horizontal lane (to the right of `01/02/03` tiers): VirtualService partitions stacked vertically. */
+  const VS_COLUMN_INDEX = 3;
+  const virtualServiceIngressCount = parsed.ingresses.filter(
+    (i) => i.kind === "VirtualService",
+  ).length;
+  const useVsVerticalColumn = sortedGlobalGwWireNames.length > 0 || virtualServiceIngressCount >= 2;
+
+  let vsLaneY = baseY;
+  let vsPrevBand: SwimlaneBandKind | null = null;
+  const lastBandByTier: Record<1 | 2 | 3, SwimlaneBandKind | null> = {
+    1: null,
+    2: null,
+    3: null,
+  };
+
   const seenGlobalGwToVs = new Set<string>();
 
   for (const ing of orderedIngresses) {
@@ -358,6 +352,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
 
     const sourceFiles = ing.sourceFiles ?? [];
     const tier = parseExampleTier(sourceFiles);
+    const swimlane = inferSwimlaneBand(sourceFiles, tier);
     ingressPartitionMeta.set(iid, { tierIndex: tier?.tierIndex });
     const sourceSummary =
       sourceFiles.length > 0
@@ -395,6 +390,8 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           sourceFiles,
           tierCode: tier?.tierCode,
           tierHint: tier?.effectiveFolderHint,
+          swimlaneBand: swimlane.band,
+          swimlaneLabel: swimlane.swimlaneLabel,
         },
         style: {
           width: ingressBlockMinW,
@@ -811,11 +808,36 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       region.style = { ...(region.style ?? {}), height: h, width: w };
 
       if (hasTieredExample && tier) {
-        // ---- Tier lanes: 01 -> left, 02 -> middle, 03 -> right; one area per row in each lane ----
-        const x = baseX + layoutOffsetX + (tier.tierIndex - 1) * lanePitchX;
-        const y = laneY[tier.tierIndex];
-        region.position = { x, y };
-        laneY[tier.tierIndex] += h + areaGapY;
+        if (useVsVerticalColumn && ing.kind === "VirtualService") {
+          if (vsPrevBand !== null && vsPrevBand !== swimlane.band) {
+            vsLaneY += SWIMLANE_BAND_GAP;
+          }
+          vsPrevBand = swimlane.band;
+          const x = baseX + layoutOffsetX + VS_COLUMN_INDEX * lanePitchX;
+          region.position = { x, y: vsLaneY };
+          vsLaneY += h + areaGapY;
+        } else {
+          const tix = tier.tierIndex;
+          const prev = lastBandByTier[tix];
+          if (prev !== null && prev !== swimlane.band) {
+            laneY[tix] += SWIMLANE_BAND_GAP;
+          }
+          lastBandByTier[tix] = swimlane.band;
+          const x = baseX + layoutOffsetX + (tix - 1) * lanePitchX;
+          const y = laneY[tix];
+          region.position = { x, y };
+          laneY[tix] += h + areaGapY;
+        }
+      } else if (useVsVerticalColumn && ing.kind === "VirtualService") {
+        if (vsPrevBand !== null && vsPrevBand !== swimlane.band) {
+          vsLaneY += SWIMLANE_BAND_GAP;
+        }
+        vsPrevBand = swimlane.band;
+        region.position = {
+          x: baseX + layoutOffsetX + VS_COLUMN_INDEX * lanePitchX,
+          y: vsLaneY,
+        };
+        vsLaneY += h + areaGapY;
       } else {
         // ---- Fallback grid placement (max 4 areas per row; auto-wrap) ----
         region.position = { x: fallbackCursorX, y: fallbackCursorY };
@@ -829,6 +851,38 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           fallbackRowMaxH = 0;
         }
       }
+    }
+  }
+
+  // Vertical center of merged Istio Gateway nodes on all connected VirtualService partition regions.
+  const childToParent = new Map<string, string>();
+  for (const n of nodes) {
+    if (n.parentNode && typeof n.parentNode === "string") {
+      childToParent.set(n.id, n.parentNode);
+    }
+  }
+  for (const gwWire of sortedGlobalGwWireNames) {
+    const gid = globalIstioGatewayNodeIdByWireName.get(gwWire);
+    if (!gid) continue;
+    const centers: number[] = [];
+    for (const e of edges) {
+      if (e.source !== gid || e.label !== "Gateway") continue;
+      const rid = childToParent.get(e.target);
+      if (!rid) continue;
+      const rn = nodes.find((x) => x.id === rid);
+      if (!rn || rn.type !== "ingressRegion") continue;
+      const py = rn.position?.y ?? 0;
+      const rh = Number((rn.style as { height?: number })?.height ?? 760);
+      centers.push(py + rh / 2);
+    }
+    if (!centers.length) continue;
+    const midY = medianOf(centers, baseY);
+    const gwNode = nodes.find((n) => n.id === gid);
+    if (gwNode) {
+      gwNode.position = {
+        x: baseX,
+        y: midY - LAYOUT_EST_ISTIO_GW_H / 2,
+      };
     }
   }
 
