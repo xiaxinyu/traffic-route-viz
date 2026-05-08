@@ -103,6 +103,70 @@ export function mergeComputedEdgesKeepingManual(
   return [...computed, ...manualKept];
 }
 
+function readNodeKey(n: Node): string | null {
+  const v = (n as Node & { data?: unknown }).data as unknown;
+  if (!v || typeof v !== "object") return null;
+  const key = (v as Record<string, unknown>).nodeKey;
+  return typeof key === "string" && key ? key : null;
+}
+
+/**
+ * 重新解析后保留手写边，并在节点 id 发生再生成时尝试按 `node.data.nodeKey` 重映射端点。
+ *
+ * This prevents manual edges from being lost when node ids are regenerated (e.g. route indices change).
+ */
+export function mergeComputedEdgesKeepingManualWithNodeRemap(
+  prevEdges: Edge[],
+  prevNodes: Node[],
+  computedEdges: Edge[],
+  nextNodes: Node[],
+): Edge[] {
+  const nextIds = new Set(nextNodes.map((n) => n.id));
+  const computedKeys = new Set(computedEdges.map((e) => edgeConnectionKey(e)));
+
+  const prevIdToKey = new Map<string, string>();
+  for (const n of prevNodes) {
+    const k = readNodeKey(n);
+    if (k) prevIdToKey.set(n.id, k);
+  }
+
+  const nextKeyToId = new Map<string, string>();
+  for (const n of nextNodes) {
+    const k = readNodeKey(n);
+    if (k) nextKeyToId.set(k, n.id);
+  }
+
+  const kept: Edge[] = [];
+  for (const e of prevEdges) {
+    if (!isManualEdge(e)) continue;
+
+    let source = e.source;
+    let target = e.target;
+
+    if (!nextIds.has(source)) {
+      const k = prevIdToKey.get(source);
+      const mapped = k ? nextKeyToId.get(k) : undefined;
+      if (mapped) source = mapped;
+    }
+    if (!nextIds.has(target)) {
+      const k = prevIdToKey.get(target);
+      const mapped = k ? nextKeyToId.get(k) : undefined;
+      if (mapped) target = mapped;
+    }
+
+    if (!nextIds.has(source) || !nextIds.has(target)) continue;
+
+    const migrated: Edge =
+      source === e.source && target === e.target ? e : ({ ...e, source, target } as Edge);
+    const k = edgeConnectionKey(migrated);
+    if (computedKeys.has(k)) continue;
+    computedKeys.add(k);
+    kept.push(migrated);
+  }
+
+  return [...computedEdges, ...kept];
+}
+
 /** 手写连线样式：虚线以示与 YAML 拓扑区别 */
 export function manualEdgeFromConnection(connection: Connection): Edge {
   if (!connection.source || !connection.target) {

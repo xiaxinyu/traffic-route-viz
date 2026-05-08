@@ -29,7 +29,7 @@ import {
 } from "./graphViewState";
 import {
   manualEdgeFromConnection,
-  mergeComputedEdgesKeepingManual,
+  mergeComputedEdgesKeepingManualWithNodeRemap,
   reconnectEdgeAsManual,
 } from "./diagramPersist";
 import {
@@ -277,12 +277,11 @@ function AppInner() {
       setParsedMsg(err);
 
       const { nodes: n, edges: e } = buildFlowGraph(p);
-      const ids = new Set(n.map((x) => x.id));
       setNodes(n);
-      setEdges((prev) => mergeComputedEdgesKeepingManual(prev, e, ids));
+      setEdges((prevEdges) => mergeComputedEdgesKeepingManualWithNodeRemap(prevEdges, nodes, e, n));
       setLastAppliedAt(Date.now());
     },
-    [yamlText, importedFiles, setNodes, setEdges],
+    [yamlText, importedFiles, setNodes, setEdges, nodes],
   );
 
   const mergedImportedText = useMemo(() => {

@@ -35,12 +35,15 @@ test("element editing: selected node can be deleted from toolbar", async ({ page
   await page.getByRole("button", { name: "刷新拓扑" }).click();
   await expect(page.locator(".react-flow").first()).toBeVisible();
 
+  // Open toolbar first so clicking it doesn't clear selection.
+  await page.getByTestId("diagram-actions-toggle").click();
+  await expect(page.getByTestId("delete-selected-elements")).toBeVisible();
+
   const nodeLocator = page.locator(".react-flow__node:not(.parent)").first();
   const before = await page.locator(".react-flow__node:not(.parent)").count();
   expect(before).toBeGreaterThan(0);
   await nodeLocator.click({ force: true });
-
-  await page.getByTestId("diagram-actions-toggle").click();
+  await expect(nodeLocator).toHaveClass(/selected/);
   await page.getByTestId("delete-selected-elements").click();
 
   await expect
