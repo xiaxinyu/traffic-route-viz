@@ -205,6 +205,7 @@ function AppInner() {
   const [importedFiles, setImportedFiles] = useState<ImportedYamlFile[] | null>(null);
   const [activeFileIndex, setActiveFileIndex] = useState<number | null>(null);
   const [leftMode, setLeftMode] = useState<"files" | "yaml">("files");
+  const [yamlPopoutOpen, setYamlPopoutOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<NodeTypeFilter>("all");
   const [matchCursor, setMatchCursor] = useState(0);
@@ -326,6 +327,15 @@ function AppInner() {
   useEffect(() => {
     setMatchCursor(0);
   }, [searchQuery, typeFilter]);
+
+  useEffect(() => {
+    if (!yamlPopoutOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setYamlPopoutOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [yamlPopoutOpen]);
 
   useEffect(() => {
     const next = clampUiScale(uiScale);
@@ -712,27 +722,40 @@ function AppInner() {
                 </div>
               )
             ) : (
-              <textarea
-                value={yamlText}
-                data-testid="yaml-textarea"
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setYamlText(next);
-                  if (importedFiles && activeFileIndex !== null) {
-                    setImportedFiles((prev) => {
-                      if (!prev) return prev;
-                      if (activeFileIndex < 0 || activeFileIndex >= prev.length) return prev;
-                      const copy = [...prev];
-                      const current = copy[activeFileIndex];
-                      if (!current) return prev;
-                      copy[activeFileIndex] = { ...current, text: next };
-                      return copy;
-                    });
-                  }
-                }}
-                spellCheck={false}
-                className="yaml-editor"
-              />
+              <>
+                <div className="yaml-editor-actions">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setYamlPopoutOpen(true)}
+                    data-testid="yaml-popout-open"
+                    title="放大查看 YAML（Esc 关闭）"
+                  >
+                    放大查看
+                  </button>
+                </div>
+                <textarea
+                  value={yamlText}
+                  data-testid="yaml-textarea"
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setYamlText(next);
+                    if (importedFiles && activeFileIndex !== null) {
+                      setImportedFiles((prev) => {
+                        if (!prev) return prev;
+                        if (activeFileIndex < 0 || activeFileIndex >= prev.length) return prev;
+                        const copy = [...prev];
+                        const current = copy[activeFileIndex];
+                        if (!current) return prev;
+                        copy[activeFileIndex] = { ...current, text: next };
+                        return copy;
+                      });
+                    }
+                  }}
+                  spellCheck={false}
+                  className="yaml-editor"
+                />
+              </>
             )}
           </section>
         </aside>
@@ -786,6 +809,67 @@ function AppInner() {
           </ReactFlow>
         </div>
       </div>
+
+      {yamlPopoutOpen ? (
+        <div
+          className="trv-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="YAML 放大查看"
+          data-testid="yaml-popout"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setYamlPopoutOpen(false);
+          }}
+        >
+          <div className="trv-modal">
+            <div className="trv-modal-header">
+              <div className="trv-modal-title">YAML 编辑器（放大查看）</div>
+              <div className="trv-modal-actions">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => applyYaml(yamlText, importedFiles)}
+                  data-testid="yaml-popout-refresh"
+                  title="重新解析 YAML 并刷新拓扑"
+                >
+                  刷新拓扑
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setYamlPopoutOpen(false)}
+                  data-testid="yaml-popout-close"
+                  title="关闭（Esc）"
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
+
+            <textarea
+              autoFocus
+              value={yamlText}
+              onChange={(e) => {
+                const next = e.target.value;
+                setYamlText(next);
+                if (importedFiles && activeFileIndex !== null) {
+                  setImportedFiles((prev) => {
+                    if (!prev) return prev;
+                    if (activeFileIndex < 0 || activeFileIndex >= prev.length) return prev;
+                    const copy = [...prev];
+                    const current = copy[activeFileIndex];
+                    if (!current) return prev;
+                    copy[activeFileIndex] = { ...current, text: next };
+                    return copy;
+                  });
+                }
+              }}
+              spellCheck={false}
+              className="yaml-editor yaml-editor-popout"
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
