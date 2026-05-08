@@ -586,23 +586,50 @@ function AppInner() {
           </section>
 
           <section className="left-panel-block compact">
-            <div className="block-title">图谱筛选</div>
-            <div className="type-filter-wrap">
-              {NODE_TYPE_ORDER.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  className={typeFilter === t ? "active" : ""}
-                  onClick={() => setTypeFilter(t)}
+            <div className="block-title-row">
+              <div>
+                <div className="block-title">图谱聚焦</div>
+                <div className="block-subtitle">先选类型，再用顶部搜索跳转目标节点</div>
+              </div>
+              <button
+                type="button"
+                className="btn-link"
+                onClick={() => {
+                  setTypeFilter("all");
+                  setSearchQuery("");
+                }}
+                title="清空类型筛选与搜索关键字"
+              >
+                清空
+              </button>
+            </div>
+
+            <div className="focus-controls">
+              <label className="focus-select-wrap" htmlFor="node-type-filter">
+                节点类型
+                <select
+                  id="node-type-filter"
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value as NodeTypeFilter)}
                 >
-                  {nodeTypeLabel(t)}
-                  <span>{graphMetrics.typeCounts[t]}</span>
-                </button>
-              ))}
+                  {NODE_TYPE_ORDER.map((t) => (
+                    <option key={t} value={t}>
+                      {nodeTypeLabel(t)}（{graphMetrics.typeCounts[t]}）
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="focus-inline-metrics">
+                <span>匹配节点 {graphPresentation.matchedNodeIds.length}</span>
+                <span>当前筛选 {nodeTypeLabel(typeFilter)}</span>
+              </div>
             </div>
           </section>
 
           <section className="left-panel-block grow">
+            <div className="panel-list-title">
+              {leftMode === "files" ? "导入文件列表" : "YAML 编辑器"}
+            </div>
             {leftMode === "files" ? (
               importedFiles?.length ? (
                 <div className="file-list">
@@ -658,18 +685,6 @@ function AppInner() {
               />
             )}
           </section>
-
-          <section className="left-panel-block compact">
-            <div className="block-title">当前选中</div>
-            {selectedNode ? (
-              <div className="selection-card">
-                <div>id: {selectedNode.id}</div>
-                <div>type: {selectedNode.type ?? "-"}</div>
-              </div>
-            ) : (
-              <div className="block-subtitle">未选中节点。点击画布节点可查看当前对象。</div>
-            )}
-          </section>
         </aside>
 
         <div ref={flowContainerRef} className="flow-stage">
@@ -692,6 +707,8 @@ function AppInner() {
             edgesUpdatable={true}
             elementsSelectable={true}
             deleteKeyCode={["Backspace", "Delete"]}
+            reconnectRadius={18}
+            edgeUpdaterRadius={18}
             defaultEdgeOptions={{ interactionWidth: 36 }}
             connectionMode={ConnectionMode.Loose}
             connectionLineStyle={{ stroke: "#334155", strokeWidth: 1.7 }}

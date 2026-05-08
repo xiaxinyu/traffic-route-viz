@@ -70,6 +70,12 @@ function toManualEdge(edge: Edge): Edge {
     },
     labelStyle: { ...(edge.labelStyle ?? {}), fontSize: 11, fill: "#334155", fontWeight: 500 },
     markerEnd: { type: MarkerType.ArrowClosed, color: MANUAL_EDGE_COLOR },
+    selectable: true,
+    deletable: true,
+    updatable: true,
+    reconnectable: true,
+    focusable: true,
+    interactionWidth: edge.interactionWidth ?? 40,
   };
 }
 

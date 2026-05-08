@@ -66,6 +66,15 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   const leftPad = 24;
   const sanitizeId = (v: string) => v.replace(/[^a-zA-Z0-9/_-]/g, "_");
   const edgeType: Edge["type"] = "smoothstep";
+  const makeEditableEdge = (e: Edge): Edge => ({
+    ...e,
+    selectable: e.selectable ?? true,
+    deletable: e.deletable ?? true,
+    updatable: (e as Edge & { updatable?: boolean }).updatable ?? true,
+    reconnectable: (e as Edge & { reconnectable?: boolean }).reconnectable ?? true,
+    focusable: e.focusable ?? true,
+    interactionWidth: e.interactionWidth ?? 40,
+  });
   const arrow = (color: string) => ({ type: MarkerType.ArrowClosed as const, color });
 
   const serviceByKey = new Map<string, (typeof parsed.services)[0]>();
@@ -730,5 +739,5 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     }
   }
 
-  return { nodes, edges };
+  return { nodes, edges: edges.map(makeEditableEdge) };
 }
