@@ -216,6 +216,7 @@ function AppInner() {
   );
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
   const flowContainerRef = useRef<HTMLDivElement | null>(null);
   const { fitView, setCenter } = useReactFlow();
 
@@ -283,6 +284,21 @@ function AppInner() {
       setLastAppliedAt(Date.now());
     },
     [yamlText, importedFiles, setNodes, setEdges, nodes],
+  );
+
+  const handleImportFileList = useCallback(
+    async (list: FileList | null) => {
+      if (!list?.length) return;
+      const incoming = await readImportedYamlFiles(list);
+      const combined = mergeImportedFiles(importedFiles, incoming);
+      setImportedFiles(combined);
+      setActiveFileIndex(null);
+      setLeftMode("files");
+      const merged = mergeYamlFiles(combined);
+      setYamlText(merged);
+      applyYaml(merged, combined);
+    },
+    [applyYaml, importedFiles],
   );
 
   const mergedImportedText = useMemo(() => {
@@ -596,25 +612,42 @@ function AppInner() {
               type="file"
               accept=".yaml,.yml,.YAML,.YML,text/plain,text/yaml"
               multiple
+              style={{ display: "none" }}
+              onChange={async (ev) => {
+                await handleImportFileList(ev.target.files);
+                ev.target.value = "";
+              }}
+            />
+
+            <input
+              ref={folderInputRef}
+              type="file"
+              accept=".yaml,.yml,.YAML,.YML,text/plain,text/yaml"
+              multiple
               {...({ webkitdirectory: "", directory: "" } as unknown as Record<string, string>)}
               style={{ display: "none" }}
               onChange={async (ev) => {
-                const list = ev.target.files;
-                if (!list?.length) return;
-                const incoming = await readImportedYamlFiles(list);
-                const combined = mergeImportedFiles(importedFiles, incoming);
-                setImportedFiles(combined);
-                setActiveFileIndex(null);
-                setLeftMode("files");
-                const merged = mergeYamlFiles(combined);
-                setYamlText(merged);
+                await handleImportFileList(ev.target.files);
                 ev.target.value = "";
-                applyYaml(merged, combined);
               }}
             />
 
             {importedFiles?.length ? (
               <div className="inline-actions">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => folderInputRef.current?.click()}
+                >
+                  追加导入文件夹
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  追加导入文件
+                </button>
                 <button
                   type="button"
                   className="btn-secondary"
