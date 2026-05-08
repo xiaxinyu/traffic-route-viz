@@ -34,3 +34,23 @@ test("smoke: loads app and can refresh topology", async ({ page }) => {
   await expect(page.getByTestId("save-diagram")).toBeVisible();
   await expect(page.getByTestId("delete-selected-edges")).toBeVisible();
 });
+
+test("yaml popout: open edit close syncs content", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByText("Traffic Route Viz")).toBeVisible({ timeout: 20_000 });
+
+  await page.getByRole("button", { name: "YAML", exact: true }).first().click();
+  await expect(page.getByTestId("yaml-textarea")).toBeVisible();
+  await page.getByTestId("yaml-popout-open").click();
+  await expect(page.getByTestId("yaml-popout")).toBeVisible();
+
+  const marker = `# popout-test-${Date.now()}`;
+  await page
+    .getByTestId("yaml-popout")
+    .locator("textarea")
+    .fill(`apiVersion: v1\nkind: Pod\nmetadata:\n  name: test\n${marker}\n`);
+  await page.getByTestId("yaml-popout-close").click();
+  await expect(page.getByTestId("yaml-popout")).toHaveCount(0);
+
+  await expect(page.getByTestId("yaml-textarea")).toContainText(marker);
+});
