@@ -13,8 +13,8 @@ usage() {
   <output-dir>/<namespace>/istio.tar.gz    （压缩包，包含 istio/）
 
 同时也会导出“资源原始 YAML（按名称分文件）”，便于完整归档：
-  <output-dir>/<namespace>/istio/raw/vs-<vs>.yaml
-  <output-dir>/<namespace>/istio/raw/dr-<dr>.yaml
+  <output-dir>/<namespace>/istio/vs-<vs>.yaml
+  <output-dir>/<namespace>/istio/dr-<dr>.yaml
 
 可选输出（适配 traffic/example 的 01/02/03 目录原则）：
   --out-root traffic/example --tier 02 --group <namespace>-istio
@@ -119,8 +119,6 @@ else
   OUT_DIR="${WORKROOT}/istio"
 fi
 mkdir -p "${OUT_DIR}"
-RAW_DIR="${OUT_DIR}/raw"
-mkdir -p "${RAW_DIR}"
 
 echo "Listing Istio VirtualService in namespace: ${NAMESPACE}"
 
@@ -152,9 +150,9 @@ missing_dr_raw=()
 missing_vs_bundle=()
 
 if [[ ${#VS_NAMES[@]} -gt 0 ]]; then
-  echo "[VS] Exporting raw VirtualService YAMLs -> ${RAW_DIR}"
+  echo "[VS] Exporting raw VirtualService YAMLs -> ${OUT_DIR}"
   for vs in "${VS_NAMES[@]}"; do
-    vs_file="${RAW_DIR}/vs-$(sanitize_filename "${vs}").yaml"
+    vs_file="${OUT_DIR}/vs-$(sanitize_filename "${vs}").yaml"
     "${KUBECTL[@]}" get virtualservice "${vs}" -n "${NAMESPACE}" -o yaml --ignore-not-found=true \
       > "${vs_file}" || true
     if [[ ! -s "${vs_file}" ]]; then
@@ -166,9 +164,9 @@ if [[ ${#VS_NAMES[@]} -gt 0 ]]; then
 fi
 
 if [[ ${#DR_NAMES_ALL[@]} -gt 0 ]]; then
-  echo "[DR] Exporting raw DestinationRule YAMLs -> ${RAW_DIR}"
+  echo "[DR] Exporting raw DestinationRule YAMLs -> ${OUT_DIR}"
   for dr in "${DR_NAMES_ALL[@]}"; do
-    dr_file="${RAW_DIR}/dr-$(sanitize_filename "${dr}").yaml"
+    dr_file="${OUT_DIR}/dr-$(sanitize_filename "${dr}").yaml"
     "${KUBECTL[@]}" get destinationrule "${dr}" -n "${NAMESPACE}" -o yaml --ignore-not-found=true \
       > "${dr_file}" || true
     if [[ ! -s "${dr_file}" ]]; then
@@ -271,7 +269,6 @@ done
 
 echo "Done."
 echo "Output dir: ${OUT_DIR}"
-echo "Raw VS/DR dir: ${RAW_DIR}"
 
 echo "Summary:"
 echo "  VS listed: ${#VS_NAMES[@]}   DR listed: ${#DR_NAMES_ALL[@]}"
