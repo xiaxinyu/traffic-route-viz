@@ -121,6 +121,14 @@ echo "Listing Istio VirtualService in namespace: ${NAMESPACE}"
 VS_JSON="$("${KUBECTL[@]}" get virtualservice -n "${NAMESPACE}" -o json 2>/dev/null || true)"
 DR_JSON="$("${KUBECTL[@]}" get destinationrule -n "${NAMESPACE}" -o json 2>/dev/null || true)"
 
+# If CRDs are missing or access is denied, kubectl may return empty output; keep jq pipelines stable.
+if [[ -z "${VS_JSON}" ]]; then
+  VS_JSON='{"items":[]}'
+fi
+if [[ -z "${DR_JSON}" ]]; then
+  DR_JSON='{"items":[]}'
+fi
+
 mapfile -t VS_NAMES < <(echo "${VS_JSON}" | jq -r '.items[]?.metadata.name' | sort)
 
 if [[ ${#VS_NAMES[@]} -eq 0 ]]; then
@@ -167,6 +175,8 @@ for vs in "${VS_NAMES[@]}"; do
 
   echo "Exporting: virtualservice/${vs} -> ${out_file}"
 
+  # Use the list snapshot for dependency matching, but re-fetch YAML for export.
+  # This avoids failing the entire script if a VS disappears between list and export (race), or RBAC differs.
   VS_OBJ="$(echo "${VS_JSON}" | jq --arg n "${vs}" '.items[] | select(.metadata.name == $n)')"
   VS_HOSTS="$(echo "${VS_OBJ}" | jq -c "${JQ_HOST_UTILS} vsHosts")"
 
@@ -185,8 +195,14 @@ for vs in "${VS_NAMES[@]}"; do
     " | sort
   )"
 
+  VS_YAML="$("${KUBECTL[@]}" get virtualservice "${vs}" -n "${NAMESPACE}" -o yaml --ignore-not-found=true 2>/dev/null || true)"
+  if [[ -z "${VS_YAML}" ]]; then
+    echo "# WARN: virtualservice not found (skipped): ${NAMESPACE}/${vs}" >&2
+    continue
+  fi
+
   {
-    "${KUBECTL[@]}" get virtualservice "${vs}" -n "${NAMESPACE}" -o yaml
+    printf '%s\n' "${VS_YAML}"
     if [[ -n "${DR_NAMES}" ]]; then
       while IFS= read -r dr; do
         [[ -z "${dr}" ]] && continue
