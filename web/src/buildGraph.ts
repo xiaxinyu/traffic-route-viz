@@ -932,5 +932,22 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     };
   });
 
-  return { nodes, edges: edgesWithReadableLabels.map(makeEditableEdge) };
+  const edgeDedupeKey = (e: Edge): string =>
+    [
+      e.source,
+      e.target,
+      e.sourceHandle ?? "",
+      e.targetHandle ?? "",
+      typeof e.label === "string" ? e.label : "",
+    ].join("|");
+
+  const seenEdge = new Set<string>();
+  const dedupedEdges = edgesWithReadableLabels.filter((e) => {
+    const k = edgeDedupeKey(e);
+    if (seenEdge.has(k)) return false;
+    seenEdge.add(k);
+    return true;
+  });
+
+  return { nodes, edges: dedupedEdges.map(makeEditableEdge) };
 }

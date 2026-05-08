@@ -157,3 +157,24 @@ describe("buildFlowGraph Istio global gateway + weighted routes", () => {
     expect(greenEdge).toBeTruthy();
   });
 });
+
+describe("buildFlowGraph edge dedupe", () => {
+  it("does not create duplicate Gateway→VirtualService edges when gateways refs normalize to same name", () => {
+    const withDupRef = GATEWAY_AND_VS.replace(
+      "  gateways:\n    - istio-system/rts-istio-ingress-gateway\n",
+      "  gateways:\n    - istio-system/rts-istio-ingress-gateway\n    - rts-istio-ingress-gateway\n",
+    );
+    const parsed = parseK8sYaml(withDupRef, "istio-dup.yaml");
+    const { nodes, edges } = buildFlowGraph(parsed);
+
+    const globalGw = nodes.find((n) => n.type === "istioGateway" && n.data?.globalGateway === true);
+    const vsEntry = nodes.find((n) => n.type === "ingress" && n.data?.label === "vs-app");
+    expect(globalGw).toBeTruthy();
+    expect(vsEntry).toBeTruthy();
+
+    const gwEdges = edges.filter(
+      (e) => e.source === globalGw!.id && e.target === vsEntry!.id && e.label === "Gateway",
+    );
+    expect(gwEdges).toHaveLength(1);
+  });
+});
