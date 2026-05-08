@@ -51,13 +51,6 @@ body {
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
 }
 
-.header-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 12px;
-  align-items: stretch;
-}
-
 .header-main {
   display: flex;
   flex-direction: column;
@@ -172,45 +165,6 @@ body {
   flex-wrap: wrap;
 }
 
-.header-side-card {
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 10px 12px;
-  background:
-    radial-gradient(circle at 100% 0%, rgba(20, 184, 166, 0.16), transparent 48%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(240, 253, 250, 0.9));
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
-.header-side-title {
-  font-size: 13px;
-  font-weight: 900;
-  color: #0f172a;
-}
-
-.header-side-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: #334155;
-}
-
-.header-side-row strong {
-  color: #0f766e;
-  font-weight: 900;
-}
-
-.header-side-hint {
-  font-size: 11px;
-  line-height: 1.35;
-  color: #475569;
-  margin-top: 2px;
-}
-
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -244,22 +198,22 @@ body {
 }
 
 .left-panel {
-  width: 392px;
+  width: 348px;
   flex-shrink: 0;
   border-right: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.84);
+  background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(4px);
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 10px;
+  gap: 8px;
+  padding: 8px;
 }
 
 .left-panel-block {
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--surface);
-  padding: 10px;
+  padding: 9px;
 }
 
 .left-panel-block.compact {
@@ -270,12 +224,13 @@ body {
   flex: 1;
   min-height: 160px;
   display: flex;
+  flex-direction: column;
 }
 
 .block-title-row {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
 }
 
@@ -338,14 +293,8 @@ body {
   line-height: 1.38;
 }
 
-.dropzone-files {
-  margin-top: 7px;
-  font-size: 11px;
-  color: #334155;
-}
-
 .inline-actions {
-  margin-top: 10px;
+  margin-top: 8px;
   display: flex;
   gap: 8px;
 }
@@ -354,38 +303,68 @@ body {
   flex: 1;
 }
 
-.type-filter-wrap {
+.btn-link {
+  border: none;
+  background: transparent;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn-link:hover {
+  background: #ecfeff;
+}
+
+.focus-controls {
   margin-top: 8px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.type-filter-wrap button {
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #fff;
-  color: #334155;
-  padding: 5px 9px;
+.focus-select-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
   font-size: 11px;
-  font-weight: 800;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.type-filter-wrap button span {
   color: #64748b;
+  font-weight: 700;
 }
 
-.type-filter-wrap button.active {
-  border-color: #14b8a6;
-  color: #0f766e;
-  background: #ddf4f1;
+.focus-select-wrap select {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 7px 8px;
+  background: #fff;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.focus-hint {
+  font-size: 11px;
+  color: #334155;
+  font-weight: 700;
+  line-height: 1.4;
+  padding: 6px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.panel-list-title {
+  font-size: 12px;
+  font-weight: 900;
+  color: #0f172a;
+  margin-bottom: 8px;
 }
 
 .file-list {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   width: 100%;
   border-radius: 10px;
@@ -436,6 +415,8 @@ body {
 }
 
 .yaml-editor {
+  flex: 1;
+  min-height: 0;
   width: 100%;
   border: none;
   resize: none;
@@ -449,18 +430,6 @@ body {
   padding: 11px;
 }
 
-.selection-card {
-  margin-top: 7px;
-  border-radius: 10px;
-  background: #f8fafc;
-  border: 1px solid var(--line);
-  padding: 8px;
-  font-size: 11px;
-  line-height: 1.45;
-  color: #334155;
-  word-break: break-all;
-}
-
 .flow-stage {
   flex: 1;
   min-width: 0;
@@ -472,15 +441,11 @@ body {
 
 @media (max-width: 1100px) {
   .left-panel {
-    width: 328px;
+    width: 312px;
   }
 }
 
 @media (max-width: 900px) {
-  .header-grid {
-    grid-template-columns: 1fr;
-  }
-
   .main-body {
     flex-direction: column;
   }

@@ -17,7 +17,7 @@ test("smoke: loads app and can refresh topology", async ({ page }) => {
   await page.getByRole("textbox", { name: "搜索节点" }).fill("rbac");
   await page.getByRole("button", { name: "下一个" }).click();
 
-  await page.getByRole("button", { name: /Service/ }).first().click();
+  await page.locator("#node-type-filter").selectOption("service");
   await page.getByRole("button", { name: "YAML", exact: true }).first().click();
   await expect(page.getByTestId("yaml-textarea")).toBeVisible();
 

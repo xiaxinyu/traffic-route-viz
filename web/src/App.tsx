@@ -197,8 +197,6 @@ function AppInner() {
     [nodes, edges, searchQuery, typeFilter],
   );
 
-  const selectedNode = useMemo(() => nodes.find((n) => n.selected), [nodes]);
-
   const onConnect = useCallback(
     (c: Connection) =>
       setEdges((eds) => {
@@ -353,108 +351,89 @@ function AppInner() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <div className="header-grid">
-          <div className="header-main">
-            <div className="header-title-wrap">
-              <h1>Traffic Route Viz</h1>
-              <p>专业化流量拓扑工作台：导入、解析、筛选、定位、导出一体化</p>
-            </div>
+        <div className="header-main">
+          <div className="header-title-wrap">
+            <h1>Traffic Route Viz</h1>
+            <p>专业化流量拓扑工作台：导入、解析、筛选、定位、导出一体化</p>
+          </div>
 
-            <div className="header-main-controls">
-              <input
-                className="search-input"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") jumpToMatch(matchCursor + 1);
-                }}
-                placeholder="搜索节点（name / host / path / service）"
-                aria-label="搜索节点"
-              />
+          <div className="header-main-controls">
+            <input
+              className="search-input"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") jumpToMatch(matchCursor + 1);
+              }}
+              placeholder="搜索节点（name / host / path / service）"
+              aria-label="搜索节点"
+            />
 
-              <div className="search-nav">
-                <button
-                  type="button"
-                  onClick={() => jumpToMatch(matchCursor - 1)}
-                  disabled={!graphPresentation.matchedNodeIds.length}
-                >
-                  上一个
-                </button>
-                <button
-                  type="button"
-                  onClick={() => jumpToMatch(matchCursor + 1)}
-                  disabled={!graphPresentation.matchedNodeIds.length}
-                >
-                  下一个
-                </button>
-                <span>
-                  {graphPresentation.matchedNodeIds.length
-                    ? `${matchCursor + 1}/${graphPresentation.matchedNodeIds.length}`
-                    : "0/0"}
-                </span>
-              </div>
-
+            <div className="search-nav">
               <button
                 type="button"
-                className="btn-primary"
-                onClick={() => applyYaml(mergedImportedText ?? yamlText)}
-                title="重新解析 YAML 并刷新拓扑"
+                onClick={() => jumpToMatch(matchCursor - 1)}
+                disabled={!graphPresentation.matchedNodeIds.length}
               >
-                刷新拓扑
+                上一个
               </button>
+              <button
+                type="button"
+                onClick={() => jumpToMatch(matchCursor + 1)}
+                disabled={!graphPresentation.matchedNodeIds.length}
+              >
+                下一个
+              </button>
+              <span>
+                {graphPresentation.matchedNodeIds.length
+                  ? `${matchCursor + 1}/${graphPresentation.matchedNodeIds.length}`
+                  : "0/0"}
+              </span>
+            </div>
 
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => applyYaml(mergedImportedText ?? yamlText)}
+              title="重新解析 YAML 并刷新拓扑"
+            >
+              刷新拓扑
+            </button>
+
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => fitView({ padding: 0.08, duration: 240 })}
+              title="将拓扑重新适配到当前画布"
+            >
+              适配视图
+            </button>
+
+            {getRuntimeConfig().auth?.enabled !== false ? (
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={() => fitView({ padding: 0.08, duration: 240 })}
-                title="将拓扑重新适配到当前画布"
+                onClick={() => {
+                  clearSession();
+                  window.location.reload();
+                }}
+                title="退出登录"
               >
-                适配视图
+                退出
               </button>
-
-              {getRuntimeConfig().auth?.enabled !== false ? (
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => {
-                    clearSession();
-                    window.location.reload();
-                  }}
-                  title="退出登录"
-                >
-                  退出
-                </button>
-              ) : null}
-            </div>
-
-            <div className="header-status-strip" data-testid="top-status-strip">
-              <span className="status-pill">节点 {graphMetrics.nodeCount}</span>
-              <span className="status-pill">边 {graphMetrics.edgeCount}</span>
-              <span className="status-pill">自动边 {graphMetrics.autoEdgeCount}</span>
-              <span className="status-pill">手写边 {graphMetrics.manualEdgeCount}</span>
-              <span className="status-pill">
-                最近刷新 {formatClockTime(lastAppliedAt)}
-                {parsedMsg ? "（有告警）" : "（正常）"}
-              </span>
-            </div>
+            ) : null}
           </div>
 
-          <aside className="header-side-card" data-testid="header-side-card">
-            <div className="header-side-title">快速导航</div>
-            <div className="header-side-row">
-              <span>当前筛选</span>
-              <strong>{nodeTypeLabel(typeFilter)}</strong>
-            </div>
-            <div className="header-side-row">
-              <span>匹配节点</span>
-              <strong>{graphPresentation.matchedNodeIds.length}</strong>
-            </div>
-            <div className="header-side-row">
-              <span>快捷键</span>
-              <strong>Delete 删除选中边</strong>
-            </div>
-            <div className="header-side-hint">输入关键字后按 Enter 可连续跳转命中节点。</div>
-          </aside>
+          <div className="header-status-strip" data-testid="top-status-strip">
+            <span className="status-pill">节点 {graphMetrics.nodeCount}</span>
+            <span className="status-pill">边 {graphMetrics.edgeCount}</span>
+            <span className="status-pill">自动边 {graphMetrics.autoEdgeCount}</span>
+            <span className="status-pill">手写边 {graphMetrics.manualEdgeCount}</span>
+            <span className="status-pill">
+              最近刷新 {formatClockTime(lastAppliedAt)}
+              {parsedMsg ? "（有告警）" : "（正常）"}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -518,17 +497,8 @@ function AppInner() {
             >
               <div className="dropzone-title">导入 YAML 文件 / 文件夹</div>
               <div className="dropzone-desc">
-                支持多文件夹追加导入、相对路径去重；导入后自动解析并刷新画布。
+                支持多文件夹追加导入与去重；导入后自动解析刷新。
               </div>
-              {importedFiles?.length ? (
-                <div className="dropzone-files">
-                  {importedFiles
-                    .slice(0, 3)
-                    .map((f) => displayPath(f))
-                    .join(", ")}
-                  {importedFiles.length > 3 ? ` ...(+${importedFiles.length - 3})` : ""}
-                </div>
-              ) : null}
             </div>
 
             <input
@@ -589,7 +559,7 @@ function AppInner() {
             <div className="block-title-row">
               <div>
                 <div className="block-title">图谱聚焦</div>
-                <div className="block-subtitle">先选类型，再用顶部搜索跳转目标节点</div>
+                <div className="block-subtitle">先选类型，再用顶部搜索和上下一个跳转</div>
               </div>
               <button
                 type="button"
@@ -619,9 +589,8 @@ function AppInner() {
                   ))}
                 </select>
               </label>
-              <div className="focus-inline-metrics">
-                <span>匹配节点 {graphPresentation.matchedNodeIds.length}</span>
-                <span>当前筛选 {nodeTypeLabel(typeFilter)}</span>
+              <div className="focus-hint">
+                当前筛选：{nodeTypeLabel(typeFilter)}，匹配 {graphPresentation.matchedNodeIds.length} 个节点
               </div>
             </div>
           </section>
