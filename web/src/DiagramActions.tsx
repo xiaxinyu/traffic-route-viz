@@ -135,11 +135,11 @@ export function DiagramActions(props: Props) {
     const el = wrap ?? flowContainerRef.current;
     if (!el) return;
     try {
-      await exportDiagramToPng(el, `traffic-route-viz-${Date.now()}.png`);
+      await exportDiagramToPng(el, nodes, `traffic-route-viz-${Date.now()}.png`);
     } catch {
-      window.alert("导出 PNG 失败：请稍后重试，或缩放画布后再导出。");
+      window.alert("导出 PNG 失败：请稍后重试。");
     }
-  }, [flowContainerRef]);
+  }, [flowContainerRef, nodes]);
 
   const onExportMermaid = useCallback(() => {
     const text = exportToMermaid(nodes, edges);

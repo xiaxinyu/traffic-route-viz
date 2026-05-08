@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Connection, Edge } from "reactflow";
 
 import {
+  createEdgeNonce,
   manualEdgeFromConnection,
   mergeComputedEdgesKeepingManual,
   reconnectEdgeAsManual,
@@ -17,6 +18,14 @@ describe("manualEdgeFromConnection", () => {
     expect(edge.style?.stroke).toBe("#475569");
     expect(edge.style?.strokeDasharray).toBe("6 4");
     expect(edge.markerEnd).toMatchObject({ color: "#475569" });
+  });
+});
+
+describe("createEdgeNonce", () => {
+  it("returns non-empty stable string even without crypto.randomUUID", () => {
+    const v = createEdgeNonce();
+    expect(typeof v).toBe("string");
+    expect(v.length).toBeGreaterThan(8);
   });
 });
 

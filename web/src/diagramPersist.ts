@@ -32,10 +32,33 @@ export function isManualEdge(e: Edge): boolean {
 const MANUAL_EDGE_COLOR = "#475569";
 const MANUAL_EDGE_DASH = "6 4";
 
+function randomHex(bytes: number): string {
+  const g = globalThis.crypto;
+  if (g && typeof g.getRandomValues === "function") {
+    const arr = new Uint8Array(bytes);
+    g.getRandomValues(arr);
+    return [...arr].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  let out = "";
+  for (let i = 0; i < bytes; i += 1) {
+    out += Math.floor(Math.random() * 256)
+      .toString(16)
+      .padStart(2, "0");
+  }
+  return out;
+}
+
+/** Cross-runtime UUID-like id generator (crypto.randomUUID fallback for legacy/insecure env). */
+export function createEdgeNonce(): string {
+  const g = globalThis.crypto as Crypto & { randomUUID?: () => string };
+  if (g && typeof g.randomUUID === "function") return g.randomUUID();
+  return `${Date.now().toString(36)}-${randomHex(8)}`;
+}
+
 function toManualEdge(edge: Edge): Edge {
   return {
     ...edge,
-    id: edge.id.startsWith("manual-") ? edge.id : `manual-${crypto.randomUUID()}`,
+    id: edge.id.startsWith("manual-") ? edge.id : `manual-${createEdgeNonce()}`,
     type: "smoothstep",
     animated: false,
     data: { ...(edge.data ?? {}), manual: true },
@@ -85,7 +108,7 @@ export function manualEdgeFromConnection(connection: Connection): Edge {
     target: connection.target,
     sourceHandle: connection.sourceHandle ?? null,
     targetHandle: connection.targetHandle ?? null,
-    id: `manual-${crypto.randomUUID()}`,
+    id: `manual-${createEdgeNonce()}`,
   });
 }
 
