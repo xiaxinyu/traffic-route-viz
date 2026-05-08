@@ -151,16 +151,24 @@ def vsHosts:
   | unique;
 
 def expandHost($h; $ns):
-  if ($h | contains(".")) then
-    [$h, ($h | split(".")[0])]
-  else
-    [
+  # Normalize both short name and common FQDN variants so VS/DR match even if
+  # one side uses `svc`, the other uses `svc.ns` / `svc.ns.svc` / `...cluster.local`.
+  ($h | split(".") | map(select(. != ""))) as $p
+  | ($p[0] // "") as $name
+  | (
+      if ($p | length) >= 2 then ($p[1]) else $ns end
+    ) as $ns2
+  | [
+      # original (may already be fqdn)
       $h,
-      "\($h).\($ns)",
-      "\($h).\($ns).svc",
-      "\($h).\($ns).svc.cluster.local"
+      # short + partial fqdn
+      $name,
+      "\($name).\($ns2)",
+      "\($name).\($ns2).svc",
+      "\($name).\($ns2).svc.cluster.local"
     ]
-  end;
+  | map(select(type=="string" and . != ""))
+  | unique;
 
 def expandSet($hs; $ns):
   ($hs | map(expandHost(.;$ns)) | add | unique);
