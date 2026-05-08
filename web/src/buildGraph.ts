@@ -561,9 +561,44 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         markerEnd: arrow("#7c3aed"),
       });
 
-      const hostRoutes = ingressRoutes
-        .filter((r) => r.host === host)
-        .sort((a, b) => a.path.localeCompare(b.path));
+      const rawHostRoutes = ingressRoutes.filter((r) => r.host === host);
+      /**
+       * Istio VirtualService can contain multiple `spec.http[]` rules that describe the same
+       * URI match. The parser emits one entry per http-rule × match, so we dedupe on canvas.
+       * Key: (host, path, pathType) and merge destination lists to avoid repeated Route cards.
+       */
+      const hostRoutes =
+        ing.kind === "VirtualService"
+          ? (() => {
+              const byPath = new Map<string, (typeof rawHostRoutes)[number]>();
+              const destKey = (d: IstioRouteDestination): string =>
+                [
+                  (d.host ?? "?").trim().toLowerCase(),
+                  String(d.port ?? "?"),
+                  (d.subset ?? "").trim().toLowerCase(),
+                  typeof d.weight === "number" ? String(d.weight) : "",
+                ].join("|");
+              for (const r of rawHostRoutes) {
+                const k = `${r.path}::${String(r.pathType ?? "")}`;
+                const prev = byPath.get(k);
+                if (!prev) {
+                  byPath.set(k, r);
+                  continue;
+                }
+                const merged = [...(prev.istioDestinations ?? []), ...(r.istioDestinations ?? [])];
+                if (merged.length) {
+                  const seen = new Set<string>();
+                  prev.istioDestinations = merged.filter((d) => {
+                    const dk = destKey(d);
+                    if (seen.has(dk)) return false;
+                    seen.add(dk);
+                    return true;
+                  });
+                }
+              }
+              return [...byPath.values()].sort((a, b) => a.path.localeCompare(b.path));
+            })()
+          : rawHostRoutes.sort((a, b) => a.path.localeCompare(b.path));
 
       if (!hostRoutes.length) {
         hostCursorY = hostY + LAYOUT_EST_HOST_CARD_H + LAYOUT_AFTER_HOST_GROUP;

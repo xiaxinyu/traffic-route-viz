@@ -250,4 +250,48 @@ describe("buildFlowGraph VirtualService column + gateway vertical center", () =>
 
     expect(edges.filter((e) => e.source === globalGw!.id && e.label === "Gateway").length).toBe(2);
   });
+
+  it("dedupes identical VirtualService host+path routes into a single Route node", () => {
+    const VS_DUP = `apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: vs-dup
+  namespace: demo
+spec:
+  gateways:
+    - istio-system/rts-istio-ingress-gateway
+  hosts:
+    - app.example.com
+  http:
+    - match:
+        - uri:
+            prefix: /api
+      route:
+        - destination:
+            host: reviews.demo.svc.cluster.local
+            subset: blue
+            port:
+              number: 9080
+          weight: 50
+    - match:
+        - uri:
+            prefix: /api
+      route:
+        - destination:
+            host: reviews.demo.svc.cluster.local
+            subset: green
+            port:
+              number: 9080
+          weight: 50
+`;
+    const parsed = parseK8sYaml(VS_DUP, "istio/vs-dup.yaml");
+    const { nodes } = buildFlowGraph(parsed);
+
+    const routeNodes = nodes.filter(
+      (n) =>
+        n.type === "route" && n.data?.ingressKind === "VirtualService" && n.data?.path === "/api",
+    );
+    expect(routeNodes).toHaveLength(1);
+    expect(routeNodes[0]?.data?.istioDestinations?.length).toBe(2);
+  });
 });
