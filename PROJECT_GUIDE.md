@@ -13,6 +13,7 @@
 - **应用目录**：`web/`
 - **示例数据**：`traffic/rbac/*.yaml`
 - **数据流**：YAML → `k8sParser.ts` → `buildGraph.ts` → React Flow → `FlowNodes.tsx`
+- **语义配色**：节点颜色映射维护在 `FlowNodes.tsx` 的 `NODE_COLOR_PALETTE`（与 `HARNESS_ENGINEERING.md` 保持一致）
 
 ---
 

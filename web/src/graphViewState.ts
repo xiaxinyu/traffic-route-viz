@@ -103,6 +103,12 @@ export function buildGraphPresentation(
 ): GraphPresentation {
   const query = options.query.trim().toLowerCase();
   const hasQuery = query.length > 0;
+  const hasTypeFilter = options.typeFilter !== "all";
+
+  // No query/type focus => return raw graph to preserve default styles/animations/editability UX.
+  if (!hasQuery && !hasTypeFilter) {
+    return { nodes: baseNodes, edges: baseEdges, matchedNodeIds: [] };
+  }
 
   const matched = new Set<string>();
 

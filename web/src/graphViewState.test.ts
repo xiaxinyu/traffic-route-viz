@@ -50,6 +50,13 @@ describe("buildGraphPresentation", () => {
     { id: "e-2", source: "svc-a", target: "ep-a" },
   ];
 
+  it("passes through raw nodes/edges when no query and no type filter", () => {
+    const view = buildGraphPresentation(baseNodes, baseEdges, { query: "", typeFilter: "all" });
+    expect(view.nodes).toBe(baseNodes);
+    expect(view.edges).toBe(baseEdges);
+    expect(view.matchedNodeIds).toEqual([]);
+  });
+
   it("highlights query-matching nodes and dims others", () => {
     const view = buildGraphPresentation(baseNodes, baseEdges, { query: "rbac", typeFilter: "all" });
 

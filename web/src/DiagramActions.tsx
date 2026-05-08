@@ -208,6 +208,18 @@ export function DiagramActions(props: Props) {
   const onDeleteSelectedEdges = useCallback(() => {
     setEdges((prev) => prev.filter((e) => !e.selected));
   }, [setEdges]);
+  const onDeleteSelectedElements = useCallback(() => {
+    setNodes((prevNodes) => {
+      const selectedNodeIds = new Set(prevNodes.filter((n) => n.selected).map((n) => n.id));
+      if (!selectedNodeIds.size) return prevNodes;
+      setEdges((prevEdges) =>
+        prevEdges.filter(
+          (e) => !e.selected && !selectedNodeIds.has(e.source) && !selectedNodeIds.has(e.target),
+        ),
+      );
+      return prevNodes.filter((n) => !selectedNodeIds.has(n.id));
+    });
+  }, [setEdges, setNodes]);
 
   return (
     <Panel position="top-right" style={{ marginRight: 8, marginTop: 8 }}>
@@ -307,6 +319,17 @@ export function DiagramActions(props: Props) {
               title="先点击选中连线，再点此按钮删除；也支持键盘 Delete/Backspace"
             >
               删除选中连线
+            </button>
+            <button
+              type="button"
+              style={btnGhost}
+              onClick={() => {
+                onDeleteSelectedElements();
+              }}
+              data-testid="delete-selected-elements"
+              title="删除当前选中的节点与连线（同时会清理其关联边）"
+            >
+              删除选中元素
             </button>
             <button
               type="button"

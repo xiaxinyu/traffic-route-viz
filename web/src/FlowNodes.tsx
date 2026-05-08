@@ -4,6 +4,30 @@ import { Handle, Position } from "reactflow";
 
 import type { IngressTlsEntry } from "./k8sParser";
 
+type EntryKind = "Ingress" | "VirtualService" | "HTTPProxy";
+
+/**
+ * Canonical node palette for a coordinated canvas style.
+ * Keep this mapping in sync with HARNESS_ENGINEERING.md §7.x visual rules.
+ */
+export const NODE_COLOR_PALETTE = {
+  ingress: "#4f46e5",
+  virtualService: "#0284c7",
+  httpProxy: "#0f766e",
+  host: "#c026d3",
+  route: "#d97706",
+  service: "#2563eb",
+  destinationRule: "#be185d",
+  endpoints: "#0d9488",
+  istioGateway: "#0369a1",
+} as const;
+
+export function accentForEntryKind(kind?: EntryKind): string {
+  if (kind === "HTTPProxy") return NODE_COLOR_PALETTE.httpProxy;
+  if (kind === "VirtualService") return NODE_COLOR_PALETTE.virtualService;
+  return NODE_COLOR_PALETTE.ingress;
+}
+
 const cardStyle: CSSProperties = {
   borderRadius: 10,
   padding: "10px 14px",
@@ -99,6 +123,7 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
       : entryKind === "VirtualService"
         ? "Istio VirtualService"
         : "Kubernetes Ingress";
+  const accent = accentForEntryKind(entryKind);
 
   return (
     <div
@@ -106,8 +131,8 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
         width: "100%",
         height: "100%",
         borderRadius: 16,
-        border: "1px solid rgba(79, 70, 229, 0.22)",
-        background: "linear-gradient(165deg, rgba(79,70,229,0.10), rgba(79,70,229,0.03))",
+        border: `1px solid ${accent}33`,
+        background: `linear-gradient(165deg, ${accent}1A, ${accent}08)`,
         boxSizing: "border-box",
         overflow: "hidden",
         display: "flex",
@@ -119,16 +144,16 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
         style={{
           flexShrink: 0,
           padding: "10px 14px",
-          background: "rgba(79, 70, 229, 0.14)",
-          borderBottom: "1px solid rgba(79, 70, 229, 0.2)",
+          background: `${accent}24`,
+          borderBottom: `1px solid ${accent}33`,
           cursor: "grab",
           userSelect: "none",
         }}
       >
-        <div style={{ fontSize: 12, fontWeight: 800, color: "#312e81" }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: "#1e293b" }}>
           入口流量拓扑分区 · 第 {idx} 视图
         </div>
-        <div style={{ fontSize: 11, marginTop: 4, color: "#4338ca", fontWeight: 700 }}>
+        <div style={{ fontSize: 11, marginTop: 4, color: accent, fontWeight: 700 }}>
           {kindLabel2}：{ingressName ?? "—"}
         </div>
         {tierCode ? (
@@ -198,8 +223,7 @@ export const IngressNode = memo(function IngressNode(props: NodeProps) {
     kind?: "Ingress" | "VirtualService" | "HTTPProxy";
   };
   const hasTls = tls && tls.length > 0;
-  const accent =
-    kind === "HTTPProxy" ? "#0f766e" : kind === "VirtualService" ? "#0ea5e9" : "#4f46e5";
+  const accent = accentForEntryKind(kind);
   return (
     <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}` }}>
       <Handle type="target" position={Position.Left} id="t-left" style={handle(accent, "left")} />
@@ -268,7 +292,7 @@ export const HostNode = memo(function HostNode(props: NodeProps) {
     ingressName?: string;
     entryKind?: "Ingress" | "VirtualService" | "HTTPProxy";
   };
-  const accent = "#7c3aed";
+  const accent = NODE_COLOR_PALETTE.host;
   return (
     <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}` }}>
       <Handle type="target" position={Position.Left} style={handle(accent, "left")} />
@@ -330,7 +354,7 @@ export const ServiceNode = memo(function ServiceNode(props: NodeProps) {
     backendPort?: number | string;
     istioSubsets?: string[];
   };
-  const accent = "#4f46e5";
+  const accent = NODE_COLOR_PALETTE.service;
   return (
     <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}` }}>
       <Handle type="target" position={Position.Left} style={handle(accent, "left")} />
@@ -344,7 +368,7 @@ export const ServiceNode = memo(function ServiceNode(props: NodeProps) {
       <div style={titleRow()}>
         <span style={iconDot(accent)} />
         <span>Service</span>
-        {st ? <span style={pill("#eef2ff", "#3730a3")}>{st}</span> : null}
+        {st ? <span style={pill("#dbeafe", "#1d4ed8")}>{st}</span> : null}
       </div>
       <div style={{ marginTop: 6, fontWeight: 900, color: "#0f172a", wordBreak: "break-word" }}>
         {label}
@@ -357,7 +381,7 @@ export const ServiceNode = memo(function ServiceNode(props: NodeProps) {
         </div>
       ) : null}
       {backendPort !== undefined && backendPort !== "?" ? (
-        <div style={{ ...meta(), color: "#4338ca", fontWeight: 600 }}>
+        <div style={{ ...meta(), color: "#1d4ed8", fontWeight: 600 }}>
           Ingress backend 端口: {String(backendPort)}
         </div>
       ) : null}
@@ -378,7 +402,7 @@ export const ServiceNode = memo(function ServiceNode(props: NodeProps) {
 
 export const HttpProxyNode = memo(function HttpProxyNode(props: NodeProps) {
   const { label, subtitle } = props.data as { label?: string; subtitle?: string };
-  const accent = "#0f766e";
+  const accent = NODE_COLOR_PALETTE.httpProxy;
   return (
     <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}`, background: "#f0fdfa" }}>
       <Handle type="target" position={Position.Left} style={handle(accent, "left")} />
@@ -408,7 +432,7 @@ export const IstioGatewayNode = memo(function IstioGatewayNode(props: NodeProps)
     servers?: { port?: number; name?: string; protocol?: string; hosts: string[] }[];
     selector?: Record<string, string>;
   };
-  const accent = "#0ea5e9";
+  const accent = NODE_COLOR_PALETTE.istioGateway;
   return (
     <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}`, background: "#f0f9ff" }}>
       <Handle type="target" position={Position.Left} style={handle(accent, "left")} />
@@ -463,9 +487,9 @@ export const DestinationRuleNode = memo(function DestinationRuleNode(props: Node
     host?: string;
     subsets?: string[];
   };
-  const accent = "#0ea5e9";
+  const accent = NODE_COLOR_PALETTE.destinationRule;
   return (
-    <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}`, background: "#f8fbff" }}>
+    <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}`, background: "#fff1f2" }}>
       <Handle type="target" position={Position.Left} style={handle(accent, "left")} />
       <Handle
         type="target"
@@ -477,7 +501,7 @@ export const DestinationRuleNode = memo(function DestinationRuleNode(props: Node
       <div style={titleRow()}>
         <span style={iconDot(accent)} />
         <span>DestinationRule</span>
-        <span style={pill("#e0f2fe", "#0369a1")}>Istio</span>
+        <span style={pill("#ffe4e6", "#be185d")}>Istio</span>
       </div>
       <div style={{ marginTop: 6, fontWeight: 900, color: "#0f172a" }}>{label ?? "—"}</div>
       {subtitle ? <div style={meta()}>{subtitle}</div> : null}
@@ -503,7 +527,7 @@ export const RouteNode = memo(function RouteNode(props: NodeProps) {
       upstreamServiceName?: string;
       upstreamServicePort?: number | string;
     };
-  const accent = "#6d28d9";
+  const accent = NODE_COLOR_PALETTE.route;
   return (
     <div
       style={{
@@ -512,7 +536,7 @@ export const RouteNode = memo(function RouteNode(props: NodeProps) {
         padding: "8px 12px",
         minWidth: 220,
         maxWidth: 340,
-        background: "#faf5ff",
+        background: "#fff7ed",
       }}
     >
       <Handle type="target" position={Position.Left} style={handle(accent, "left")} />
@@ -525,10 +549,10 @@ export const RouteNode = memo(function RouteNode(props: NodeProps) {
       <div style={titleRow()}>
         <span style={iconDot(accent)} />
         <span>Route</span>
-        {pathType ? <span style={pill("#f3e8ff", "#6d28d9")}>{pathType}</span> : null}
+        {pathType ? <span style={pill("#ffedd5", "#c2410c")}>{pathType}</span> : null}
       </div>
       <div style={{ marginTop: 4, fontWeight: 800, color: "#0f172a" }}>{path ?? "/"}</div>
-      <div style={{ ...meta(), marginTop: 4, color: "#4338ca", fontWeight: 700 }}>
+      <div style={{ ...meta(), marginTop: 4, color: "#1d4ed8", fontWeight: 700 }}>
         backend: {serviceName} :{String(servicePort ?? "?")}
       </div>
       {upstreamServiceName ? (

@@ -252,6 +252,14 @@ kubectl apply -f k8s/traffic-route-viz.yaml
   - **可连线性（必须）**：画布中所有业务节点（Ingress/VirtualService/Istio Gateway/HTTPProxy/Host/Route/Service/Endpoints/DestinationRule）都必须提供可见的连接手柄（至少左右各一），确保用户可手动关联任意两节点（含跨 Area）。
   - **Istio 网关跨区连线（必须与 §5.1 一致）**：**同名（P1）** + **URI 规则相交（P6）**；**禁止**仅以 namespace / Host 分桶决定是否连线。**M×N（P5）** 只对通过 **P6** 的 **（Ingress Service 结点 × Istio Gateway 结点）** 对连线。
   - **路由粒度（语义）**：**P6** 的比对落在 **Ingress path + pathType** 与 **VS `uri.prefix|exact|regex`**；不按 Host 做匹配分桶。
+- **节点语义配色（必须）**：`web/src/FlowNodes.tsx` 的 `NODE_COLOR_PALETTE` 为配色单一事实来源，要求 `ingress / host / service / virtualService / destinationRule / route / httpProxy` 使用**可区分且协调**的固定语义色，不因 `01/02/03` 层级改变语义色。
+  - ingress：`#4f46e5`
+  - host：`#c026d3`
+  - service：`#2563eb`
+  - virtualService：`#0284c7`
+  - destinationRule：`#be185d`
+  - route：`#d97706`
+  - httpProxy：`#0f766e`
 - **第三方导出**：提供 PNG；并支持导出 Mermaid / draw.io 以便第三方工具打开（画图会话文件为 React Flow JSON）。
 - **Contour Gateway 强制原则**：
   - **链路**：Ingress → Service → Contour Gateway（跨 Area 连线也必须稳定出现，不能因构图顺序缺失）。
@@ -411,4 +419,3 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 
 - `cd web && pnpm run build` 通过
 - 无新增 lints（或已解释并处理）
-
