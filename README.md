@@ -59,8 +59,11 @@ pnpm run dev
 ## Docs
 
 - **规格/验收（单一事实来源）**：`HARNESS_ENGINEERING.md`
+- **代码级规格（逆向工程沉淀）**：`SPEC_CODING.md`
 - **运行/协作手册**：`PROJECT_GUIDE.md`
 - **发布指南**：`DEPLOYMENT.md`
+- **路线图（规划）**：`docs/ROADMAP_2026-2027.md`
+- **GitHub Issue 种子**：`docs/GITHUB_ISSUES_SEED_2026Q3.json`
 
 ## Deploy
 
@@ -76,9 +79,12 @@ pnpm run dev
 ## Project docs
 
 - `HARNESS_ENGINEERING.md`：工程规格与验收标准（单一事实来源）
+- `SPEC_CODING.md`：代码级规范（模块职责、关键契约、测试矩阵、改动红线）
 - `PROJECT_GUIDE.md`：项目运行/协作手册（目录、命令、已知陷阱）
 - `AGENTS.md`：多 Agent 切换/交接入口
 - `docs/UX_OPTIMIZATION_2026-05.md`：本轮 UI/UX 深度优化设计、实现与测试沉淀
+- `docs/ROADMAP_2026-2027.md`：未来阶段规划（需求、路线图）
+- `docs/GITHUB_ISSUES_SEED_2026Q3.json`：可同步到 GitHub 的 issue/bug 种子清单
 
 ## Repo layout
 

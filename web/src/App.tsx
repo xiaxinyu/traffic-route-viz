@@ -63,6 +63,27 @@ const nodeTypes = {
   endpoints: EndpointsNode,
 };
 
+const UI_SCALE_STORAGE_KEY = "trv.ui.scale";
+const UI_SCALE_MIN = 0.8;
+const UI_SCALE_MAX = 1.4;
+const UI_SCALE_STEP = 0.1;
+
+function clampUiScale(v: number): number {
+  return Math.min(UI_SCALE_MAX, Math.max(UI_SCALE_MIN, Number(v.toFixed(2))));
+}
+
+function readUiScale(): number {
+  try {
+    const raw = localStorage.getItem(UI_SCALE_STORAGE_KEY);
+    if (!raw) return 1;
+    const v = Number(raw);
+    if (!Number.isFinite(v)) return 1;
+    return clampUiScale(v);
+  } catch {
+    return 1;
+  }
+}
+
 /** Demo: show 2 ingresses + TLS + LB + one endpoints */
 const SAMPLE = `apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -173,6 +194,7 @@ function AppInner() {
   const [typeFilter, setTypeFilter] = useState<NodeTypeFilter>("all");
   const [matchCursor, setMatchCursor] = useState(0);
   const [lastAppliedAt, setLastAppliedAt] = useState(() => Date.now());
+  const [uiScale, setUiScale] = useState<number>(() => readUiScale());
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const flowContainerRef = useRef<HTMLDivElement | null>(null);
@@ -287,6 +309,16 @@ function AppInner() {
   useEffect(() => {
     setMatchCursor(0);
   }, [searchQuery, typeFilter]);
+
+  useEffect(() => {
+    const next = clampUiScale(uiScale);
+    document.documentElement.style.setProperty("--ui-scale", String(next));
+    try {
+      localStorage.setItem(UI_SCALE_STORAGE_KEY, String(next));
+    } catch {
+      // ignore persistence failures
+    }
+  }, [uiScale]);
 
   const readDroppedFiles = useCallback(async (dt: DataTransfer): Promise<ImportedYamlFile[]> => {
     const items = Array.from(dt.items ?? []);
@@ -408,6 +440,30 @@ function AppInner() {
             >
               适配视图
             </button>
+
+            <div className="search-nav" aria-label="全局缩放控制">
+              <button
+                type="button"
+                onClick={() => setUiScale((v) => clampUiScale(v - UI_SCALE_STEP))}
+                title="全局缩小"
+              >
+                A-
+              </button>
+              <button
+                type="button"
+                onClick={() => setUiScale(1)}
+                title="恢复 100%"
+              >
+                {Math.round(uiScale * 100)}%
+              </button>
+              <button
+                type="button"
+                onClick={() => setUiScale((v) => clampUiScale(v + UI_SCALE_STEP))}
+                title="全局放大"
+              >
+                A+
+              </button>
+            </div>
 
             {getRuntimeConfig().auth?.enabled !== false ? (
               <button

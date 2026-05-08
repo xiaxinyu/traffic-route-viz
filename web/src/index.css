@@ -5,6 +5,7 @@
 }
 
 :root {
+  --ui-scale: 1;
   --bg-0: #eef6f7;
   --bg-1: #f8fafc;
   --surface: #ffffff;
@@ -41,6 +42,7 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  zoom: var(--ui-scale);
 }
 
 .app-header {

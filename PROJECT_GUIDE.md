@@ -2,7 +2,7 @@
 
 本文件是项目的“运行/协作手册”，用于快速接上下文、跑起来、以及在不同 Agent 之间切换时保持一致的工作方式。
 
-规格与验收以 `HARNESS_ENGINEERING.md` 为准。
+规格与验收以 `HARNESS_ENGINEERING.md` 为准。代码级实现规范与模块契约见 `SPEC_CODING.md`（尤其 §11 Constraint Register / §12 Review Checklist）。
 
 ---
 

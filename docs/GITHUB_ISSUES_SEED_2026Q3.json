@@ -1,0 +1,77 @@
+[
+  {
+    "title": "[Roadmap][Q3] Add edge-render health guard for handle mismatch",
+    "labels": ["type:bug", "priority:high", "area:graph", "roadmap:q3"],
+    "body": "## Background\nEdges can silently disappear when `sourceHandle/targetHandle` does not exist on target nodes.\n\n## Scope\n- Add runtime health check in graph build/presentation path.\n- Warn with actionable details (edge id, node id, missing handle id).\n- Add tests to prevent regression.\n\n## Acceptance Criteria\n- Missing handle mismatch is detectable in dev mode.\n- No silent edge-loss regression in CI tests.\n"
+  },
+  {
+    "title": "[Roadmap][Q3] Improve cross-area edge routing readability",
+    "labels": ["type:feature", "priority:high", "area:ui", "roadmap:q3"],
+    "body": "## Goal\nReduce visual confusion for long/cross-area edges.\n\n## Scope\n- Optimize routing style for cross-area edges.\n- Reduce backtracking and unnecessary bends.\n- Keep semantic labels readable.\n\n## Acceptance Criteria\n- Cross-area lines are directionally understandable.\n- E2E snapshot/manual checks pass on sample datasets.\n"
+  },
+  {
+    "title": "[Roadmap][Q3] Add delete safety + undo/redo baseline",
+    "labels": ["type:feature", "priority:medium", "area:editing", "roadmap:q3"],
+    "body": "## Goal\nImprove editing safety when deleting nodes/edges.\n\n## Scope\n- Add undo/redo baseline for edit operations.\n- Keep manual-edge persistence contract intact.\n\n## Acceptance Criteria\n- Undo/redo works for node delete, edge delete, reconnect.\n- Existing persistence tests still pass.\n"
+  },
+  {
+    "title": "[Roadmap][Q3] Export reliability for large graphs",
+    "labels": ["type:bug", "priority:high", "area:export", "roadmap:q3"],
+    "body": "## Background\nExport may fail or degrade with very large graphs.\n\n## Scope\n- Validate export frame limits and scaling strategy.\n- Add fallback strategy for oversized captures.\n\n## Acceptance Criteria\n- Export succeeds for representative large samples.\n- Clear failure message when limits are exceeded.\n"
+  },
+  {
+    "title": "[Roadmap][Q3] Add CI check for Spec constraints (Constraint Register)",
+    "labels": ["type:chore", "priority:medium", "area:governance", "roadmap:q3"],
+    "body": "## Goal\nEnforce key constraints from `SPEC_CODING.md` in CI.\n\n## Scope\n- Add checklists/lints for critical constraints (handle IDs, export path, manual edge mark).\n- Report actionable errors in CI.\n\n## Acceptance Criteria\n- CI fails fast when violating core constraints.\n- Constraint IDs are referenced in output.\n"
+  },
+  {
+    "title": "[Roadmap][Q4] Explainable linking: why connected / why not connected",
+    "labels": ["type:feature", "priority:high", "area:semantics", "roadmap:q4"],
+    "body": "## Goal\nProvide explainability for auto-generated edges.\n\n## Scope\n- Edge tooltip/panel with matched rules and decision reason.\n- Non-linked diagnostics for expected but missing links.\n\n## Acceptance Criteria\n- Users can inspect link decisions without reading code.\n- Supports Ingress->Istio and Ingress->Ingress forwarding links.\n"
+  },
+  {
+    "title": "[Roadmap][Q4] Path-match diagnostics panel",
+    "labels": ["type:feature", "priority:medium", "area:semantics", "roadmap:q4"],
+    "body": "## Goal\nAssist debugging for Host/Path/Regex intersection logic.\n\n## Scope\n- Add diagnostics panel for match inputs and result.\n- Include sampled path evidence for regex checks.\n\n## Acceptance Criteria\n- Diagnostics are available per candidate link pair.\n- Tests cover exact/prefix/regex and invalid regex.\n"
+  },
+  {
+    "title": "[Roadmap][Q4] Shortest-path and key-path highlighting",
+    "labels": ["type:feature", "priority:medium", "area:graph", "roadmap:q4"],
+    "body": "## Goal\nEnable path exploration from entry to endpoint.\n\n## Scope\n- Implement shortest-path highlight between selected nodes.\n- Optional key-path mode for common traffic routes.\n\n## Acceptance Criteria\n- Users can choose source/target and visualize path.\n- Works with manual + auto edges.\n"
+  },
+  {
+    "title": "[Roadmap][Q4] EndpointSlice support feasibility and implementation",
+    "labels": ["type:feature", "priority:medium", "area:parser", "roadmap:q4"],
+    "body": "## Goal\nExpand backend endpoint compatibility.\n\n## Scope\n- Add EndpointSlice parser support (or documented fallback).\n- Keep Endpoints behavior backward compatible.\n\n## Acceptance Criteria\n- EndpointSlice input generates endpoint nodes correctly.\n- Existing Endpoints tests remain green.\n"
+  },
+  {
+    "title": "[Roadmap][Q4] Namespace-aware link mode toggle",
+    "labels": ["type:feature", "priority:low", "area:semantics", "roadmap:q4"],
+    "body": "## Goal\nSupport stricter topology rules for certain teams.\n\n## Scope\n- Add optional mode to require namespace alignment for selected edge types.\n- Keep default behavior unchanged.\n\n## Acceptance Criteria\n- Toggle is visible and persisted.\n- Rule behavior is covered by tests.\n"
+  },
+  {
+    "title": "[Roadmap][Q1-2027] Graph diff mode (baseline vs current)",
+    "labels": ["type:feature", "priority:high", "area:analysis", "roadmap:q1-2027"],
+    "body": "## Goal\nEnable change review between two YAML baselines.\n\n## Scope\n- Compare nodes/edges added/removed/changed.\n- Visual diff overlays and export.\n\n## Acceptance Criteria\n- Diff is deterministic and review-friendly.\n- Supports multi-file bundles.\n"
+  },
+  {
+    "title": "[Roadmap][Q1-2027] Performance tuning for >300 nodes",
+    "labels": ["type:chore", "priority:high", "area:performance", "roadmap:q1-2027"],
+    "body": "## Goal\nKeep graph interactions responsive on large datasets.\n\n## Scope\n- Identify render bottlenecks and optimize.\n- Introduce profiling baseline in CI docs.\n\n## Acceptance Criteria\n- Documented performance baseline and measurable improvements.\n- Core interactions remain usable under large loads.\n"
+  },
+  {
+    "title": "[Bug] Global UI scale compatibility regression on edge layer",
+    "labels": ["type:bug", "priority:high", "area:ui"],
+    "body": "## Problem\nGlobal zoom/scaling can affect edge rendering consistency on some browsers.\n\n## Scope\n- Validate scale strategy across browsers.\n- Ensure edge SVG layer remains visible and interactive.\n\n## Acceptance Criteria\n- Edge visibility remains stable after scaling.\n- Smoke/e2e includes scale scenario.\n"
+  },
+  {
+    "title": "[Bug] Missing edge label readability on dense routes",
+    "labels": ["type:bug", "priority:medium", "area:ui"],
+    "body": "## Problem\nEdge labels overlap in dense route sections.\n\n## Scope\n- Improve label placement and background strategy.\n- Consider optional label visibility controls.\n\n## Acceptance Criteria\n- Key labels remain readable in dense samples.\n- No major overlap in baseline snapshots.\n"
+  },
+  {
+    "title": "[Bug] Manual edge persistence with node rename/regenerate edge cases",
+    "labels": ["type:bug", "priority:medium", "area:persistence"],
+    "body": "## Problem\nManual edge retention may fail in certain node id regeneration scenarios.\n\n## Scope\n- Harden keying/merge logic for manual edges.\n- Add tests for refresh + partial model changes.\n\n## Acceptance Criteria\n- Manual edges persist when endpoints semantically unchanged.\n- No duplicate/manual drift after repeated refresh.\n"
+  }
+]
