@@ -16,6 +16,10 @@ test("edge editing: auto edge can be selected and deleted", async ({ page }) => 
   await page.getByRole("button", { name: "刷新拓扑" }).click();
   await expect(page.locator(".react-flow").first()).toBeVisible();
 
+  // Regression guard: global UI scale should not break edge SVG layer visibility/interactions.
+  await page.getByTitle("全局缩小").click();
+  await page.getByTitle("全局放大").click();
+
   const edges = page.locator(".react-flow__edge");
   const before = await edges.count();
   expect(before).toBeGreaterThan(0);
