@@ -186,6 +186,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     { nodeId: string; ownerKind: string; ingressPartitionId?: string }[]
   >();
   const pendingServiceToGatewayEdges: { serviceKey: string; gatewayNodeId: string }[] = [];
+  const ingressPartitionMeta = new Map<string, { tierIndex?: 1 | 2 | 3 }>();
   /** Istio Gateway node id + owning VirtualService partition (for URI rule intersection checks). */
   const globalIstioGatewayTargetsByGatewayName = new Map<
     string,
@@ -230,6 +231,38 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     );
   };
 
+  const normalizeHost = (host: string | undefined): string => {
+    const h = (host ?? "*").trim().toLowerCase();
+    return h || "*";
+  };
+
+  const hostMayOverlap = (left: string | undefined, right: string | undefined): boolean => {
+    const a = normalizeHost(left);
+    const b = normalizeHost(right);
+    if (a === "*" || b === "*") return true;
+    if (a === b) return true;
+    if (a.startsWith("*.") && b.endsWith(a.slice(1))) return true;
+    if (b.startsWith("*.") && a.endsWith(b.slice(1))) return true;
+    return false;
+  };
+
+  const ingressPairPathMayOverlap = (leftPartitionId: string, rightPartitionId: string): boolean => {
+    const leftRoutes = (routesByIngress.get(leftPartitionId) ?? []).filter(
+      (r) => r.ingressKind === "Ingress",
+    );
+    const rightRoutes = (routesByIngress.get(rightPartitionId) ?? []).filter(
+      (r) => r.ingressKind === "Ingress",
+    );
+    if (!leftRoutes.length || !rightRoutes.length) return false;
+    return leftRoutes.some((l) =>
+      rightRoutes.some(
+        (r) =>
+          hostMayOverlap(l.host, r.host) &&
+          ingressVsPathOverlaps(l.path, l.pathType, r.path, r.pathType),
+      ),
+    );
+  };
+
   // Placement cursors:
   // - If files are imported as a tiered folder (01/02/03), use 3 fixed columns and stack vertically.
   // - Otherwise fall back to a simple multi-column grid.
@@ -249,6 +282,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
 
     const sourceFiles = ing.sourceFiles ?? [];
     const tier = parseExampleTier(sourceFiles);
+    ingressPartitionMeta.set(iid, { tierIndex: tier?.tierIndex });
     const sourceSummary =
       sourceFiles.length > 0
         ? `来源文件：${sourceFiles.join("，")}`
@@ -736,6 +770,39 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           markerEnd: arrow("#0ea5e9"),
         });
       }
+    }
+  }
+
+  // Ingress -> Ingress forwarding edges (mainly tiered 01/02 nginx forwarding layers).
+  // Rule: both are Ingress partitions, and at least one host+path pair overlaps.
+  // In tiered examples, only draw forward edges to the next tier (01->02, 02->03) to avoid visual noise.
+  const ingressPartitionIds = orderedIngresses
+    .filter((ing) => ing.kind === "Ingress")
+    .map((ing) => ingId(ing.kind, ing.namespace, ing.name));
+  const seenIngressForward = new Set<string>();
+  for (const src of ingressPartitionIds) {
+    for (const dst of ingressPartitionIds) {
+      if (src === dst) continue;
+      const srcMeta = ingressPartitionMeta.get(src);
+      const dstMeta = ingressPartitionMeta.get(dst);
+      if (hasTieredExample && srcMeta?.tierIndex && dstMeta?.tierIndex) {
+        if (dstMeta.tierIndex !== srcMeta.tierIndex + 1) continue;
+      }
+      const pair = `${src}>${dst}`;
+      if (seenIngressForward.has(pair)) continue;
+      if (!ingressPairPathMayOverlap(src, dst)) continue;
+      seenIngressForward.add(pair);
+      edges.push({
+        id: `e-${src}-${dst}-ingress-forward-${edgeIdx++}`,
+        source: src,
+        target: dst,
+        type: edgeType,
+        label: "Nginx 转发",
+        style: { stroke: "#6366f1", strokeWidth: 2.2, strokeDasharray: "7 4" },
+        labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
+        labelBgStyle: { fill: "#e0e7ff", fillOpacity: 0.92 },
+        markerEnd: arrow("#6366f1"),
+      });
     }
   }
 

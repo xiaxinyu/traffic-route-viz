@@ -148,6 +148,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 ### 边的语义
 
 - `Ingress → Host`：入口域名规则（可 animated）
+- `Ingress → Ingress`（新增）：当两侧均为 `ingressClassName: nginx` 的入口层，且 Host/Path 规则存在语义相交时，允许自动绘制「Nginx 转发」边（用于 01/02 等分层入口转发链路展示）
 - `Istio Gateway → VirtualService`：当 VirtualService 配置 gateways 时，Gateway 必须可视化并连入链路
 - `Host → Route → Service`：每条 path 一条路由，Route 节点承载信息避免边标签堆叠
 - `Service → Endpoints`：后端实例（Pod IP）
@@ -252,6 +253,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
   - **可连线性（必须）**：画布中所有业务节点（Ingress/VirtualService/Istio Gateway/HTTPProxy/Host/Route/Service/Endpoints/DestinationRule）都必须提供可见的连接手柄（至少左右各一），确保用户可手动关联任意两节点（含跨 Area）。
   - **Istio 网关跨区连线（必须与 §5.1 一致）**：**同名（P1）** + **URI 规则相交（P6）**；**禁止**仅以 namespace / Host 分桶决定是否连线。**M×N（P5）** 只对通过 **P6** 的 **（Ingress Service 结点 × Istio Gateway 结点）** 对连线。
   - **路由粒度（语义）**：**P6** 的比对落在 **Ingress path + pathType** 与 **VS `uri.prefix|exact|regex`**；不按 Host 做匹配分桶。
+  - **Ingress 分层转发（必须）**：在 Example 分层（`01/02/03`）中，若两个 Ingress 分区 Host+Path 有重叠，允许自动连 `Nginx 转发`；为避免噪声，分层场景仅绘制相邻层前向边（`01→02`、`02→03`）。
 - **节点语义配色（必须）**：`web/src/FlowNodes.tsx` 的 `NODE_COLOR_PALETTE` 为配色单一事实来源，要求 `ingress / host / service / virtualService / destinationRule / route / httpProxy` 使用**可区分且协调**的固定语义色，不因 `01/02/03` 层级改变语义色。
   - ingress：`#4f46e5`
   - host：`#c026d3`
