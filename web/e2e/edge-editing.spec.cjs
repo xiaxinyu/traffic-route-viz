@@ -1,14 +1,17 @@
 const { expect, test } = require("@playwright/test");
 
+test.beforeEach(async ({ page }) => {
+  // Make e2e deterministic regardless of local /config.json credentials.
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "trv.auth.session",
+      JSON.stringify({ expMs: Date.now() + 8 * 60 * 60 * 1000 }),
+    );
+  });
+});
+
 test("edge editing: auto edge can be selected and deleted", async ({ page }) => {
   await page.goto("/");
-  const loginBtn = page.getByRole("button", { name: "登录" });
-  if (await loginBtn.count()) {
-    const inputs = page.locator("input");
-    await inputs.nth(0).fill("admin");
-    await inputs.nth(1).fill("change-me");
-    await loginBtn.click();
-  }
 
   await page.getByRole("button", { name: "刷新拓扑" }).click();
   await expect(page.locator(".react-flow").first()).toBeVisible();
@@ -28,13 +31,6 @@ test("edge editing: auto edge can be selected and deleted", async ({ page }) => 
 
 test("element editing: selected node can be deleted from toolbar", async ({ page }) => {
   await page.goto("/");
-  const loginBtn = page.getByRole("button", { name: "登录" });
-  if (await loginBtn.count()) {
-    const inputs = page.locator("input");
-    await inputs.nth(0).fill("admin");
-    await inputs.nth(1).fill("change-me");
-    await loginBtn.click();
-  }
 
   await page.getByRole("button", { name: "刷新拓扑" }).click();
   await expect(page.locator(".react-flow").first()).toBeVisible();
@@ -48,6 +44,8 @@ test("element editing: selected node can be deleted from toolbar", async ({ page
   await page.getByTestId("delete-selected-elements").click();
 
   await expect
-    .poll(async () => await page.locator(".react-flow__node:not(.parent)").count(), { timeout: 5000 })
+    .poll(async () => await page.locator(".react-flow__node:not(.parent)").count(), {
+      timeout: 5000,
+    })
     .toBeLessThan(before);
 });

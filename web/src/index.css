@@ -28,8 +28,8 @@ body,
 }
 
 body {
-  font-family: "Avenir Next", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
-    sans-serif;
+  font-family:
+    "Avenir Next", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   color: var(--text-main);
   background:
     radial-gradient(circle at 0% -8%, rgba(15, 118, 110, 0.2), transparent 45%),

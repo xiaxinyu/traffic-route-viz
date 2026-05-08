@@ -32,6 +32,8 @@ type Props = {
   setEdges: Dispatch<SetStateAction<Edge[]>>;
   setParsedMsg: (s: string | null) => void;
   flowContainerRef: RefObject<HTMLDivElement | null>;
+  edgeLabelsEnabled: boolean;
+  setEdgeLabelsEnabled: Dispatch<SetStateAction<boolean>>;
 };
 
 const btnPrimary: CSSProperties = {
@@ -97,6 +99,8 @@ export function DiagramActions(props: Props) {
     setEdges,
     setParsedMsg,
     flowContainerRef,
+    edgeLabelsEnabled,
+    setEdgeLabelsEnabled,
   } = props;
 
   const { getViewport, setViewport } = useReactFlow();
@@ -227,19 +231,19 @@ export function DiagramActions(props: Props) {
         data-save-png-hide="true"
         data-testid="diagram-toolbar"
         className="diagram-toolbar-panel"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 6,
-            padding: open ? "8px 10px" : 0,
-            background: open ? "rgba(255,255,255,0.96)" : "transparent",
-            borderRadius: open ? 12 : 999,
-            border: open ? "1px solid #dbe4ea" : "none",
-            boxShadow: open ? "0 2px 12px rgba(15,23,42,0.08)" : "none",
-            minWidth: open ? 156 : undefined,
-            fontFamily: '"Avenir Next", "Segoe UI", "PingFang SC", sans-serif',
-          }}
-        >
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
+          padding: open ? "8px 10px" : 0,
+          background: open ? "rgba(255,255,255,0.96)" : "transparent",
+          borderRadius: open ? 12 : 999,
+          border: open ? "1px solid #dbe4ea" : "none",
+          boxShadow: open ? "0 2px 12px rgba(15,23,42,0.08)" : "none",
+          minWidth: open ? 156 : undefined,
+          fontFamily: '"Avenir Next", "Segoe UI", "PingFang SC", sans-serif',
+        }}
+      >
         <button
           type="button"
           style={btnCompact}
@@ -265,6 +269,27 @@ export function DiagramActions(props: Props) {
             >
               画布工具
             </div>
+
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 12,
+                color: "#334155",
+                padding: "4px 2px",
+                userSelect: "none",
+              }}
+            >
+              <input
+                data-testid="toggle-edge-labels"
+                type="checkbox"
+                checked={edgeLabelsEnabled}
+                onChange={(e) => setEdgeLabelsEnabled(e.target.checked)}
+              />
+              显示边标签
+            </label>
+
             <button
               type="button"
               style={btnPrimary}

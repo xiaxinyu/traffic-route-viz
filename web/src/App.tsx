@@ -18,6 +18,7 @@ import "reactflow/dist/style.css";
 import { AuthGate, clearSession } from "./AuthGate";
 import { DiagramActions } from "./DiagramActions";
 import { buildFlowGraph } from "./buildGraph";
+import { edgeTypes } from "./FlowEdges";
 import {
   buildGraphMetrics,
   buildGraphPresentation,
@@ -68,6 +69,8 @@ const UI_SCALE_MIN = 0.8;
 const UI_SCALE_MAX = 1.4;
 const UI_SCALE_STEP = 0.1;
 
+const EDGE_LABELS_STORAGE_KEY = "trv.ui.edgeLabels";
+
 function clampUiScale(v: number): number {
   return Math.min(UI_SCALE_MAX, Math.max(UI_SCALE_MIN, Number(v.toFixed(2))));
 }
@@ -81,6 +84,18 @@ function readUiScale(): number {
     return clampUiScale(v);
   } catch {
     return 1;
+  }
+}
+
+function readEdgeLabelsEnabled(): boolean {
+  try {
+    const raw = localStorage.getItem(EDGE_LABELS_STORAGE_KEY);
+    if (raw === null) return true;
+    if (raw === "true") return true;
+    if (raw === "false") return false;
+    return true;
+  } catch {
+    return true;
   }
 }
 
@@ -195,6 +210,9 @@ function AppInner() {
   const [matchCursor, setMatchCursor] = useState(0);
   const [lastAppliedAt, setLastAppliedAt] = useState(() => Date.now());
   const [uiScale, setUiScale] = useState<number>(() => readUiScale());
+  const [edgeLabelsEnabled, setEdgeLabelsEnabled] = useState<boolean>(() =>
+    readEdgeLabelsEnabled(),
+  );
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const flowContainerRef = useRef<HTMLDivElement | null>(null);
@@ -320,6 +338,19 @@ function AppInner() {
     }
   }, [uiScale]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(EDGE_LABELS_STORAGE_KEY, String(edgeLabelsEnabled));
+    } catch {
+      // ignore persistence failures
+    }
+  }, [edgeLabelsEnabled]);
+
+  const presentedEdges = useMemo(() => {
+    if (edgeLabelsEnabled) return graphPresentation.edges;
+    return graphPresentation.edges.map((e) => (e.label ? { ...e, label: undefined } : e));
+  }, [graphPresentation.edges, edgeLabelsEnabled]);
+
   const readDroppedFiles = useCallback(async (dt: DataTransfer): Promise<ImportedYamlFile[]> => {
     const items = Array.from(dt.items ?? []);
     const hasEntryApi = items.some((it) => typeof (it as any).webkitGetAsEntry === "function");
@@ -441,7 +472,7 @@ function AppInner() {
               适配视图
             </button>
 
-            <div className="search-nav" aria-label="全局缩放控制">
+            <div className="search-nav" role="group" aria-label="全局缩放控制">
               <button
                 type="button"
                 onClick={() => setUiScale((v) => clampUiScale(v - UI_SCALE_STEP))}
@@ -449,11 +480,7 @@ function AppInner() {
               >
                 A-
               </button>
-              <button
-                type="button"
-                onClick={() => setUiScale(1)}
-                title="恢复 100%"
-              >
+              <button type="button" onClick={() => setUiScale(1)} title="恢复 100%">
                 {Math.round(uiScale * 100)}%
               </button>
               <button
@@ -552,9 +579,7 @@ function AppInner() {
               tabIndex={0}
             >
               <div className="dropzone-title">导入 YAML 文件 / 文件夹</div>
-              <div className="dropzone-desc">
-                支持多文件夹追加导入与去重；导入后自动解析刷新。
-              </div>
+              <div className="dropzone-desc">支持多文件夹追加导入与去重；导入后自动解析刷新。</div>
             </div>
 
             <input
@@ -646,7 +671,8 @@ function AppInner() {
                 </select>
               </label>
               <div className="focus-hint">
-                当前筛选：{nodeTypeLabel(typeFilter)}，匹配 {graphPresentation.matchedNodeIds.length} 个节点
+                当前筛选：{nodeTypeLabel(typeFilter)}，匹配{" "}
+                {graphPresentation.matchedNodeIds.length} 个节点
               </div>
             </div>
           </section>
@@ -716,12 +742,13 @@ function AppInner() {
           <ReactFlow
             data-testid="react-flow"
             nodes={graphPresentation.nodes}
-            edges={graphPresentation.edges}
+            edges={presentedEdges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onReconnect={onReconnect}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             onInit={(instance) => {
               requestAnimationFrame(() => instance.fitView({ padding: 0.08 }));
             }}
@@ -754,6 +781,8 @@ function AppInner() {
               setEdges={setEdges}
               setParsedMsg={setParsedMsg}
               flowContainerRef={flowContainerRef}
+              edgeLabelsEnabled={edgeLabelsEnabled}
+              setEdgeLabelsEnabled={setEdgeLabelsEnabled}
             />
           </ReactFlow>
         </div>

@@ -43,7 +43,8 @@ export async function exportDiagramToPng(
 ): Promise<void> {
   const frame = computePngExportFrame(nodes);
   const viewportEl =
-    (flowContainerEl.querySelector(".react-flow__viewport") as HTMLElement | null) ?? flowContainerEl;
+    (flowContainerEl.querySelector(".react-flow__viewport") as HTMLElement | null) ??
+    flowContainerEl;
 
   const dataUrl = await toPng(viewportEl, {
     width: frame.width,

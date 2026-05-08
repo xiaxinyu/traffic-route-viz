@@ -76,7 +76,7 @@ function toManualEdge(edge: Edge): Edge {
     reconnectable: true,
     focusable: true,
     interactionWidth: edge.interactionWidth ?? 40,
-  };
+  } as unknown as Edge;
 }
 
 function edgeConnectionKey(e: Pick<Edge, "source" | "target" | "sourceHandle" | "targetHandle">) {
@@ -121,7 +121,11 @@ export function manualEdgeFromConnection(connection: Connection): Edge {
 /**
  * 用户重连任意边后，统一按“手写边”持久化，避免解析刷新时丢失人工调整。
  */
-export function reconnectEdgeAsManual(oldEdge: Edge, connection: Connection, edges: Edge[]): Edge[] {
+export function reconnectEdgeAsManual(
+  oldEdge: Edge,
+  connection: Connection,
+  edges: Edge[],
+): Edge[] {
   const reconnected = reconnectEdge(oldEdge, connection, edges, { shouldReplaceId: false });
   return reconnected.map((e) => (e.id === oldEdge.id ? toManualEdge(e) : e));
 }
