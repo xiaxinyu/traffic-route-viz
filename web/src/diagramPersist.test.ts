@@ -5,6 +5,7 @@ import {
   createEdgeNonce,
   manualEdgeFromConnection,
   mergeComputedEdgesKeepingManual,
+  mergeComputedEdgesKeepingManualWithNodeRemap,
   reconnectEdgeAsManual,
 } from "./diagramPersist";
 
@@ -73,6 +74,67 @@ describe("mergeComputedEdgesKeepingManual", () => {
     const computed: Edge[] = [{ id: "c-1", source: "a", target: "b" }];
     const merged = mergeComputedEdgesKeepingManual([manual], computed, new Set(["a", "b"]));
 
+    expect(merged).toHaveLength(1);
+    expect(merged[0]!.id).toBe("c-1");
+  });
+});
+
+describe("mergeComputedEdgesKeepingManualWithNodeRemap", () => {
+  it("remaps manual edge endpoints when node ids are regenerated", () => {
+    const prevNodes = [
+      { id: "svc-old", type: "service", data: { nodeKey: "service::p1::ns/svc-a" } },
+      { id: "ep-old", type: "endpoints", data: { nodeKey: "endpoints::p1::ns/svc-a" } },
+    ] as any[];
+    const nextNodes = [
+      { id: "svc-new", type: "service", data: { nodeKey: "service::p1::ns/svc-a" } },
+      { id: "ep-new", type: "endpoints", data: { nodeKey: "endpoints::p1::ns/svc-a" } },
+    ] as any[];
+
+    const manual = manualEdgeFromConnection({
+      source: "svc-old",
+      target: "ep-old",
+      sourceHandle: null,
+      targetHandle: null,
+    });
+
+    const merged = mergeComputedEdgesKeepingManualWithNodeRemap(
+      [manual],
+      prevNodes as any,
+      [],
+      nextNodes as any,
+    );
+    expect(merged).toHaveLength(1);
+    expect(merged[0]!.source).toBe("svc-new");
+    expect(merged[0]!.target).toBe("ep-new");
+    expect(merged[0]!.data?.manual).toBe(true);
+  });
+
+  it("drops remapped manual edge when computed edge has same connection", () => {
+    const prevNodes = [
+      { id: "a-old", type: "service", data: { nodeKey: "k-a" } },
+      { id: "b-old", type: "service", data: { nodeKey: "k-b" } },
+    ] as any[];
+    const nextNodes = [
+      { id: "a-new", type: "service", data: { nodeKey: "k-a" } },
+      { id: "b-new", type: "service", data: { nodeKey: "k-b" } },
+    ] as any[];
+
+    const manual = manualEdgeFromConnection({
+      source: "a-old",
+      target: "b-old",
+      sourceHandle: null,
+      targetHandle: null,
+    });
+    const computed = [
+      { id: "c-1", source: "a-new", target: "b-new", sourceHandle: null, targetHandle: null },
+    ] as any[];
+
+    const merged = mergeComputedEdgesKeepingManualWithNodeRemap(
+      [manual],
+      prevNodes as any,
+      computed as any,
+      nextNodes as any,
+    );
     expect(merged).toHaveLength(1);
     expect(merged[0]!.id).toBe("c-1");
   });
