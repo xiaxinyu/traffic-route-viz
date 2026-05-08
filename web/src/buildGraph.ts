@@ -578,8 +578,33 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
                   (d.subset ?? "").trim().toLowerCase(),
                   typeof d.weight === "number" ? String(d.weight) : "",
                 ].join("|");
+              const qpKey = (
+                qps:
+                  | { key: string; op: "exact" | "prefix" | "regex" | "present"; value?: string }[]
+                  | undefined,
+              ): string => {
+                if (!qps?.length) return "";
+                return qps
+                  .map((q) => `${q.key}:${q.op}:${q.value ?? ""}`)
+                  .sort()
+                  .join(",");
+              };
+              const hdrKey = (h: Record<string, string> | undefined): string => {
+                if (!h) return "";
+                return Object.entries(h)
+                  .map(([k, v]) => `${k}=${v}`)
+                  .sort()
+                  .join(",");
+              };
               for (const r of rawHostRoutes) {
-                const k = `${r.path}::${String(r.pathType ?? "")}`;
+                // VS routes can share same URI but differ by queryParams / headers / rule name.
+                const k = [
+                  r.path,
+                  String(r.pathType ?? ""),
+                  r.istioRouteName ?? "",
+                  qpKey(r.istioQueryParams),
+                  hdrKey(r.istioRequestHeadersSet),
+                ].join("::");
                 const prev = byPath.get(k);
                 if (!prev) {
                   byPath.set(k, r);
@@ -628,6 +653,14 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
                 host,
                 r.path,
                 String(r.pathType ?? ""),
+                r.istioRouteName ?? "",
+                (r.istioQueryParams ?? [])
+                  .map((q) => `${q.key}:${q.op}:${q.value ?? ""}`)
+                  .join(","),
+                Object.entries(r.istioRequestHeadersSet ?? {})
+                  .map(([k, v]) => `${k}=${v}`)
+                  .sort()
+                  .join(","),
                 r.serviceName,
                 String(r.servicePort ?? ""),
               ),
@@ -639,6 +672,9 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
               upstreamServicePort: r.upstreamServicePort,
               ingressKind: r.ingressKind,
               istioDestinations: r.istioDestinations,
+              istioRouteName: r.istioRouteName,
+              istioQueryParams: r.istioQueryParams,
+              istioRequestHeadersSet: r.istioRequestHeadersSet,
             },
           });
 

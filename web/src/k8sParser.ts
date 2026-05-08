@@ -53,6 +53,16 @@ export interface IngressRoute {
   sourceFile?: string;
   /** Istio VirtualService: all weighted destinations for this match (subset / weight). */
   istioDestinations?: IstioRouteDestination[];
+  /** Istio VirtualService: http route name (spec.http[].name). */
+  istioRouteName?: string;
+  /** Istio VirtualService: match-level query params (match.queryParams). */
+  istioQueryParams?: {
+    key: string;
+    op: "exact" | "prefix" | "regex" | "present";
+    value?: string;
+  }[];
+  /** Istio VirtualService: request headers set (match.headers.request.set). */
+  istioRequestHeadersSet?: Record<string, string>;
 }
 
 export interface ServiceInfo {
@@ -475,6 +485,17 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
       const http = Array.isArray(spec?.http) ? spec!.http! : [];
       for (const httpRule of http) {
         const hr = asRecord(httpRule);
+        const httpName = typeof hr?.name === "string" ? hr.name : undefined;
+        const hrHeaders = asRecord(hr?.headers);
+        const hrReq = asRecord(hrHeaders?.request);
+        const hrSetObj = asRecord(hrReq?.set);
+        const hrRequestHeadersSet: Record<string, string> | undefined = hrSetObj
+          ? Object.fromEntries(
+              Object.entries(hrSetObj)
+                .filter(([, v]) => typeof v === "string")
+                .map(([k, v]) => [k, v as string]),
+            )
+          : undefined;
         const matches = Array.isArray(hr?.match) ? (hr!.match! as unknown[]) : [];
         const routesArr = Array.isArray(hr?.route) ? (hr!.route! as unknown[]) : [];
         const istioDestinations = extractIstioRouteDestinations(routesArr);
@@ -493,10 +514,11 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
                 : "?";
         const { name: svcName, namespace: svcNs } = parseIstioHostToServiceKey(destHost, vsNs);
 
-        const matchPaths: { path: string; pathType?: string }[] = [];
-        for (const m of matches) {
+        const matchList = matches.length ? matches : [null];
+        for (const m of matchList) {
           const mr = asRecord(m);
           const uri = asRecord(mr?.uri);
+          const matchPaths: { path: string; pathType?: string }[] = [];
           if (uri) {
             if (typeof uri.prefix === "string")
               matchPaths.push({ path: uri.prefix, pathType: "Prefix" });
@@ -505,25 +527,72 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
             else if (typeof uri.regex === "string")
               matchPaths.push({ path: uri.regex, pathType: "Regex" });
           }
-        }
-        if (!matchPaths.length) matchPaths.push({ path: "*", pathType: undefined });
+          if (!matchPaths.length) matchPaths.push({ path: "*", pathType: undefined });
 
-        for (const h of hosts) {
-          for (const mp of matchPaths) {
-            routes.push({
-              ingressKind: "VirtualService",
-              ingressNs: vsNs,
-              ingressName: vsName,
-              gateways,
-              host: h,
-              path: mp.path,
-              pathType: mp.pathType,
-              serviceName: svcName,
-              servicePort,
-              serviceNamespace: svcNs,
-              sourceFile,
-              istioDestinations: istioDestinations.length > 0 ? istioDestinations : undefined,
-            });
+          const queryParamsRaw = asRecord(mr?.queryParams);
+          const queryParams: {
+            key: string;
+            op: "exact" | "prefix" | "regex" | "present";
+            value?: string;
+          }[] = [];
+          if (queryParamsRaw) {
+            for (const [k, v] of Object.entries(queryParamsRaw)) {
+              const q = asRecord(v);
+              if (!q) continue;
+              if (typeof q.exact === "string")
+                queryParams.push({ key: k, op: "exact", value: q.exact });
+              else if (typeof q.prefix === "string")
+                queryParams.push({ key: k, op: "prefix", value: q.prefix });
+              else if (typeof q.regex === "string")
+                queryParams.push({ key: k, op: "regex", value: q.regex });
+              else if (typeof q.present === "boolean") queryParams.push({ key: k, op: "present" });
+            }
+          }
+          queryParams.sort(
+            (a, b) =>
+              a.key.localeCompare(b.key) ||
+              a.op.localeCompare(b.op) ||
+              (a.value ?? "").localeCompare(b.value ?? ""),
+          );
+
+          const headers = asRecord(mr?.headers);
+          const req = asRecord(headers?.request);
+          const setObj = asRecord(req?.set);
+          const matchRequestHeadersSet: Record<string, string> | undefined = setObj
+            ? Object.fromEntries(
+                Object.entries(setObj)
+                  .filter(([, v]) => typeof v === "string")
+                  .map(([k, v]) => [k, v as string]),
+              )
+            : undefined;
+          const requestHeadersSet =
+            hrRequestHeadersSet || matchRequestHeadersSet
+              ? { ...(hrRequestHeadersSet ?? {}), ...(matchRequestHeadersSet ?? {}) }
+              : undefined;
+
+          for (const h of hosts) {
+            for (const mp of matchPaths) {
+              routes.push({
+                ingressKind: "VirtualService",
+                ingressNs: vsNs,
+                ingressName: vsName,
+                gateways,
+                host: h,
+                path: mp.path,
+                pathType: mp.pathType,
+                serviceName: svcName,
+                servicePort,
+                serviceNamespace: svcNs,
+                sourceFile,
+                istioDestinations: istioDestinations.length > 0 ? istioDestinations : undefined,
+                istioRouteName: httpName,
+                istioQueryParams: queryParams.length ? queryParams : undefined,
+                istioRequestHeadersSet:
+                  requestHeadersSet && Object.keys(requestHeadersSet).length
+                    ? requestHeadersSet
+                    : undefined,
+              });
+            }
           }
         }
       }
