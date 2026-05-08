@@ -8,7 +8,7 @@
 
 ## 0. 你需要准备什么
 
-- Node.js（建议 18+）
+- Node.js **20+**（与 `web/package.json` `engines` 及 CI 一致）
 - Docker（如需构建镜像）
 - Kubernetes + Ingress Controller（如需发布到集群）
 

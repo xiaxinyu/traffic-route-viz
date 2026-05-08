@@ -21,7 +21,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
           cache: pnpm
 
       - name: Setup pnpm
@@ -41,6 +41,9 @@ jobs:
 
       - name: Typecheck
         run: pnpm run typecheck
+
+      - name: Spec constraint checks
+        run: node ../tools/check-spec.mjs
 
       - name: Unit tests
         run: pnpm test

@@ -27,6 +27,7 @@ traffic-route-viz/
 ├── README.md
 ├── CONTRIBUTING.md
 ├── tools/
+│   ├── check-spec.mjs          ← SPEC 契约轻量检查（CI / pnpm run spec:check）
 │   └── export-ingress-services.sh
 └── web/
     └── src/
@@ -52,6 +53,10 @@ pnpm run ci
 pnpm run build
 pnpm run preview
 ```
+
+### 仓库设置（合并护栏）
+
+默认分支建议启用 **Require status checks**，必选 CI job **`web`**（workflow `ci`）。设置步骤见 `CONTRIBUTING.md` 中「分支保护」小节。
 
 ---
 

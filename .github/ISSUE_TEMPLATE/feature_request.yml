@@ -1,0 +1,29 @@
+name: 功能建议
+description: 提议新能力或改进
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        画布与验收以 `HARNESS_ENGINEERING.md` 为准；跨模块契约见 `SPEC_CODING.md`。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解决什么问题？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案（可选）
+    validations:
+      required: false
+  - type: checkboxes
+    id: harness
+    attributes:
+      label: 交付约定
+      options:
+        - label: 愿意同步更新 HARNESS / SPEC（若影响验收或契约）
+          required: false
