@@ -2,7 +2,7 @@ import { memo, type CSSProperties } from "react";
 import type { NodeProps } from "reactflow";
 import { Handle, Position } from "reactflow";
 
-import type { IngressTlsEntry } from "./k8sParser";
+import type { IngressTlsEntry, IstioRouteDestination } from "./k8sParser";
 
 type EntryKind = "Ingress" | "VirtualService" | "HTTPProxy";
 
@@ -441,11 +441,12 @@ export const HttpProxyNode = memo(function HttpProxyNode(props: NodeProps) {
 });
 
 export const IstioGatewayNode = memo(function IstioGatewayNode(props: NodeProps) {
-  const { label, subtitle, servers, selector } = props.data as {
+  const { label, subtitle, servers, selector, globalGateway } = props.data as {
     label?: string;
     subtitle?: string;
     servers?: { port?: number; name?: string; protocol?: string; hosts: string[] }[];
     selector?: Record<string, string>;
+    globalGateway?: boolean;
   };
   const accent = NODE_COLOR_PALETTE.istioGateway;
   return (
@@ -461,6 +462,11 @@ export const IstioGatewayNode = memo(function IstioGatewayNode(props: NodeProps)
         <span style={iconDot(accent)} />
         <span>Istio Gateway</span>
         <span style={pill("#e0f2fe", "#0369a1")}>Gateway</span>
+        {globalGateway ? (
+          <span style={pill("#bae6fd", "#0369a1")} title="Merged entry shared by VirtualServices">
+            Global
+          </span>
+        ) : null}
       </div>
       <div style={{ marginTop: 6, fontWeight: 900, color: "#0f172a" }}>{label ?? "—"}</div>
       {subtitle ? <div style={meta()}>{subtitle}</div> : null}
@@ -543,15 +549,25 @@ export const DestinationRuleNode = memo(function DestinationRuleNode(props: Node
 });
 
 export const RouteNode = memo(function RouteNode(props: NodeProps) {
-  const { path, pathType, serviceName, servicePort, upstreamServiceName, upstreamServicePort } =
-    props.data as {
-      path?: string;
-      pathType?: string;
-      serviceName?: string;
-      servicePort?: number | string;
-      upstreamServiceName?: string;
-      upstreamServicePort?: number | string;
-    };
+  const {
+    path,
+    pathType,
+    serviceName,
+    servicePort,
+    upstreamServiceName,
+    upstreamServicePort,
+    ingressKind,
+    istioDestinations,
+  } = props.data as {
+    path?: string;
+    pathType?: string;
+    serviceName?: string;
+    servicePort?: number | string;
+    upstreamServiceName?: string;
+    upstreamServicePort?: number | string;
+    ingressKind?: string;
+    istioDestinations?: IstioRouteDestination[];
+  };
   const accent = NODE_COLOR_PALETTE.route;
   return (
     <div
@@ -574,12 +590,50 @@ export const RouteNode = memo(function RouteNode(props: NodeProps) {
       <div style={titleRow()}>
         <span style={iconDot(accent)} />
         <span>Route</span>
+        {ingressKind === "VirtualService" ? (
+          <span style={pill("#e0f2fe", "#0369a1")}>VirtualService</span>
+        ) : null}
         {pathType ? <span style={pill("#ffedd5", "#c2410c")}>{pathType}</span> : null}
       </div>
       <div style={{ marginTop: 4, fontWeight: 800, color: "#0f172a" }}>{path ?? "/"}</div>
-      <div style={{ ...meta(), marginTop: 4, color: "#1d4ed8", fontWeight: 700 }}>
-        backend: {serviceName} :{String(servicePort ?? "?")}
-      </div>
+      {ingressKind === "VirtualService" && istioDestinations?.length ? (
+        <div style={{ ...meta(), marginTop: 6, color: "#0f172a", fontWeight: 700 }}>
+          <div style={{ fontWeight: 900, marginBottom: 4 }}>Destinations</div>
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: 16,
+              fontSize: 11,
+              fontWeight: 600,
+              color: "#334155",
+            }}
+          >
+            {istioDestinations.map((d, i) => (
+              <li key={`${d.host}-${i}`} style={{ marginTop: 2 }}>
+                <span style={{ color: "#2563eb" }}>{d.host}</span>
+                {" · "}
+                <span style={{ color: "#64748b" }}>:{String(d.port ?? "?")}</span>
+                {d.subset ? (
+                  <>
+                    {" · "}
+                    <span style={pill("#fce7f3", "#be185d")}>subset {d.subset}</span>
+                  </>
+                ) : null}
+                {typeof d.weight === "number" ? (
+                  <>
+                    {" · "}
+                    <span style={pill("#fef3c7", "#b45309")}>w={d.weight}</span>
+                  </>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <div style={{ ...meta(), marginTop: 4, color: "#1d4ed8", fontWeight: 700 }}>
+          backend: {serviceName} :{String(servicePort ?? "?")}
+        </div>
+      )}
       {upstreamServiceName ? (
         <div style={{ ...meta({ marginTop: 2 }), color: "#0f766e", fontWeight: 700 }}>
           upstream: {upstreamServiceName} :{String(upstreamServicePort ?? "?")}
