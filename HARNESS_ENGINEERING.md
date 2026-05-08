@@ -225,7 +225,9 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 - **防重叠初始布局（必须）**：自动构图时同一 `ingressRegion` 内 **禁止** Ingress/VirtualService 卡、Host、Route、Gateway、Service、DestinationRule、Endpoints 等卡片在初始坐标上互相压盖。
   - **Route 不得在 Host 卡内部起笔**：首张 Route 的 `y` 必须位于为该 Host **预留的整块卡片估算高度之下**再加间隙（不得再使用 Host 顶端 + 极小偏移的旧模式）。
   - **多 Host 纵向串联**：下一个 Host 的顶边必须在前一 Host **子树底边**（该 Host 下最后一条 Route 的底边，或「无 Route 时」Host 卡底边）**再加块间留白**之后开始；**禁止**仅用固定常量 `hostGap` 推导而不考虑上一 Host **实际路由条数**。
-  - **Istio Gateway（全局合并）**：凡 VirtualService 引用的 Gateway（过滤 `mesh`）在画布 **左侧独立列**按名称合并为全局节点（垂直栈间距）；**分区宽度预留**左侧 Gateway 列，避免与分区重叠；Host 带起始高度仍与 **Ingress/VirtualService 头条 + 估算底边**对齐（分区内不再叠放多块 Gateway 卡）。
+  - **Istio Gateway（全局合并）**：凡 VirtualService 引用的 Gateway（过滤 `mesh`）在画布 **左侧独立列**按名称合并为全局节点；初始纵向位置按名称占位堆叠后，在 **全部 VS 分区定位完成** 后再做一次 **垂直居中**：使每个全局 Gateway 卡片的垂直中心与「所有与之相连的 VirtualService 分区（`ingressRegion`）」垂直中心的 **中位数**对齐（多块 Gateway 名称时各自独立计算）；**分区宽度预留**左侧 Gateway 列，避免与分区重叠；Host 带起始高度仍与 **Ingress/VirtualService 头条 + 估算底边**对齐（分区内不再叠放多块 Gateway 卡）。
+  - **VirtualService 竖列**：当 bundle 内存在 **至少一条** VirtualService 引用非 `mesh` 的 Istio Gateway，或 **VirtualService 入口对象 ≥ 2** 时，各 VirtualService 分区在画布上置于 **`01/02/03` Example 三列右侧的第四列**（与 Ingress / HTTPProxy 分区列分离），按导入排序 **纵向堆叠**；非 tier 导入时同样使用该竖列（与 fallback 网格中的 Ingress 分区分离）。
+  - **画布泳道（启发式）**：依据导入路径推断 **Global / Worker / 默认** band（实现：`web/src/swimlaneInfer.ts`）；同一 Example tier 列内若 band 切换，插入额外垂直间距（`SWIMLANE_BAND_GAP`）；分区页眉展示 **泳道文案**（`swimlaneLabel`），与现有 `Level 01–03`、文件夹 hint 并存。
   - **多 Service**：在按 Route `y` median 初值对齐后，须按 **预估 Service 卡高 + gap** 做纵向碰撞-resolve，并保持 **DestinationRule** 占位在对应 Service **估算高度之下的独立留白带**。
   - **常量与节点 UI 同步**：估高常量定义于 `web/src/buildGraph.ts`（`LAYOUT_EST_*`）；若 **`FlowNodes.tsx`** 卡片内边距/字体/可选字段显著变高或变矮，须在 **同一 MR** 内调整估算并在此处更新本条说明意图（避免再次出现结构性重叠）。
   - **边线视觉**：初始布局以降低节点重叠为第一目标；多层边仍可共用出口点，但通过 **拉大列距与纵向间距** 减轻「糊成一束」的阅读问题（进一步拆 **sourceHandle / targetHandle** 为多条出口属增强项，按需另开任务）。
@@ -234,6 +236,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
   - `01-*`：最左列
   - `02-*`：中间列
   - `03-*`：最右列
+  - 满足 **VirtualService 竖列** 条件时，在以上三列的 **右侧** 增加 **第四列** 专用于 VirtualService 分区（Ingress / HTTPProxy 仍只占前三列）。
   - 同一列：**每行最多 1 个 Area**（超出则纵向堆叠）
   - `Active01` 必须排在 `Active02` 上方（同一列内排序规则）
   - 页面与 Area 标题中展示“有效文件夹信息”时，不应把 `01/02/03` 这种数字前缀当作业务信息展示（可做成 Level 标识或隐藏前缀后的展示）
@@ -389,7 +392,10 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 - `hostGap`: **220**
 - `routeGap`: **84**
 - `serviceGap`: **210**
-- `regionHeaderReserveY`: **168**
+- `regionHeaderReserveY`: **156**（含分区页眉可选泳道一行；与 `web/src/buildGraph.ts` 一致）
+- `SWIMLANE_BAND_GAP`: **100**（同一 tier 列内 swimlane band 切换时的额外垂直间距）
+- `lanePitchX`: **round(col × 7.2) + areaGapX**（与代码一致；用于 Example tier 列距及 VS 竖列）
+- **VirtualService 竖列**：在 Example tier 画布上为第四列，分区锚点 **x = baseX + layoutOffsetX + 3 × lanePitchX**；与 **`layoutOffsetX`**（全局 Istio Gateway 预留列宽） additive
 - 分区排版：**一行最多 4 个 Area**（超出自动换行），行/列间距为常量（见代码：`areaGapX/areaGapY`）
 - 分区宽度：按内容 **动态扩展**（至少 `ingressBlockMinW`；按最右侧卡片估算宽度）
 - 横向列偏移（Ingress 锚点为 `blockX`）：

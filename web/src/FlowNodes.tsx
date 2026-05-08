@@ -103,6 +103,7 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
     hint,
     tierCode,
     tierHint,
+    swimlaneLabel,
   } = props.data as {
     partitionIndex?: number;
     entryKind?: "Ingress" | "VirtualService" | "HTTPProxy";
@@ -113,6 +114,7 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
     hint?: string;
     tierCode?: "01" | "02" | "03";
     tierHint?: string;
+    swimlaneLabel?: string;
   };
 
   const idx = partitionIndex ?? 1;
@@ -176,6 +178,11 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
                 {tierHint}
               </span>
             ) : null}
+          </div>
+        ) : null}
+        {swimlaneLabel ? (
+          <div style={{ ...meta({ marginTop: 6 }), color: "#64748b", fontWeight: 600 }}>
+            {swimlaneLabel}
           </div>
         ) : null}
         <div style={{ ...meta({ marginTop: 2 }), color: "#57534e" }}>
