@@ -13,8 +13,8 @@ usage() {
   <output-dir>/<namespace>/istio.tar.gz    （压缩包，包含 istio/）
 
 同时也会导出“资源原始 YAML（按名称分文件）”，便于完整归档：
-  <output-dir>/<namespace>/istio/virtualservices/<vs>.yaml
-  <output-dir>/<namespace>/istio/destinationrules/<dr>.yaml
+  <output-dir>/<namespace>/istio/raw/vs-<vs>.yaml
+  <output-dir>/<namespace>/istio/raw/dr-<dr>.yaml
 
 可选输出（适配 traffic/example 的 01/02/03 目录原则）：
   --out-root traffic/example --tier 02 --group <namespace>-istio
@@ -119,9 +119,8 @@ else
   OUT_DIR="${WORKROOT}/istio"
 fi
 mkdir -p "${OUT_DIR}"
-RAW_VS_DIR="${OUT_DIR}/virtualservices"
-RAW_DR_DIR="${OUT_DIR}/destinationrules"
-mkdir -p "${RAW_VS_DIR}" "${RAW_DR_DIR}"
+RAW_DIR="${OUT_DIR}/raw"
+mkdir -p "${RAW_DIR}"
 
 echo "Listing Istio VirtualService in namespace: ${NAMESPACE}"
 
@@ -148,28 +147,34 @@ if [[ ${#VS_NAMES[@]} -eq 0 ]]; then
 fi
 
 # Export raw resources (one YAML per resource) for complete archiving.
+missing_vs_raw=()
+missing_dr_raw=()
+missing_vs_bundle=()
+
 if [[ ${#VS_NAMES[@]} -gt 0 ]]; then
-  echo "Exporting raw VirtualService YAMLs -> ${RAW_VS_DIR}"
+  echo "[VS] Exporting raw VirtualService YAMLs -> ${RAW_DIR}"
   for vs in "${VS_NAMES[@]}"; do
-    vs_file="${RAW_VS_DIR}/$(sanitize_filename "${vs}").yaml"
+    vs_file="${RAW_DIR}/vs-$(sanitize_filename "${vs}").yaml"
     "${KUBECTL[@]}" get virtualservice "${vs}" -n "${NAMESPACE}" -o yaml --ignore-not-found=true \
       > "${vs_file}" || true
     if [[ ! -s "${vs_file}" ]]; then
       rm -f "${vs_file}"
-      echo "# WARN: virtualservice not found (skipped raw export): ${NAMESPACE}/${vs}" >&2
+      missing_vs_raw+=("${vs}")
+      echo "[VS][WARN] not found (skipped raw export): ${NAMESPACE}/${vs}" >&2
     fi
   done
 fi
 
 if [[ ${#DR_NAMES_ALL[@]} -gt 0 ]]; then
-  echo "Exporting raw DestinationRule YAMLs -> ${RAW_DR_DIR}"
+  echo "[DR] Exporting raw DestinationRule YAMLs -> ${RAW_DIR}"
   for dr in "${DR_NAMES_ALL[@]}"; do
-    dr_file="${RAW_DR_DIR}/$(sanitize_filename "${dr}").yaml"
+    dr_file="${RAW_DIR}/dr-$(sanitize_filename "${dr}").yaml"
     "${KUBECTL[@]}" get destinationrule "${dr}" -n "${NAMESPACE}" -o yaml --ignore-not-found=true \
       > "${dr_file}" || true
     if [[ ! -s "${dr_file}" ]]; then
       rm -f "${dr_file}"
-      echo "# WARN: destinationrule not found (skipped raw export): ${NAMESPACE}/${dr}" >&2
+      missing_dr_raw+=("${dr}")
+      echo "[DR][WARN] not found (skipped raw export): ${NAMESPACE}/${dr}" >&2
     fi
   done
 fi
@@ -219,7 +224,7 @@ for vs in "${VS_NAMES[@]}"; do
   file_vs="$(sanitize_filename "${vs}")"
   out_file="${OUT_DIR}/${file_vs}.yaml"
 
-  echo "Exporting: virtualservice/${vs} -> ${out_file}"
+  echo "[VS] Exporting bundle: virtualservice/${vs} (+DRs) -> ${out_file}"
 
   # Use the list snapshot for dependency matching, but re-fetch YAML for export.
   # This avoids failing the entire script if a VS disappears between list and export (race), or RBAC differs.
@@ -243,7 +248,8 @@ for vs in "${VS_NAMES[@]}"; do
 
   VS_YAML="$("${KUBECTL[@]}" get virtualservice "${vs}" -n "${NAMESPACE}" -o yaml --ignore-not-found=true 2>/dev/null || true)"
   if [[ -z "${VS_YAML}" ]]; then
-    echo "# WARN: virtualservice not found (skipped): ${NAMESPACE}/${vs}" >&2
+    missing_vs_bundle+=("${vs}")
+    echo "[VS][WARN] not found (skipped bundle): ${NAMESPACE}/${vs}" >&2
     continue
   fi
 
@@ -265,8 +271,20 @@ done
 
 echo "Done."
 echo "Output dir: ${OUT_DIR}"
-echo "Raw VirtualServices: ${RAW_VS_DIR}"
-echo "Raw DestinationRules: ${RAW_DR_DIR}"
+echo "Raw VS/DR dir: ${RAW_DIR}"
+
+echo "Summary:"
+echo "  VS listed: ${#VS_NAMES[@]}   DR listed: ${#DR_NAMES_ALL[@]}"
+echo "  VS raw missing: ${#missing_vs_raw[@]}   DR raw missing: ${#missing_dr_raw[@]}   VS bundle missing: ${#missing_vs_bundle[@]}"
+if [[ ${#missing_vs_raw[@]} -gt 0 ]]; then
+  printf '  Missing VS raw: %s\n' "${missing_vs_raw[*]}"
+fi
+if [[ ${#missing_dr_raw[@]} -gt 0 ]]; then
+  printf '  Missing DR raw: %s\n' "${missing_dr_raw[*]}"
+fi
+if [[ ${#missing_vs_bundle[@]} -gt 0 ]]; then
+  printf '  Missing VS bundle: %s\n' "${missing_vs_bundle[*]}"
+fi
 
 # Create a tarball:
 # - default mode: <namespace>/istio.tar.gz contains istio/
