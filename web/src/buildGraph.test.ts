@@ -294,4 +294,57 @@ spec:
     expect(routeNodes).toHaveLength(1);
     expect(routeNodes[0]?.data?.istioDestinations?.length).toBe(2);
   });
+
+  it("does NOT dedupe VirtualService routes that differ by queryParams or name", () => {
+    const VS_QP = `apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: vs-qp
+  namespace: demo
+spec:
+  gateways:
+    - istio-system/rts-istio-ingress-gateway
+  hosts:
+    - api.example.com
+  http:
+    - name: WTCHK
+      match:
+        - queryParams:
+            buCode:
+              exact: WTCHK
+          uri:
+            prefix: /rts/physical/v2.1.0/stock/enquire_product
+      route:
+        - destination:
+            host: reviews.demo.svc.cluster.local
+            port:
+              number: 9080
+          weight: 80
+    - name: FTRHK
+      match:
+        - queryParams:
+            buCode:
+              exact: FTRHK
+          uri:
+            prefix: /rts/physical/v2.1.0/stock/enquire_product
+      route:
+        - destination:
+            host: reviews.demo.svc.cluster.local
+            port:
+              number: 9080
+          weight: 20
+`;
+    const parsed = parseK8sYaml(VS_QP, "istio/vs-qp.yaml");
+    const { nodes } = buildFlowGraph(parsed);
+    const routeNodes = nodes.filter(
+      (n) =>
+        n.type === "route" &&
+        n.data?.ingressKind === "VirtualService" &&
+        n.data?.path === "/rts/physical/v2.1.0/stock/enquire_product",
+    );
+    expect(routeNodes).toHaveLength(2);
+    expect(new Set(routeNodes.map((n) => n.data?.istioRouteName))).toEqual(
+      new Set(["WTCHK", "FTRHK"]),
+    );
+  });
 });

@@ -565,6 +565,9 @@ export const RouteNode = memo(function RouteNode(props: NodeProps) {
     upstreamServicePort,
     ingressKind,
     istioDestinations,
+    istioRouteName,
+    istioQueryParams,
+    istioRequestHeadersSet,
   } = props.data as {
     path?: string;
     pathType?: string;
@@ -574,6 +577,9 @@ export const RouteNode = memo(function RouteNode(props: NodeProps) {
     upstreamServicePort?: number | string;
     ingressKind?: string;
     istioDestinations?: IstioRouteDestination[];
+    istioRouteName?: string;
+    istioQueryParams?: { key: string; op: string; value?: string }[];
+    istioRequestHeadersSet?: Record<string, string>;
   };
   const accent = NODE_COLOR_PALETTE.route;
   return (
@@ -602,7 +608,34 @@ export const RouteNode = memo(function RouteNode(props: NodeProps) {
         ) : null}
         {pathType ? <span style={pill("#ffedd5", "#c2410c")}>{pathType}</span> : null}
       </div>
+      {ingressKind === "VirtualService" && istioRouteName ? (
+        <div style={{ ...meta({ marginTop: 4 }), color: "#0f172a", fontWeight: 800 }}>
+          name: {istioRouteName}
+        </div>
+      ) : null}
       <div style={{ marginTop: 4, fontWeight: 800, color: "#0f172a" }}>{path ?? "/"}</div>
+      {ingressKind === "VirtualService" && istioQueryParams?.length ? (
+        <div style={{ ...meta({ marginTop: 6 }), color: "#334155" }}>
+          <div style={{ fontWeight: 900, marginBottom: 2 }}>queryParams</div>
+          <div style={{ fontSize: 11, fontWeight: 650 }}>
+            {istioQueryParams
+              .map((q) => `${q.key}.${q.op}${q.value !== undefined ? `=${q.value}` : ""}`)
+              .join(", ")}
+          </div>
+        </div>
+      ) : null}
+      {ingressKind === "VirtualService" &&
+      istioRequestHeadersSet &&
+      Object.keys(istioRequestHeadersSet).length ? (
+        <div style={{ ...meta({ marginTop: 6 }), color: "#334155" }}>
+          <div style={{ fontWeight: 900, marginBottom: 2 }}>headers.request.set</div>
+          <div style={{ fontSize: 11, fontWeight: 650 }}>
+            {Object.entries(istioRequestHeadersSet)
+              .map(([k, v]) => `${k}=${v}`)
+              .join(", ")}
+          </div>
+        </div>
+      ) : null}
       {ingressKind === "VirtualService" && istioDestinations?.length ? (
         <div style={{ ...meta(), marginTop: 6, color: "#0f172a", fontWeight: 700 }}>
           <div style={{ fontWeight: 900, marginBottom: 4 }}>Destinations</div>
