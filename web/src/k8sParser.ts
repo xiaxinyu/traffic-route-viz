@@ -123,15 +123,28 @@ function resourceKey(ns: string | undefined, name: string): string {
 
 function extractIstioRouteDestinations(routeArr: unknown[]): IstioRouteDestination[] {
   const out: IstioRouteDestination[] = [];
+  const parseMaybeNumber = (v: unknown): number | undefined => {
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+    if (typeof v === "string") {
+      const s = v.trim();
+      if (!s) return undefined;
+      // Accept formats like "80", "80.5", "80%" (some YAML exports include %).
+      const cleaned = s.endsWith("%") ? s.slice(0, -1).trim() : s;
+      const n = Number(cleaned);
+      return Number.isFinite(n) ? n : undefined;
+    }
+    return undefined;
+  };
   for (const item of routeArr) {
     const r = asRecord(item);
     const dest = asRecord(r?.destination);
     const host = typeof dest?.host === "string" ? dest.host : "?";
     const subset = typeof dest?.subset === "string" ? dest.subset : undefined;
-    const weight = typeof r?.weight === "number" ? r.weight : undefined;
+    const weight = parseMaybeNumber(r?.weight);
     const destPortObj = asRecord(dest?.port);
     let port: number | string = "?";
-    if (typeof destPortObj?.number === "number") port = destPortObj.number;
+    const pn = parseMaybeNumber(destPortObj?.number);
+    if (typeof pn === "number") port = pn;
     else if (typeof destPortObj?.name === "string") port = destPortObj.name;
     out.push({ host, subset, weight, port });
   }
