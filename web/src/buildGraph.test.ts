@@ -99,6 +99,42 @@ metadata:
   namespace: demo
 `;
 
+/** Two weighted subsets to the same Service → parallel Route→Service edges (same endpoints). */
+const VS_SAME_SVC_WEIGHTED = `apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: vs-same-svc
+  namespace: demo
+spec:
+  gateways:
+    - istio-system/rts-istio-ingress-gateway
+  hosts:
+    - app.example.com
+  http:
+    - match:
+        - uri:
+            prefix: /api
+      route:
+        - destination:
+            host: reviews.demo.svc.cluster.local
+            subset: blue
+            port:
+              number: 9080
+          weight: 80
+        - destination:
+            host: reviews.demo.svc.cluster.local
+            subset: green
+            port:
+              number: 9080
+          weight: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: reviews
+  namespace: demo
+`;
+
 describe("buildFlowGraph ingress forwarding", () => {
   it("creates tier-forward ingress->ingress edge for overlapping nginx routes", () => {
     const parsed = mergeParseResults([
@@ -199,6 +235,47 @@ describe("buildFlowGraph edge dedupe", () => {
       (e) => e.source === globalGw!.id && e.target === vsEntry!.id && e.label === "Gateway",
     );
     expect(gwEdges).toHaveLength(1);
+  });
+});
+
+describe("buildFlowGraph parallel Route→Service edges", () => {
+  it("fans out overlapping edges with symmetric step offsets", () => {
+    const parsed = parseK8sYaml(VS_SAME_SVC_WEIGHTED, "istio/same-svc.yaml");
+    const { nodes, edges } = buildFlowGraph(parsed);
+
+    const blue = edges.find(
+      (e) =>
+        typeof e.label === "string" && e.label.includes("subset=blue") && e.label.includes("w=80"),
+    );
+    const green = edges.find(
+      (e) =>
+        typeof e.label === "string" && e.label.includes("subset=green") && e.label.includes("w=20"),
+    );
+    expect(blue).toBeTruthy();
+    expect(green).toBeTruthy();
+    expect(blue!.source).toBe(green!.source);
+    expect(blue!.target).toBe(green!.target);
+
+    const parallel = edges.filter(
+      (e) =>
+        e.source === blue!.source &&
+        e.target === blue!.target &&
+        e.type === "readableLabel" &&
+        (e.data as { baseType?: string })?.baseType === "step",
+    );
+    expect(parallel).toHaveLength(2);
+    const offsets = parallel
+      .map((e) => (e.pathOptions as { offset?: number } | undefined)?.offset)
+      .filter((x): x is number => typeof x === "number")
+      .sort((a, b) => a - b);
+    expect(offsets).toEqual([-7, 7]);
+
+    const routeId = blue!.source;
+    const svcId = blue!.target;
+    const route = nodes.find((n) => n.id === routeId);
+    const svc = nodes.find((n) => n.id === svcId);
+    expect(route?.type).toBe("route");
+    expect(svc?.type).toBe("service");
   });
 });
 

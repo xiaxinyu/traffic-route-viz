@@ -1054,7 +1054,52 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     }
   }
 
-  const edgesWithReadableLabels = edges.map((e) => {
+  const spreadParallelEdges = (es: Edge[]): Edge[] => {
+    // Only apply to auto edges. Manual edges must keep their user-intended shape.
+    const auto = es.filter((e) => e.data?.manual !== true);
+    const manual = es.filter((e) => e.data?.manual === true);
+
+    const groupKey = (e: Edge): string =>
+      [
+        e.source,
+        e.target,
+        e.sourceHandle ?? "",
+        e.targetHandle ?? "",
+        // Keep label out of key: we want parallel edges with different labels to spread too.
+      ].join("|");
+
+    const groups = new Map<string, Edge[]>();
+    for (const e of auto) {
+      const k = groupKey(e);
+      const list = groups.get(k) ?? [];
+      list.push(e);
+      groups.set(k, list);
+    }
+
+    const out: Edge[] = [];
+    for (const list of groups.values()) {
+      if (list.length <= 1) {
+        out.push(list[0]!);
+        continue;
+      }
+      // Stable ordering so offsets don't jump between renders.
+      const ordered = [...list].sort((a, b) => (a.id ?? "").localeCompare(b.id ?? ""));
+      const step = 14;
+      const mid = (ordered.length - 1) / 2;
+      ordered.forEach((e, idx) => {
+        const offset = Math.round((idx - mid) * step);
+        out.push({
+          ...e,
+          // Step edges support pathOptions.offset and visually separate parallel paths.
+          type: "step",
+          pathOptions: { ...(e.pathOptions as object), offset, borderRadius: 6 },
+        });
+      });
+    }
+    return [...out, ...manual];
+  };
+
+  const edgesWithReadableLabels = spreadParallelEdges(edges).map((e) => {
     if (!e.label) return e;
     return {
       ...e,
