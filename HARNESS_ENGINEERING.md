@@ -234,7 +234,13 @@ kubectl apply -f k8s/traffic-route-viz.yaml
   - **Istio Gateway（全局合并）**：凡 VirtualService 引用的 Gateway（过滤 `mesh`）在画布 **左侧独立列**按名称合并为全局节点；初始纵向位置按名称占位堆叠后，在 **全部 VS 分区定位完成** 后再做一次 **垂直居中**：使每个全局 Gateway 卡片的垂直中心与「所有与之相连的 VirtualService 分区（`ingressRegion`）」垂直中心的 **中位数**对齐（多块 Gateway 名称时各自独立计算）；**分区宽度预留**左侧 Gateway 列，避免与分区重叠；Host 带起始高度仍与 **Ingress/VirtualService 头条 + 估算底边**对齐（分区内不再叠放多块 Gateway 卡）。
   - **Gateway→VS 连线长度（必须）**：全局 Gateway 的 **x** 不固定死在 `baseX`。在所有 VS 分区定位完成后，Gateway 节点 **自动贴近其连接到的 VS 列左侧**：\(x = \max(baseX,\; \min(\text{connected VS region }x) - (\text{gwCardW} + gap))\)。这样当 VS 列更靠左/靠右时，连线会自动变短/变长，避免永远拉一根超长线。
   - **VirtualService 竖列**：当 bundle 内存在 **至少一条** VirtualService 引用非 `mesh` 的 Istio Gateway，或 **VirtualService 入口对象 ≥ 2** 时，各 VirtualService 分区在画布上置于 **`01/02/03` Example 三列右侧的第四列**（与 Ingress / HTTPProxy 分区列分离），按导入排序 **纵向堆叠**；非 tier 导入时同样使用该竖列（与 fallback 网格中的 Ingress 分区分离）。
-  - **画布泳道（启发式）**：依据导入路径推断 **Global / Worker / 默认** band（实现：`web/src/swimlaneInfer.ts`）；同一 Example tier 列内若 band 切换，插入额外垂直间距（`SWIMLANE_BAND_GAP`）；分区页眉展示 **泳道文案**（`swimlaneLabel`），与现有 `Level 01–03`、文件夹 hint 并存。
+- **画布泳道（启发式）**：依据导入路径推断 **4 个泳道层级**（实现：`web/src/swimlaneInfer.ts`），并在布局中强制按固定顺序自上而下堆叠：
+  - `Global`
+  - `Active01`
+  - `Active02`
+  - `Gateway`（Contour Gateway / Istio Gateway 相关资源）
+  
+  同一列内若泳道切换，插入额外垂直间距（`SWIMLANE_BAND_GAP`）；分区页眉展示 **泳道文案**（`swimlaneLabel`），与现有 `Level 01–03`、文件夹 hint 并存；同泳道内的 Area 必须严格 **上下排列**（不做多列网格散排）。
   - **多 Service**：在按 Route `y` median 初值对齐后，须按 **预估 Service 卡高 + gap** 做纵向碰撞-resolve，并保持 **DestinationRule** 占位在对应 Service **估算高度之下的独立留白带**。
   - **常量与节点 UI 同步**：估高常量定义于 `web/src/buildGraph.ts`（`LAYOUT_EST_*`）；若 **`FlowNodes.tsx`** 卡片内边距/字体/可选字段显著变高或变矮，须在 **同一 MR** 内调整估算并在此处更新本条说明意图（避免再次出现结构性重叠）。
   - **边线视觉**：初始布局以降低节点重叠为第一目标；多层边仍可共用出口点，但通过 **拉大列距与纵向间距** 减轻「糊成一束」的阅读问题。**并行边散开（必须）**：对汇入同一目标端点的 **≥ 2** 条自动连线（按 **`target/targetHandle/sourceHandle`** 分组；含多 `istioDestination` → 同一 `service` 的场景），`buildFlowGraph.ts` 在包装 `readableLabel` 前将它们转为 **`step` 路径**并按边 `id` 稳定排序对称分配 **`pathOptions.offset`**（相邻间距约 **14px**），使多条并排蓝线可区分；手写边不受影响。
@@ -405,7 +411,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 - `routeGap`: **84**
 - `serviceGap`: **210**
 - `regionHeaderReserveY`: **162**（含分区页眉可选泳道一行；与 `web/src/buildGraph.ts` 一致）
-- `SWIMLANE_BAND_GAP`: **100**（同一 tier 列内 swimlane band 切换时的额外垂直间距）
+- `SWIMLANE_BAND_GAP`: **100**（同一列内 swimlane（Global/Active01/Active02/Gateway）切换时的额外垂直间距）
 - `lanePitchX`: **round(col × 7.2) + areaGapX**（与代码一致；用于 Example tier 列距及 VS 竖列）
 - **VirtualService 竖列**：在 Example tier 画布上为第四列，分区锚点 **x = baseX + layoutOffsetX + 3 × lanePitchX**；与 **`layoutOffsetX`**（全局 Istio Gateway 预留列宽） additive
 - 分区排版：**一行最多 4 个 Area**（超出自动换行），行/列间距为常量（见代码：`areaGapX/areaGapY`）

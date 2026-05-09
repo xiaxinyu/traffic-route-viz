@@ -302,6 +302,13 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
 
   const hasTieredExample = parsed.ingresses.some((ing) => !!parseExampleTier(ing.sourceFiles));
 
+  const swimlaneRank = (b: ReturnType<typeof inferSwimlaneBand>["band"]): number => {
+    if (b === "global") return 10;
+    if (b === "active01") return 20;
+    if (b === "active02") return 30;
+    return 40; // gateway
+  };
+
   const orderedIngresses = [...parsed.ingresses].sort((a, b) => {
     if (hasTieredExample) {
       const ta = parseExampleTier(a.sourceFiles);
@@ -313,6 +320,13 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       const fa = (ta?.effectiveFolderHint ?? "").localeCompare(tb?.effectiveFolderHint ?? "");
       if (fa !== 0) return fa;
     }
+
+    // Ensure a stable swimlane vertical grouping order regardless of import order:
+    // Global → Active01 → Active02 → Gateway
+    const sa = inferSwimlaneBand(a.sourceFiles ?? [], parseExampleTier(a.sourceFiles)).band;
+    const sb = inferSwimlaneBand(b.sourceFiles ?? [], parseExampleTier(b.sourceFiles)).band;
+    const sw = swimlaneRank(sa) - swimlaneRank(sb);
+    if (sw !== 0) return sw;
 
     const dw = kindWeight(a.kind) - kindWeight(b.kind);
     if (dw !== 0) return dw;
@@ -504,7 +518,8 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   // - Otherwise fall back to a simple multi-column grid.
   const lanePitchX = Math.round(col * 7.2) + areaGapX; // wide enough for a full region chain + comfortable edges
   const laneY: Record<1 | 2 | 3, number> = { 1: baseY, 2: baseY, 3: baseY };
-  const fallbackMaxAreasPerRow = 4;
+  // Swimlane requirement: elements should be stacked vertically (no multi-column grid).
+  const fallbackMaxAreasPerRow = 1;
   let fallbackColIdx = 0;
   let fallbackCursorX = baseX + layoutOffsetX;
   let fallbackCursorY = baseY;

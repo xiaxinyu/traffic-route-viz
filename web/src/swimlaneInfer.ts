@@ -3,7 +3,7 @@
  * Aligns with Example tier folders when present (01=global ingress layer, 02/03=worker layers).
  */
 
-export type SwimlaneBandKind = "global" | "worker" | "default";
+export type SwimlaneBandKind = "global" | "active01" | "active02" | "gateway";
 
 export type ExampleTierInfo = {
   tierCode: "01" | "02" | "03";
@@ -56,20 +56,24 @@ export function inferSwimlaneBand(
     return undefined;
   };
 
+  const isGatewayBundle =
+    hay.includes("gateway") ||
+    hay.includes("istio") ||
+    hay.includes("virtualservice") ||
+    hay.includes("destinationrule") ||
+    hay.includes("httpproxy") ||
+    hay.includes("contour");
+
   if (tier?.tierIndex === 1) {
     return {
       band: "global",
-      swimlaneLabel: "泳道：Global（Stretch / 01 入口层）",
+      swimlaneLabel: "泳道：Global",
     };
   }
   if (tier?.tierIndex === 2 || tier?.tierIndex === 3) {
-    const ch = clusterFromPath();
-    const tail = ch ? ` · ${ch}` : "";
-    return {
-      band: "worker",
-      clusterHint: ch,
-      swimlaneLabel: `泳道：Worker（Level 0${tier.tierIndex}）${tail}`,
-    };
+    if (isGatewayBundle) return { band: "gateway", swimlaneLabel: "泳道：Gateway" };
+    if (hay.includes("active02")) return { band: "active02", clusterHint: "Active02", swimlaneLabel: "泳道：Active02" };
+    return { band: "active01", clusterHint: "Active01", swimlaneLabel: "泳道：Active01" };
   }
 
   if (
@@ -79,23 +83,15 @@ export function inferSwimlaneBand(
     hay.includes("/global/") ||
     hay.includes("global-ingress")
   ) {
-    return { band: "global", swimlaneLabel: "泳道：Global（路径启发）" };
+    return { band: "global", swimlaneLabel: "泳道：Global" };
   }
 
+  if (isGatewayBundle) return { band: "gateway", swimlaneLabel: "泳道：Gateway" };
+  if (hay.includes("active02")) return { band: "active02", clusterHint: "Active02", swimlaneLabel: "泳道：Active02" };
   const ch = clusterFromPath();
-  if (
-    ch ||
-    hay.includes("worker") ||
-    hay.includes("active01") ||
-    hay.includes("active02") ||
-    hay.includes("/uat/")
-  ) {
-    return {
-      band: "worker",
-      clusterHint: ch,
-      swimlaneLabel: ch ? `泳道：Worker · ${ch}` : "泳道：Worker（路径启发）",
-    };
+  if (ch === "Active01" || hay.includes("active01")) {
+    return { band: "active01", clusterHint: "Active01", swimlaneLabel: "泳道：Active01" };
   }
-
-  return { band: "default", swimlaneLabel: "泳道：默认" };
+  // Fallback: default worker lane goes to Active01
+  return { band: "active01", swimlaneLabel: "泳道：Active01" };
 }
