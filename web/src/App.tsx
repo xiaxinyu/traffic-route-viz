@@ -233,6 +233,12 @@ function AppInner() {
   );
   const [statusOpen, setStatusOpen] = useState(false);
 
+  const Icon = ({ d }: { d: string }) => (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="trv-icon">
+      <path d={d} fill="currentColor" />
+    </svg>
+  );
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
   const flowContainerRef = useRef<HTMLDivElement | null>(null);
@@ -594,15 +600,19 @@ function AppInner() {
                   type="button"
                   onClick={() => jumpToMatch(matchCursor - 1)}
                   disabled={!graphPresentation.matchedNodeIds.length}
+                  aria-label="上一个"
+                  title="上一个"
                 >
-                  上一个
+                  <Icon d="M15 6l-6 6 6 6" />
                 </button>
                 <button
                   type="button"
                   onClick={() => jumpToMatch(matchCursor + 1)}
                   disabled={!graphPresentation.matchedNodeIds.length}
+                  aria-label="下一个"
+                  title="下一个"
                 >
-                  下一个
+                  <Icon d="M9 6l6 6-6 6" />
                 </button>
                 <span>
                   {graphPresentation.matchedNodeIds.length
@@ -616,8 +626,9 @@ function AppInner() {
                 className="btn-primary"
                 onClick={() => applyYaml(mergedImportedText ?? yamlText)}
                 title="重新解析 YAML 并刷新拓扑"
+                aria-label="刷新"
               >
-                刷新
+                <Icon d="M17.65 6.35A7.95 7.95 0 0 0 12 4V1L7 6l5 5V7a5 5 0 1 1-5 5H5a7 7 0 1 0 12.65-5.65z" />
               </button>
 
               <button
@@ -625,8 +636,9 @@ function AppInner() {
                 className="btn-secondary"
                 onClick={() => fitView({ padding: 0.05, duration: 240 })}
                 title="将拓扑重新适配到当前画布"
+                aria-label="适配"
               >
-                适配
+                <Icon d="M4 7V4h3v2H6v1H4zm14-1V4h3v3h-2V6h-1zm1 15h2v-3h-2v1h-1v2h1zm-15 0v-3h2v1h1v2H4z" />
               </button>
 
               <div className="search-nav" role="group" aria-label="全局缩放控制">
@@ -634,22 +646,25 @@ function AppInner() {
                   type="button"
                   onClick={() => setUiScale((v) => clampUiScale(v - UI_SCALE_STEP))}
                   title="缩小侧栏与拓扑（含文字）"
+                  aria-label="缩小"
                 >
-                  A-
+                  <Icon d="M19 13H5v-2h14v2z" />
                 </button>
                 <button
                   type="button"
                   onClick={() => setUiScale(1)}
                   title="将侧栏与拓扑缩放设为 100%"
+                  aria-label="重置缩放"
                 >
-                  {Math.round(uiScale * 100)}%
+                  <span className="trv-icon-btn-text">{Math.round(uiScale * 100)}%</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setUiScale((v) => clampUiScale(v + UI_SCALE_STEP))}
                   title="放大侧栏与拓扑（含文字）"
+                  aria-label="放大"
                 >
-                  A+
+                  <Icon d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z" />
                 </button>
               </div>
 
@@ -658,8 +673,9 @@ function AppInner() {
                 className={statusOpen ? "btn-secondary btn-pill-active" : "btn-secondary"}
                 onClick={() => setStatusOpen((v) => !v)}
                 title={statusOpen ? "收起指标" : "展开指标"}
+                aria-label="指标"
               >
-                数据
+                <Icon d="M5 9h3v10H5V9zm5-4h3v14h-3V5zm5 7h3v7h-3v-7z" />
               </button>
 
               {getRuntimeConfig().auth?.enabled !== false ? (
@@ -671,8 +687,9 @@ function AppInner() {
                     window.location.reload();
                   }}
                   title="退出登录"
+                  aria-label="退出"
                 >
-                  退出
+                  <Icon d="M10 17l1.41-1.41L9.83 14H20v-2H9.83l1.58-1.59L10 9l-5 5 5 3zM4 5h8V3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8v-2H4V5z" />
                 </button>
               ) : null}
             </div>
@@ -775,16 +792,18 @@ function AppInner() {
                 className="btn-secondary"
                 onClick={() => fileInputRef.current?.click()}
                 title="导入一个或多个 YAML 文件"
+                aria-label="导入文件"
               >
-                导文
+                <Icon d="M14 2H6a2 2 0 0 0-2 2v16h16V8l-6-6zm1 7V3.5L18.5 9H15z" />
               </button>
               <button
                 type="button"
                 className="btn-secondary"
                 onClick={() => folderInputRef.current?.click()}
                 title="导入文件夹（保留相对路径）"
+                aria-label="导入文件夹"
               >
-                导夹
+                <Icon d="M10 4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h6z" />
               </button>
               {importedFiles?.length ? (
                 <button
@@ -798,8 +817,10 @@ function AppInner() {
                     setLeftMode("yaml");
                     applyYaml(SAMPLE, null);
                   }}
+                  aria-label="清空"
+                  title="清空"
                 >
-                  清空
+                  <Icon d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2z" />
                 </button>
               ) : null}
             </div>

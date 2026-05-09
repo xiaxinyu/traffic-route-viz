@@ -5,6 +5,7 @@ import {
   type RefObject,
   type SetStateAction,
   useCallback,
+  useEffect,
   useState,
   useRef,
 } from "react";
@@ -95,11 +96,43 @@ export function DiagramActions(props: Props) {
 
   const { fitView, getViewport, setViewport } = useReactFlow();
   const loadInputRef = useRef<HTMLInputElement | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const selectedNodeCount = nodes.filter((n) => n.selected).length;
   const selectedEdgeCount = edges.filter((e) => e.selected).length;
   const hasSelectedEdges = selectedEdgeCount > 0;
   const hasSelectedElements = selectedNodeCount > 0 || selectedEdgeCount > 0;
+
+  const Icon = ({ d }: { d: string }) => (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="trv-icon">
+      <path d={d} fill="currentColor" />
+    </svg>
+  );
+
+  useEffect(() => {
+    const onChange = () => {
+      const el = flowContainerRef.current ?? null;
+      const fsEl = document.fullscreenElement;
+      setIsFullscreen(Boolean(el && fsEl === el));
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    onChange();
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, [flowContainerRef]);
+
+  const toggleFullscreen = useCallback(async () => {
+    const el = flowContainerRef.current;
+    if (!el) return;
+    try {
+      if (document.fullscreenElement === el) {
+        await document.exitFullscreen();
+        return;
+      }
+      await el.requestFullscreen();
+    } catch {
+      window.alert("全屏失败：浏览器可能阻止了该操作。");
+    }
+  }, [flowContainerRef]);
 
   const onSaveDiagramJson = useCallback(() => {
     const vp = getViewport();
@@ -237,24 +270,39 @@ export function DiagramActions(props: Props) {
           <button
             type="button"
             style={btnGhost}
+            onClick={toggleFullscreen}
+            aria-label={isFullscreen ? "退出全屏" : "全屏"}
+            title={isFullscreen ? "退出全屏（Esc）" : "全屏"}
+          >
+            <Icon
+              d={
+                isFullscreen
+                  ? "M9 3H5a2 2 0 0 0-2 2v4h2V5h4V3zm10 0h-4v2h4v4h2V5a2 2 0 0 0-2-2zM5 15H3v4a2 2 0 0 0 2 2h4v-2H5v-4zm16 0h-2v4h-4v2h4a2 2 0 0 0 2-2v-4z"
+                  : "M7 14H5v5h5v-2H7v-3zm0-4h3V7h2v5H7V10zm12 9h-5v-2h3v-3h2v5zM14 7h5v5h-2V9h-3V7z"
+              }
+            />
+          </button>
+          <button
+            type="button"
+            style={btnGhost}
             onClick={() => setCollapsed((v) => !v)}
             aria-label={collapsed ? "展开画布工具" : "收起画布工具"}
             title={collapsed ? "展开" : "收起"}
           >
-            {collapsed ? "展开" : "收起"}
+            <Icon d={collapsed ? "M7 10l5 5 5-5" : "M7 14l5-5 5 5"} />
           </button>
         </div>
 
         {!collapsed ? (
           <div className="diagram-toolbar-row">
-            <label className="diagram-toolbar-check">
+            <label className="diagram-toolbar-check" title="边标签">
               <input
                 data-testid="toggle-edge-labels"
                 type="checkbox"
                 checked={edgeLabelsEnabled}
                 onChange={(e) => setEdgeLabelsEnabled(e.target.checked)}
               />
-              边标签
+              <span className="diagram-toolbar-check-text">边标签</span>
             </label>
 
             <button
@@ -262,35 +310,45 @@ export function DiagramActions(props: Props) {
               style={btnGhost}
               onClick={() => fitView({ padding: 0.05, duration: 240 })}
               data-testid="canvas-fit-view"
+              aria-label="适配"
+              title="适配"
             >
-              适配
+              <Icon d="M4 7V4h3v2H6v1H4zm14-1V4h3v3h-2V6h-1zm1 15h2v-3h-2v1h-1v2h1zm-15 0v-3h2v1h1v2H4z" />
             </button>
             <button type="button" style={btnPrimary} onClick={onExportPng} data-testid="export-png">
-              PNG
+              <span aria-hidden="true" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <Icon d="M21 19H3V5h18v14zm-2-2V7H5v10h14zM7 15l2.5-3 2 2.5L15 10l2 5H7z" />
+              </span>
             </button>
             <button
               type="button"
               style={btnGhost}
               onClick={onExportMermaid}
               data-testid="export-mermaid"
+              aria-label="Mermaid"
+              title="Mermaid"
             >
-              Mermaid
+              <Icon d="M4 19V5h16v14H4zm2-2h12V7H6v10zm2-8h8v2H8V9zm0 4h6v2H8v-2z" />
             </button>
             <button
               type="button"
               style={btnGhost}
               onClick={onExportDrawio}
               data-testid="export-drawio"
+              aria-label="draw.io"
+              title="draw.io"
             >
-              draw.io
+              <Icon d="M7 7h10v4H7V7zm0 6h4v4H7v-4zm6 0h4v4h-4v-4z" />
             </button>
             <button
               type="button"
               style={btnGhost}
               onClick={onSaveDiagramJson}
               data-testid="save-diagram"
+              aria-label="保存"
+              title="保存"
             >
-              保存
+              <Icon d="M17 3H5a2 2 0 0 0-2 2v14h18V7l-4-4zM7 5h8v4H7V5zm5 12H6v-6h6v6zm2 0v-6h4v6h-4z" />
             </button>
             <button
               type="button"
@@ -303,8 +361,9 @@ export function DiagramActions(props: Props) {
               data-testid="delete-selected-edges"
               disabled={!hasSelectedEdges}
               title="删除当前选中的连线；也支持键盘 Delete/Backspace"
+              aria-label="删线"
             >
-              删线
+              <Icon d="M6 6l12 12M18 6L6 18" />
             </button>
             <button
               type="button"
@@ -317,16 +376,19 @@ export function DiagramActions(props: Props) {
               data-testid="delete-selected-elements"
               disabled={!hasSelectedElements}
               title="删除当前选中的节点与连线（同时会清理其关联边）"
+              aria-label="删除"
             >
-              删除
+              <Icon d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2z" />
             </button>
             <button
               type="button"
               style={btnGhost}
               onClick={() => loadInputRef.current?.click()}
               data-testid="open-diagram"
+              aria-label="打开"
+              title="打开"
             >
-              打开
+              <Icon d="M10 4H4v16h16V8h-8l-2-4zm-4 6h12v8H6v-8z" />
             </button>
           </div>
         ) : null}

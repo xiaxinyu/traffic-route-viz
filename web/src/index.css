@@ -145,6 +145,37 @@ body {
   font-weight: 700;
 }
 
+.trv-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.btn-primary .trv-icon,
+.btn-secondary .trv-icon,
+.btn-danger .trv-icon,
+.search-nav button .trv-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.trv-icon-btn-text {
+  font-variant-numeric: tabular-nums;
+}
+
+.diagram-toolbar-check-text {
+  display: inline-block;
+}
+
 .search-nav button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -610,6 +641,35 @@ body {
 .flow-stage {
   flex: 1;
   min-width: 0;
+}
+
+.flow-stage:fullscreen {
+  /* Fullscreen defaults to black in some browsers if the element is transparent. */
+  background:
+    radial-gradient(circle at 0% -8%, rgba(15, 118, 110, 0.14), transparent 45%),
+    radial-gradient(circle at 100% 0%, rgba(14, 165, 233, 0.12), transparent 42%),
+    linear-gradient(180deg, #f6fbfc, #ffffff);
+}
+
+.flow-stage:fullscreen .react-flow {
+  background: transparent;
+}
+
+.flow-stage:fullscreen .react-flow__minimap-mask {
+  fill: rgba(15, 23, 42, 0.06);
+}
+
+.flow-stage:fullscreen .react-flow__minimap {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.flow-stage:fullscreen .react-flow__controls {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  overflow: hidden;
 }
 
 .diagram-toolbar-panel {
