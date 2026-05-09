@@ -231,6 +231,7 @@ function AppInner() {
   const [edgeLabelsEnabled, setEdgeLabelsEnabled] = useState<boolean>(() =>
     readEdgeLabelsEnabled(),
   );
+  const [statusOpen, setStatusOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
@@ -398,6 +399,21 @@ function AppInner() {
     return importedFiles ? mergeYamlFiles(importedFiles) : null;
   }, [importedFiles]);
 
+  const switchLeftMode = useCallback(
+    (next: "files" | "yaml") => {
+      setLeftMode(next);
+      if (next !== "yaml") return;
+      if (!importedFiles?.length) return;
+      if (activeFileIndex !== null) {
+        const f = importedFiles[activeFileIndex];
+        if (f) setYamlText(f.text);
+        return;
+      }
+      setYamlText(mergeYamlFiles(importedFiles));
+    },
+    [activeFileIndex, importedFiles],
+  );
+
   const displayPath = useCallback((f: ImportedYamlFile) => f.relPath ?? f.name, []);
 
   const displayFolderHint = useCallback((p: string) => {
@@ -419,6 +435,26 @@ function AppInner() {
       setCenter(pos.x + w / 2, pos.y + h / 2, { zoom: 1.06, duration: 260 });
     },
     [nodes, setCenter],
+  );
+
+  const focusRegionByImportedFile = useCallback(
+    (f: ImportedYamlFile) => {
+      const candidates = [f.relPath, f.name].filter(Boolean).map((x) => String(x).toLowerCase());
+      if (!candidates.length) return;
+      const hit = nodes.find((n) => {
+        if (n.type !== "ingressRegion") return false;
+        const src = (n.data as any)?.sourceFiles as string[] | undefined;
+        if (!Array.isArray(src) || !src.length) return false;
+        return src.some((s) => {
+          const ss = String(s).toLowerCase();
+          return candidates.some((c) => ss === c || ss.endsWith(`/${c}`) || c.endsWith(`/${ss}`));
+        });
+      });
+      if (!hit) return;
+      setNodes((prev) => applyCanvasSelection(prev, hit.id, false));
+      focusNodeById(hit.id);
+    },
+    [focusNodeById, nodes, setNodes],
   );
 
   const jumpToMatch = useCallback(
@@ -533,111 +569,132 @@ function AppInner() {
     <div className="app-shell">
       <header className="app-header">
         <div className="header-main">
-          <div className="header-title-wrap">
-            <h1>Traffic Route Viz</h1>
-            <p>专业化流量拓扑工作台：导入、解析、筛选、定位、导出一体化</p>
+          <div className="header-left">
+            <div className="header-title-wrap">
+              <h1>Traffic Route Viz</h1>
+              <p>专业化流量拓扑工作台：导入、解析、筛选、定位、导出一体化</p>
+            </div>
           </div>
 
-          <div className="header-main-controls">
-            <input
-              className="search-input"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") jumpToMatch(matchCursor + 1);
-              }}
-              placeholder="搜索节点（name / host / path / service）"
-              aria-label="搜索节点"
-            />
+          <div className="header-right">
+            <div className="header-main-controls">
+              <input
+                className="search-input"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") jumpToMatch(matchCursor + 1);
+                }}
+                placeholder="搜索节点（name / host / path / service）"
+                aria-label="搜索节点"
+              />
 
-            <div className="search-nav">
+              <div className="search-nav">
+                <button
+                  type="button"
+                  onClick={() => jumpToMatch(matchCursor - 1)}
+                  disabled={!graphPresentation.matchedNodeIds.length}
+                >
+                  上一个
+                </button>
+                <button
+                  type="button"
+                  onClick={() => jumpToMatch(matchCursor + 1)}
+                  disabled={!graphPresentation.matchedNodeIds.length}
+                >
+                  下一个
+                </button>
+                <span>
+                  {graphPresentation.matchedNodeIds.length
+                    ? `${matchCursor + 1}/${graphPresentation.matchedNodeIds.length}`
+                    : "0/0"}
+                </span>
+              </div>
+
               <button
                 type="button"
-                onClick={() => jumpToMatch(matchCursor - 1)}
-                disabled={!graphPresentation.matchedNodeIds.length}
+                className="btn-primary"
+                onClick={() => applyYaml(mergedImportedText ?? yamlText)}
+                title="重新解析 YAML 并刷新拓扑"
               >
-                上一个
+                刷新
               </button>
-              <button
-                type="button"
-                onClick={() => jumpToMatch(matchCursor + 1)}
-                disabled={!graphPresentation.matchedNodeIds.length}
-              >
-                下一个
-              </button>
-              <span>
-                {graphPresentation.matchedNodeIds.length
-                  ? `${matchCursor + 1}/${graphPresentation.matchedNodeIds.length}`
-                  : "0/0"}
-              </span>
-            </div>
 
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => applyYaml(mergedImportedText ?? yamlText)}
-              title="重新解析 YAML 并刷新拓扑"
-            >
-              刷新拓扑
-            </button>
-
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => fitView({ padding: 0.05, duration: 240 })}
-              title="将拓扑重新适配到当前画布"
-            >
-              适配视图
-            </button>
-
-            <div className="search-nav" role="group" aria-label="全局缩放控制">
-              <button
-                type="button"
-                onClick={() => setUiScale((v) => clampUiScale(v - UI_SCALE_STEP))}
-                title="缩小侧栏与拓扑（含文字）"
-              >
-                A-
-              </button>
-              <button type="button" onClick={() => setUiScale(1)} title="将侧栏与拓扑缩放设为 100%">
-                {Math.round(uiScale * 100)}%
-              </button>
-              <button
-                type="button"
-                onClick={() => setUiScale((v) => clampUiScale(v + UI_SCALE_STEP))}
-                title="放大侧栏与拓扑（含文字）"
-              >
-                A+
-              </button>
-            </div>
-
-            {getRuntimeConfig().auth?.enabled !== false ? (
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={() => {
-                  clearSession();
-                  window.location.reload();
-                }}
-                title="退出登录"
+                onClick={() => fitView({ padding: 0.05, duration: 240 })}
+                title="将拓扑重新适配到当前画布"
               >
-                退出
+                适配
               </button>
-            ) : null}
-          </div>
 
-          <div className="header-status-strip" data-testid="top-status-strip">
-            <span className="status-pill">节点 {graphMetrics.nodeCount}</span>
-            <span className="status-pill">边 {graphMetrics.edgeCount}</span>
-            <span className="status-pill">自动边 {graphMetrics.autoEdgeCount}</span>
-            <span className="status-pill">手写边 {graphMetrics.manualEdgeCount}</span>
-            <span className="status-pill">
-              已选 {selectionMetrics.selectedNodeCount} 节点 / {selectionMetrics.selectedEdgeCount}{" "}
-              边
-            </span>
-            <span className="status-pill">
-              最近刷新 {formatClockTime(lastAppliedAt)}
-              {parsedMsg ? "（有告警）" : "（正常）"}
-            </span>
+              <div className="search-nav" role="group" aria-label="全局缩放控制">
+                <button
+                  type="button"
+                  onClick={() => setUiScale((v) => clampUiScale(v - UI_SCALE_STEP))}
+                  title="缩小侧栏与拓扑（含文字）"
+                >
+                  A-
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUiScale(1)}
+                  title="将侧栏与拓扑缩放设为 100%"
+                >
+                  {Math.round(uiScale * 100)}%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUiScale((v) => clampUiScale(v + UI_SCALE_STEP))}
+                  title="放大侧栏与拓扑（含文字）"
+                >
+                  A+
+                </button>
+              </div>
+
+              <button
+                type="button"
+                className={statusOpen ? "btn-secondary btn-pill-active" : "btn-secondary"}
+                onClick={() => setStatusOpen((v) => !v)}
+                title={statusOpen ? "收起指标" : "展开指标"}
+              >
+                数据
+              </button>
+
+              {getRuntimeConfig().auth?.enabled !== false ? (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    clearSession();
+                    window.location.reload();
+                  }}
+                  title="退出登录"
+                >
+                  退出
+                </button>
+              ) : null}
+            </div>
+
+            {statusOpen ? (
+              <div
+                className="header-status-strip header-status-strip-compact"
+                data-testid="top-status-strip"
+              >
+                <span className="status-pill">节点 {graphMetrics.nodeCount}</span>
+                <span className="status-pill">边 {graphMetrics.edgeCount}</span>
+                <span className="status-pill">自动 {graphMetrics.autoEdgeCount}</span>
+                <span className="status-pill">手写 {graphMetrics.manualEdgeCount}</span>
+                <span className="status-pill">
+                  已选 {selectionMetrics.selectedNodeCount}/{selectionMetrics.selectedEdgeCount}
+                </span>
+                <span className="status-pill">
+                  刷新 {formatClockTime(lastAppliedAt)}
+                  {parsedMsg ? "（告警）" : "（正常）"}
+                </span>
+              </div>
+            ) : null}
           </div>
         </div>
       </header>
@@ -660,23 +717,6 @@ function AppInner() {
                     ? `已导入 ${importedFiles.length} 个文件（默认合并解析）`
                     : "可粘贴 YAML，或导入多文件/文件夹进行合并解析"}
                 </div>
-              </div>
-
-              <div className="mode-switch">
-                <button
-                  type="button"
-                  className={leftMode === "files" ? "active" : ""}
-                  onClick={() => setLeftMode("files")}
-                >
-                  文件
-                </button>
-                <button
-                  type="button"
-                  className={leftMode === "yaml" ? "active" : ""}
-                  onClick={() => setLeftMode("yaml")}
-                >
-                  YAML
-                </button>
               </div>
             </div>
 
@@ -729,34 +769,24 @@ function AppInner() {
               }}
             />
 
-            {importedFiles?.length ? (
-              <div className="inline-actions">
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => folderInputRef.current?.click()}
-                >
-                  追加导入文件夹
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  追加导入文件
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => {
-                    setActiveFileIndex(null);
-                    const merged = mergeYamlFiles(importedFiles);
-                    setYamlText(merged);
-                    setLeftMode("yaml");
-                  }}
-                >
-                  查看合并 YAML
-                </button>
+            <div className="inline-actions" role="group" aria-label="导入按钮">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => fileInputRef.current?.click()}
+                title="导入一个或多个 YAML 文件"
+              >
+                导文
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => folderInputRef.current?.click()}
+                title="导入文件夹（保留相对路径）"
+              >
+                导夹
+              </button>
+              {importedFiles?.length ? (
                 <button
                   type="button"
                   className="btn-danger"
@@ -771,8 +801,8 @@ function AppInner() {
                 >
                   清空
                 </button>
-              </div>
-            ) : null}
+              ) : null}
+            </div>
           </section>
 
           <section className="left-panel-block compact">
@@ -818,39 +848,59 @@ function AppInner() {
 
           <section className="left-panel-block grow">
             <div className="panel-list-title">
-              {leftMode === "files" ? "导入文件列表" : "YAML 编辑器"}
+              <span>{leftMode === "files" ? "文件" : "YAML"}</span>
+              <div className="mode-switch" aria-label="文件与 YAML 切换">
+                <button
+                  type="button"
+                  className={leftMode === "files" ? "active" : ""}
+                  onClick={() => switchLeftMode("files")}
+                >
+                  文件
+                </button>
+                <button
+                  type="button"
+                  className={leftMode === "yaml" ? "active" : ""}
+                  onClick={() => switchLeftMode("yaml")}
+                >
+                  YAML
+                </button>
+              </div>
             </div>
             {leftMode === "files" ? (
-              importedFiles?.length ? (
-                <div className="file-list">
-                  {importedFiles.map((f, idx) => {
-                    const active = activeFileIndex === idx;
-                    const p = displayPath(f);
-                    const folderHint = f.relPath ? displayFolderHint(f.relPath) : "";
-                    return (
-                      <div
-                        key={p + idx}
-                        onClick={() => {
-                          setActiveFileIndex(idx);
-                          setYamlText(f.text);
-                          setLeftMode("yaml");
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        title={p}
-                        className={active ? "file-item active" : "file-item"}
-                      >
-                        <div className="file-item-title">{f.name}</div>
-                        {folderHint ? <div className="file-item-hint">{folderHint}</div> : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="empty-box">
-                  尚未导入文件。可直接粘贴 YAML，或拖入文件/目录后自动解析。
-                </div>
-              )
+              <>
+                {importedFiles?.length ? (
+                  <div className="file-list">
+                    {importedFiles.map((f, idx) => {
+                      const active = activeFileIndex === idx;
+                      const p = displayPath(f);
+                      const folderHint = f.relPath ? displayFolderHint(f.relPath) : "";
+                      return (
+                        <div
+                          key={p + idx}
+                          onClick={() => {
+                            setActiveFileIndex(idx);
+                            focusRegionByImportedFile(f);
+                          }}
+                          onDoubleClick={() => {
+                            setActiveFileIndex(idx);
+                            setYamlText(f.text);
+                            setLeftMode("yaml");
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          title={p}
+                          className={active ? "file-item active" : "file-item"}
+                        >
+                          <div className="file-item-title">{f.name}</div>
+                          {folderHint ? <div className="file-item-hint">{folderHint}</div> : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="empty-box">尚未导入。可拖入文件/目录，或点击上方“导文/导夹”。</div>
+                )}
+              </>
             ) : (
               <>
                 <div className="yaml-editor-actions">
@@ -867,7 +917,7 @@ function AppInner() {
                       disabled={!yamlTextStats.hasContent}
                       title="解析当前 YAML 并刷新拓扑"
                     >
-                      解析刷新
+                      解析
                     </button>
                     <button
                       type="button"
@@ -891,7 +941,7 @@ function AppInner() {
                       }}
                       data-testid="yaml-restore-sample"
                     >
-                      恢复示例
+                      示例
                     </button>
                     <button
                       type="button"
@@ -900,7 +950,7 @@ function AppInner() {
                       data-testid="yaml-popout-open"
                       title="放大查看 YAML（Esc 关闭）"
                     >
-                      放大查看
+                      放大
                     </button>
                   </div>
                 </div>
@@ -1001,7 +1051,7 @@ function AppInner() {
                   data-testid="yaml-popout-refresh"
                   title="重新解析 YAML 并刷新拓扑"
                 >
-                  刷新拓扑
+                  刷新
                 </button>
                 <button
                   type="button"
