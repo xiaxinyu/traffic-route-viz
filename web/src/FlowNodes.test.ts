@@ -10,6 +10,8 @@ describe("NODE_COLOR_PALETTE", () => {
     expect(NODE_COLOR_PALETTE.virtualService).not.toBe(NODE_COLOR_PALETTE.destinationRule);
     expect(NODE_COLOR_PALETTE.destinationRule).not.toBe(NODE_COLOR_PALETTE.route);
     expect(NODE_COLOR_PALETTE.route).not.toBe(NODE_COLOR_PALETTE.httpProxy);
+    expect(NODE_COLOR_PALETTE.istioDestination).not.toBe(NODE_COLOR_PALETTE.service);
+    expect(NODE_COLOR_PALETTE.istioDestination).not.toBe(NODE_COLOR_PALETTE.route);
   });
 });
 

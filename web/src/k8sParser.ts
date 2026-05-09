@@ -119,7 +119,10 @@ export interface IstioGatewayInfo {
 }
 
 export interface DestinationRuleInfo {
-  key: string; // service key (ns/name) resolved from spec.host
+  /** Unique DestinationRule resource key `namespace/name`. */
+  key: string;
+  /** Service key (ns/name) resolved from `spec.host`. */
+  serviceKey: string;
   name: string;
   namespace?: string;
   host?: string;
@@ -265,7 +268,7 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
   const endpoints = new Map<string, EndpointsInfo>();
   // DestinationRule host -> subsets
   const istioSubsetsByKey = new Map<string, string[]>();
-  const destinationRuleByServiceKey = new Map<string, DestinationRuleInfo>();
+  const destinationRules: DestinationRuleInfo[] = [];
   const gatewayByKey = new Map<string, IstioGatewayInfo>();
 
   let docs: unknown[];
@@ -612,16 +615,21 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
       const host = typeof spec?.host === "string" ? spec.host : undefined;
       if (host) {
         const { name, namespace } = parseIstioHostToServiceKey(host, drNs);
-        const k = resourceKey(namespace, name);
+        const serviceKey = resourceKey(namespace, name);
+        const drKey = resourceKey(drNs, drName);
         const subsetsRaw = Array.isArray(spec?.subsets) ? spec!.subsets! : [];
         const subsetNames = subsetsRaw
           .map((s) => asRecord(s))
           .filter(Boolean)
           .map((s) => (typeof s!.name === "string" ? s!.name : null))
           .filter((x): x is string => !!x);
-        if (subsetNames.length) istioSubsetsByKey.set(k, subsetNames);
-        destinationRuleByServiceKey.set(k, {
-          key: k,
+        if (subsetNames.length) {
+          const prev = istioSubsetsByKey.get(serviceKey) ?? [];
+          istioSubsetsByKey.set(serviceKey, [...new Set([...prev, ...subsetNames])]);
+        }
+        destinationRules.push({
+          key: drKey,
+          serviceKey,
           name: drName,
           namespace: drNs,
           host,
@@ -730,13 +738,19 @@ export function parseK8sYaml(text: string, sourceFile?: string): ParseResult {
     }
   }
 
+  // Attach Istio subsets to Services in a post-pass (DestinationRule may appear after Service).
+  for (const [k, svc] of services.entries()) {
+    const subs = istioSubsetsByKey.get(k);
+    if (subs?.length) services.set(k, { ...svc, istioSubsets: subs });
+  }
+
   return {
     ingresses: [...ingressByKey.values()],
     routes,
     services: [...services.values()],
     endpoints: [...endpoints.values()],
     gateways: [...gatewayByKey.values()],
-    destinationRules: [...destinationRuleByServiceKey.values()],
+    destinationRules,
     errors,
   };
 }

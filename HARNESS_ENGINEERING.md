@@ -23,6 +23,11 @@
 - Istio `VirtualService`（`networking.istio.io/*`）
 - Istio `DestinationRule`（`networking.istio.io/*`）
 
+> 说明：当导入内容为 **Istio-only bundle**（仅含 VirtualService/DestinationRule/Gateway，且无 Service/Endpoints）时，画布进入 **Istio-only 视图**：
+> - 不渲染 `Service` / `Endpoints` 节点
+> - 以 `Route → Destination → DestinationRule` 为主链（权重在 Route→Destination 连线上）
+> - 保留全局 `Gateway → VirtualService` 连线
+
 ### Out of Scope（除非明确扩展）
 
 - Gateway API（`HTTPRoute` 等）
@@ -221,7 +226,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 以下为本项目在多轮迭代中沉淀出的**硬原则**。任何布局/解析/节点语义变更，均不得破坏这些原则；若确需调整，必须同步更新本条款与实现并给出理由。
 
 - **通用 Traffic 可视化定位**：面向 Kubernetes / Istio / Contour 的流量拓扑，不局限于 Ingress。
-- **Area（分区）呈现**：一行最多 4 个 Area，超出自动换行；Area 宽高应按内容动态扩展，避免内容溢出遮挡。
+- **Area（分区）呈现**：一行最多 4 个 Area，超出自动换行；Area 宽高 **初始** 按内容动态扩展，避免内容溢出遮挡；用户 **可选中后拖动边缘/角点** 再放大留白（`NodeResizer`，`IngressRegionNode`）。**刷新拓扑** 时同一 `nodeKey` 的分区取 **`max`（用户当前宽高，重算宽高）**，避免把用户拉宽的底板缩回；导入新 YAML 导致分区消失时无此保留。
 - **防重叠初始布局（必须）**：自动构图时同一 `ingressRegion` 内 **禁止** Ingress/VirtualService 卡、Host、Route、Gateway、Service、DestinationRule、Endpoints 等卡片在初始坐标上互相压盖。
   - **Route 不得在 Host 卡内部起笔**：首张 Route 的 `y` 必须位于为该 Host **预留的整块卡片估算高度之下**再加间隙（不得再使用 Host 顶端 + 极小偏移的旧模式）。
   - **多 Host 纵向串联**：下一个 Host 的顶边必须在前一 Host **子树底边**（该 Host 下最后一条 Route 的底边，或「无 Route 时」Host 卡底边）**再加块间留白**之后开始；**禁止**仅用固定常量 `hostGap` 推导而不考虑上一 Host **实际路由条数**。
@@ -230,7 +235,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
   - **画布泳道（启发式）**：依据导入路径推断 **Global / Worker / 默认** band（实现：`web/src/swimlaneInfer.ts`）；同一 Example tier 列内若 band 切换，插入额外垂直间距（`SWIMLANE_BAND_GAP`）；分区页眉展示 **泳道文案**（`swimlaneLabel`），与现有 `Level 01–03`、文件夹 hint 并存。
   - **多 Service**：在按 Route `y` median 初值对齐后，须按 **预估 Service 卡高 + gap** 做纵向碰撞-resolve，并保持 **DestinationRule** 占位在对应 Service **估算高度之下的独立留白带**。
   - **常量与节点 UI 同步**：估高常量定义于 `web/src/buildGraph.ts`（`LAYOUT_EST_*`）；若 **`FlowNodes.tsx`** 卡片内边距/字体/可选字段显著变高或变矮，须在 **同一 MR** 内调整估算并在此处更新本条说明意图（避免再次出现结构性重叠）。
-  - **边线视觉**：初始布局以降低节点重叠为第一目标；多层边仍可共用出口点，但通过 **拉大列距与纵向间距** 减轻「糊成一束」的阅读问题。**并行边散开（必须）**：对同一 **`source/target/sourceHandle/targetHandle`** 出现 **≥ 2** 条自动连线时，`buildFlowGraph.ts` 在包装 `readableLabel` 前将它们转为 **`step` 路径**并按边 `id` 稳定排序对称分配 **`pathOptions.offset`**（相邻间距约 **14px**），使多条并排蓝线可区分；手写边不受影响。
+  - **边线视觉**：初始布局以降低节点重叠为第一目标；多层边仍可共用出口点，但通过 **拉大列距与纵向间距** 减轻「糊成一束」的阅读问题。**并行边散开（必须）**：对汇入同一目标端点的 **≥ 2** 条自动连线（按 **`target/targetHandle/sourceHandle`** 分组；含多 `istioDestination` → 同一 `service` 的场景），`buildFlowGraph.ts` 在包装 `readableLabel` 前将它们转为 **`step` 路径**并按边 `id` 稳定排序对称分配 **`pathOptions.offset`**（相邻间距约 **14px**），使多条并排蓝线可区分；手写边不受影响。
 - **文件名绑定**：导入文件后，Area 页眉必须展示来源文件名（不可出现“未绑定”状态）。
 - **Example 分层布局（必须）**：当导入的文件路径中存在 `01-*/02-*/03-*` 这样的 tier 目录时，Area 必须按层级固定到三列泳道：
   - `01-*`：最左列
@@ -241,7 +246,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
   - `Active01` 必须排在 `Active02` 上方（同一列内排序规则）
   - 页面与 Area 标题中展示“有效文件夹信息”时，不应把 `01/02/03` 这种数字前缀当作业务信息展示（可做成 Level 标识或隐藏前缀后的展示）
 - **可编辑性（必须）**：画布是“可操作的工作台”，不是只读报表。用户能通过拖拽与手写边对拓扑进行补全与整理。
-  - **Area 可拖拽**：`ingressRegion`（分区底板）必须可拖拽；拖拽分区会带动其下所有子节点一起移动（保持相对布局）。
+  - **Area 可拖拽 / 可调尺寸**：`ingressRegion`（分区底板）必须可拖拽；**选中后出现缩放手柄**，可拉宽拉高浅蓝底板。拖拽分区会带动其下所有子节点一起移动（保持相对布局）。
   - **节点可拖拽**：分区内所有业务节点（Ingress/VirtualService/Istio Gateway/HTTPProxy/Host/Route/Service/Endpoints/DestinationRule）必须可单独拖拽（允许用户整理布局、避免遮挡）。
   - **手写连线**：所有业务节点必须提供可见连接手柄（至少左右各一），允许用户在任意两节点之间手动拉线建立关联。
   - **手写边可持续**：解析刷新/重新构图后，只要两端节点仍存在，手写边必须保留（丢失会破坏用户工作成果）；若端点消失则对应手写边应自动剔除。
@@ -290,6 +295,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 - `ingress` → `IngressNode`
 - `host` → `HostNode`
 - `route` → `RouteNode`
+- `istioDestination` → `IstioDestinationNode`（仅当 VirtualService `route` 有多条 `destination` 时插入；**权重在 Route→Destination 连线上**）
 - `service` → `ServiceNode`
 - `endpoints` → `EndpointsNode`
 
@@ -312,6 +318,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 - Contour Gateway / HTTPProxy（Contour）：`#0f766e`
 - Host：`#7c3aed`
 - Route：`#6d28d9`
+- VirtualService Destination（中间节点）：`#0e7490`（`istioDestination`）
 - Service：`#4f46e5`
 - Endpoints：`#0d9488`
 
@@ -326,6 +333,8 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 - `Ingress/Contour Gateway/VirtualService → Host`：紫色 `#7c3aed`，加粗，可 animated，带箭头
 - `Host → Route`：紫色 `#7c3aed`，加粗，带箭头
 - `Route → Service`：靛蓝 `#4f46e5`，加粗，带箭头（端口 label 使用浅底色以便阅读）
+- **`Route → istioDestination`**：靛蓝 `#4f46e5`；**连线 label 仅展示权重**（如 `w=80`），不设子集 pill
+- **`istioDestination → Service`**：靛蓝 `#4f46e5`；label 含 **端口 + subset**（用于与并行边去重区分；权重不在此段重复）
 - `Service → Endpoints`：青绿 `#0d9488`，加粗，带箭头
 - `Service → Contour Gateway`（跨 Area）：深绿 `#0f766e`，**虚线**（dash），加粗，带箭头
 - **手写边（Manual Edge）**：灰色 `#475569`，**虚线**，带箭头，`edge.data.manual === true`
@@ -388,21 +397,26 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 
 以下数值为实现契约；改动时需同步更新本节：
 
-- `col`: **440**
+- `col`: **505**
 - `hostGap`: **220**
 - `routeGap`: **84**
 - `serviceGap`: **210**
-- `regionHeaderReserveY`: **156**（含分区页眉可选泳道一行；与 `web/src/buildGraph.ts` 一致）
+- `regionHeaderReserveY`: **162**（含分区页眉可选泳道一行；与 `web/src/buildGraph.ts` 一致）
 - `SWIMLANE_BAND_GAP`: **100**（同一 tier 列内 swimlane band 切换时的额外垂直间距）
 - `lanePitchX`: **round(col × 7.2) + areaGapX**（与代码一致；用于 Example tier 列距及 VS 竖列）
 - **VirtualService 竖列**：在 Example tier 画布上为第四列，分区锚点 **x = baseX + layoutOffsetX + 3 × lanePitchX**；与 **`layoutOffsetX`**（全局 Istio Gateway 预留列宽） additive
 - 分区排版：**一行最多 4 个 Area**（超出自动换行），行/列间距为常量（见代码：`areaGapX/areaGapY`）
-- 分区宽度：按内容 **动态扩展**（至少 `ingressBlockMinW`；按最右侧卡片估算宽度）
-- 横向列偏移（Ingress 锚点为 `blockX`）：
+- 分区宽高：按 **`max(布局游标 maxX/maxY, 子节点包围盒)` + 留白** **动态计算**（至少 `ingressBlockMinW` × `regionMinHeight`）；子节点脚印与 `Route` / `istioDestination` / `Service` / `DestinationRule` 等 **估宽估高规则** 与初次落点一致，避免长 VS、多 Route、DR 叠在 Service 下方时 **Area 过小**。
+- 横向列偏移（Ingress / 常规 VirtualService 单列 destination）：
   - Host：`leftPad + col * 1.12`
   - Route：`leftPad + col * 2.05`
-  - Service：`leftPad + col * 3.10`
+  - Service：`leftPad + col * 3.42`
   - Endpoints：`leftPad + col * 4.22`
+- **VirtualService 且存在拆分 `istioDestination`（多条 destination）**：**不再**仅用 `col * 系数` 放置中间列 —— Route 卡 `maxWidth`≈**352** 会吃掉列距。**Destination / Service / Endpoints** 按下式锚定（与代码常量一致）：`istioDestination.x = routeX + 352 + 182`；`service.x = istioDestination.x + 308 + 156`；Endpoints 再相对 Service 右缘留白 **88px**。
+- **Istio 多 destination 堆叠**：`LAYOUT_EST_ISTIO_DEST_H` **124**（下限；**长 FQDN / subset** 会加价），纵向间隙 `LAYOUT_ISTIO_DEST_STACK_GAP` **42**；Route **行间**额外间隙 `LAYOUT_ROUTE_STACK_GAP` **58**（见 `web/src/buildGraph.ts`）
+- **可读性与缩放**：画布区（`.flow-stage`）与左侧栏共用 **`--ui-scale`**；顶栏 **A+/A−** 可同时放大/缩小 YAML 与拓扑节点文字（默认约 **108%**，上限 **150%**，`localStorage`：`trv.ui.scale`）。
+- **VirtualService Route 行距**：在 `LAYOUT_EST_ROUTE_CARD_H` 基线之上，按 **path 行数（窄卡折行假设）/ queryParams / headers / 内嵌 Destinations** **动态估高**，避免长 Regex、多 header 卡片与下一行 Route 重叠。
+- **分区留白**：`regionPadBottom` **72**、`regionPadRight` **64**；**不再**使用过高的固定高度地板（旧 `620`），代之以 `regionMinHeight` 与内容包围盒。
 - 边类型：`smoothstep`
 
 ---

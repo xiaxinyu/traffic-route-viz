@@ -8,6 +8,7 @@ export type NodeTypeFilter =
   | "httpProxy"
   | "host"
   | "route"
+  | "istioDestination"
   | "service"
   | "destinationRule"
   | "endpoints";
@@ -20,6 +21,7 @@ export const NODE_TYPE_ORDER: NodeTypeFilter[] = [
   "httpProxy",
   "host",
   "route",
+  "istioDestination",
   "service",
   "destinationRule",
   "endpoints",
@@ -32,6 +34,7 @@ const NODE_TYPE_LABELS: Record<Exclude<NodeTypeFilter, "all">, string> = {
   httpProxy: "Contour Gateway",
   host: "Host",
   route: "Route",
+  istioDestination: "VS Destination",
   service: "Service",
   destinationRule: "DestinationRule",
   endpoints: "Endpoints",
@@ -51,6 +54,7 @@ export function buildGraphMetrics(nodes: Node[], edges: Edge[]) {
     httpProxy: 0,
     host: 0,
     route: 0,
+    istioDestination: 0,
     service: 0,
     destinationRule: 0,
     endpoints: 0,

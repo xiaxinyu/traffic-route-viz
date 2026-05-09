@@ -6,6 +6,7 @@ import {
   manualEdgeFromConnection,
   mergeComputedEdgesKeepingManual,
   mergeComputedEdgesKeepingManualWithNodeRemap,
+  mergeIngressRegionDimensionsFromPrevious,
   reconnectEdgeAsManual,
 } from "./diagramPersist";
 
@@ -137,5 +138,51 @@ describe("mergeComputedEdgesKeepingManualWithNodeRemap", () => {
     );
     expect(merged).toHaveLength(1);
     expect(merged[0]!.id).toBe("c-1");
+  });
+});
+
+describe("mergeIngressRegionDimensionsFromPrevious", () => {
+  it("keeps larger user-sized region when computed is smaller", () => {
+    const prev = [
+      {
+        id: "r1",
+        type: "ingressRegion",
+        data: { nodeKey: "region::ing-x" },
+        style: { width: 2400, height: 900 },
+      },
+    ] as any[];
+    const computed = [
+      {
+        id: "r1n",
+        type: "ingressRegion",
+        data: { nodeKey: "region::ing-x" },
+        style: { width: 1200, height: 500 },
+      },
+    ] as any[];
+
+    const out = mergeIngressRegionDimensionsFromPrevious(prev as any, computed as any);
+    expect(out[0]!.style).toMatchObject({ width: 2400, height: 900 });
+  });
+
+  it("grows when computed region is larger than previous", () => {
+    const prev = [
+      {
+        id: "r1",
+        type: "ingressRegion",
+        data: { nodeKey: "region::ing-x" },
+        style: { width: 800, height: 400 },
+      },
+    ] as any[];
+    const computed = [
+      {
+        id: "r1n",
+        type: "ingressRegion",
+        data: { nodeKey: "region::ing-x" },
+        style: { width: 1400, height: 700 },
+      },
+    ] as any[];
+
+    const out = mergeIngressRegionDimensionsFromPrevious(prev as any, computed as any);
+    expect(out[0]!.style).toMatchObject({ width: 1400, height: 700 });
   });
 });

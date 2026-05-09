@@ -30,6 +30,7 @@ import {
 import {
   manualEdgeFromConnection,
   mergeComputedEdgesKeepingManualWithNodeRemap,
+  mergeIngressRegionDimensionsFromPrevious,
   reconnectEdgeAsManual,
 } from "./diagramPersist";
 import {
@@ -46,6 +47,7 @@ import {
   HttpProxyNode,
   IngressNode,
   IngressRegionNode,
+  IstioDestinationNode,
   IstioGatewayNode,
   RouteNode,
   ServiceNode,
@@ -60,14 +62,16 @@ const nodeTypes = {
   host: HostNode,
   httpProxy: HttpProxyNode,
   route: RouteNode,
+  istioDestination: IstioDestinationNode,
   service: ServiceNode,
   endpoints: EndpointsNode,
 };
 
 const UI_SCALE_STORAGE_KEY = "trv.ui.scale";
 const UI_SCALE_MIN = 0.8;
-const UI_SCALE_MAX = 1.4;
+const UI_SCALE_MAX = 1.5;
 const UI_SCALE_STEP = 0.1;
+const UI_SCALE_DEFAULT = 1.08;
 
 const EDGE_LABELS_STORAGE_KEY = "trv.ui.edgeLabels";
 
@@ -78,12 +82,12 @@ function clampUiScale(v: number): number {
 function readUiScale(): number {
   try {
     const raw = localStorage.getItem(UI_SCALE_STORAGE_KEY);
-    if (!raw) return 1;
+    if (!raw) return UI_SCALE_DEFAULT;
     const v = Number(raw);
-    if (!Number.isFinite(v)) return 1;
+    if (!Number.isFinite(v)) return UI_SCALE_DEFAULT;
     return clampUiScale(v);
   } catch {
-    return 1;
+    return UI_SCALE_DEFAULT;
   }
 }
 
@@ -278,9 +282,12 @@ function AppInner() {
       const err = p.errors.length ? p.errors.join("\n") : null;
       setParsedMsg(err);
 
-      const { nodes: n, edges: e } = buildFlowGraph(p);
-      setNodes(n);
-      setEdges((prevEdges) => mergeComputedEdgesKeepingManualWithNodeRemap(prevEdges, nodes, e, n));
+      const { nodes: computedNodes, edges: e } = buildFlowGraph(p);
+      const mergedNodes = mergeIngressRegionDimensionsFromPrevious(nodes, computedNodes);
+      setNodes(mergedNodes);
+      setEdges((prevEdges) =>
+        mergeComputedEdgesKeepingManualWithNodeRemap(prevEdges, nodes, e, mergedNodes),
+      );
       setLastAppliedAt(Date.now());
     },
     [yamlText, importedFiles, setNodes, setEdges, nodes],
@@ -491,7 +498,7 @@ function AppInner() {
             <button
               type="button"
               className="btn-secondary"
-              onClick={() => fitView({ padding: 0.08, duration: 240 })}
+              onClick={() => fitView({ padding: 0.05, duration: 240 })}
               title="将拓扑重新适配到当前画布"
             >
               适配视图
@@ -501,17 +508,17 @@ function AppInner() {
               <button
                 type="button"
                 onClick={() => setUiScale((v) => clampUiScale(v - UI_SCALE_STEP))}
-                title="全局缩小"
+                title="缩小侧栏与拓扑（含文字）"
               >
                 A-
               </button>
-              <button type="button" onClick={() => setUiScale(1)} title="恢复 100%">
+              <button type="button" onClick={() => setUiScale(1)} title="将侧栏与拓扑缩放设为 100%">
                 {Math.round(uiScale * 100)}%
               </button>
               <button
                 type="button"
                 onClick={() => setUiScale((v) => clampUiScale(v + UI_SCALE_STEP))}
-                title="全局放大"
+                title="放大侧栏与拓扑（含文字）"
               >
                 A+
               </button>
@@ -805,7 +812,7 @@ function AppInner() {
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             onInit={(instance) => {
-              requestAnimationFrame(() => instance.fitView({ padding: 0.08 }));
+              requestAnimationFrame(() => instance.fitView({ padding: 0.05 }));
             }}
             minZoom={0.2}
             maxZoom={1.8}

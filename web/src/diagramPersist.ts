@@ -110,6 +110,50 @@ function readNodeKey(n: Node): string | null {
   return typeof key === "string" && key ? key : null;
 }
 
+function readStyleWH(style: unknown): { w: number; h: number } | null {
+  if (typeof style !== "object" || style === null) return null;
+  const s = style as { width?: unknown; height?: unknown };
+  const w = typeof s.width === "number" ? s.width : Number.parseFloat(String(s.width ?? ""));
+  const h = typeof s.height === "number" ? s.height : Number.parseFloat(String(s.height ?? ""));
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w < 80 || h < 80) return null;
+  return { w, h };
+}
+
+/**
+ * 保留用户在画布上拉大的分区（`ingressRegion`）宽/高；与重新构图后的尺寸取 **max**。
+ * 内容变矮/变窄时仍至少满足新拓扑的估算包围盒。
+ */
+export function mergeIngressRegionDimensionsFromPrevious(
+  prevNodes: Node[],
+  computedNodes: Node[],
+): Node[] {
+  const prevByKey = new Map<string, { w: number; h: number }>();
+  for (const n of prevNodes) {
+    if (n.type !== "ingressRegion") continue;
+    const key = readNodeKey(n);
+    const wh = readStyleWH(n.style);
+    if (key && wh) prevByKey.set(key, wh);
+  }
+  if (!prevByKey.size) return computedNodes;
+
+  return computedNodes.map((node) => {
+    if (node.type !== "ingressRegion") return node;
+    const key = readNodeKey(node);
+    if (!key) return node;
+    const kept = prevByKey.get(key);
+    const cur = readStyleWH(node.style);
+    if (!kept || !cur) return node;
+    return {
+      ...node,
+      style: {
+        ...(node.style ?? {}),
+        width: Math.max(kept.w, cur.w),
+        height: Math.max(kept.h, cur.h),
+      },
+    };
+  });
+}
+
 /**
  * 重新解析后保留手写边，并在节点 id 发生再生成时尝试按 `node.data.nodeKey` 重映射端点。
  *

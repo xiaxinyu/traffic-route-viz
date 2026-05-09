@@ -89,6 +89,7 @@ describe("label/time helpers", () => {
   it("returns friendly node type labels", () => {
     expect(nodeTypeLabel("all")).toBe("全部");
     expect(nodeTypeLabel("route")).toBe("Route");
+    expect(nodeTypeLabel("istioDestination")).toBe("VS Destination");
   });
 
   it("formats clock time as HH:mm:ss", () => {

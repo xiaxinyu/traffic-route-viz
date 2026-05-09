@@ -98,3 +98,32 @@ spec:
     });
   });
 });
+
+describe("parseK8sYaml DestinationRule", () => {
+  it("keeps multiple DestinationRules for the same service host", () => {
+    const DR_MULTI = `apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: dr-a
+  namespace: demo
+spec:
+  host: reviews.demo.svc.cluster.local
+  subsets:
+    - name: blue
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: dr-b
+  namespace: demo
+spec:
+  host: reviews.demo.svc.cluster.local
+  subsets:
+    - name: green
+`;
+    const r = parseK8sYaml(DR_MULTI, "dr.yaml");
+    expect(r.destinationRules).toHaveLength(2);
+    expect(r.destinationRules.map((d) => d.key).sort()).toEqual(["demo/dr-a", "demo/dr-b"]);
+    expect(r.destinationRules.every((d) => d.serviceKey === "demo/reviews")).toBe(true);
+  });
+});

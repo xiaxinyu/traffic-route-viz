@@ -1,6 +1,6 @@
 import { memo, type CSSProperties } from "react";
 import type { NodeProps } from "reactflow";
-import { Handle, Position } from "reactflow";
+import { Handle, NodeResizer, Position } from "reactflow";
 
 import type { IngressTlsEntry, IstioRouteDestination } from "./k8sParser";
 
@@ -20,6 +20,8 @@ export const NODE_COLOR_PALETTE = {
   destinationRule: "#be185d",
   endpoints: "#0d9488",
   istioGateway: "#0369a1",
+  /** VirtualService 多 destination 的中间节点（子集/host 展示，权重在连线） */
+  istioDestination: "#0e7490",
 } as const;
 
 export function accentForEntryKind(kind?: EntryKind): string {
@@ -30,10 +32,11 @@ export function accentForEntryKind(kind?: EntryKind): string {
 
 const cardStyle: CSSProperties = {
   borderRadius: 10,
-  padding: "10px 14px",
-  minWidth: 160,
+  padding: "11px 15px",
+  minWidth: 168,
   maxWidth: 300,
-  fontSize: 13,
+  fontSize: 14,
+  lineHeight: 1.38,
   border: "1px solid rgba(15,23,42,0.12)",
   background: "#fff",
   boxShadow: "0 2px 8px rgba(15,23,42,0.06)",
@@ -60,7 +63,7 @@ const pill = (bg: string, fg: string): CSSProperties => ({
   display: "inline-flex",
   alignItems: "center",
   gap: 6,
-  fontSize: 11,
+  fontSize: 12,
   fontWeight: 800,
   padding: "2px 8px",
   borderRadius: 999,
@@ -69,7 +72,7 @@ const pill = (bg: string, fg: string): CSSProperties => ({
 });
 
 const meta = (s: CSSProperties = {}): CSSProperties => ({
-  fontSize: 11,
+  fontSize: 12,
   color: "#64748b",
   marginTop: 2,
   wordBreak: "break-word",
@@ -93,6 +96,7 @@ const handle = (color: string, side: "left" | "right"): CSSProperties => ({
 
 /** 可拖拽的整块拓扑分区底板（Ingress 及以下子节点挂载在其下） */
 export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProps) {
+  const { selected } = props;
   const {
     partitionIndex,
     entryKind,
@@ -130,6 +134,7 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
   return (
     <div
       style={{
+        position: "relative",
         width: "100%",
         height: "100%",
         borderRadius: 16,
@@ -142,6 +147,14 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
         pointerEvents: "auto",
       }}
     >
+      <NodeResizer
+        isVisible={selected}
+        minWidth={320}
+        minHeight={260}
+        lineClassName="trv-region-resizer-line"
+        handleClassName="trv-region-resizer-handle"
+        color="#64748b"
+      />
       <div
         style={{
           flexShrink: 0,
@@ -152,17 +165,17 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
           userSelect: "none",
         }}
       >
-        <div style={{ fontSize: 12, fontWeight: 800, color: "#1e293b" }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: "#1e293b" }}>
           入口流量拓扑分区 · 第 {idx} 视图
         </div>
-        <div style={{ fontSize: 11, marginTop: 4, color: accent, fontWeight: 700 }}>
+        <div style={{ fontSize: 12, marginTop: 4, color: accent, fontWeight: 700 }}>
           {kindLabel2}：{ingressName ?? "—"}
         </div>
         {tierCode ? (
           <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8 }}>
             <span
               style={{
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: 800,
                 color: "#0f172a",
                 background: "rgba(15, 23, 42, 0.06)",
@@ -211,8 +224,8 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
         {hint ? (
           <div style={{ ...meta({ marginTop: 4 }), color: "#6b7280" }}>{hint}</div>
         ) : (
-          <div style={{ ...meta({ marginTop: 4 }), color: "#6b7280" }}>
-            拖拽本分区标题栏或空白底板可整体平移画布中的本组资源
+          <div style={{ ...meta({ marginTop: 4 }), fontSize: 11, color: "#6b7280" }}>
+            选中分区后拖动边缘/角点可调整 Area 大小；拖拽标题栏或底板可整体平移
           </div>
         )}
       </div>
@@ -324,7 +337,7 @@ export const HostNode = memo(function HostNode(props: NodeProps) {
           wordBreak: "break-all",
           fontWeight: 900,
           color: "#0f172a",
-          fontSize: 14,
+          fontSize: 15,
         }}
       >
         {label}
@@ -403,7 +416,7 @@ export const ServiceNode = memo(function ServiceNode(props: NodeProps) {
         </div>
       ) : null}
       {ports?.length ? (
-        <div style={{ fontSize: 11, marginTop: 4, color: "#475569" }}>
+        <div style={{ fontSize: 12, marginTop: 4, color: "#475569" }}>
           spec ports: {ports.map((p) => `${p.port}→${p.targetPort ?? "?"}`).join(", ")}
         </div>
       ) : null}
@@ -555,6 +568,61 @@ export const DestinationRuleNode = memo(function DestinationRuleNode(props: Node
   );
 });
 
+export const IstioDestinationNode = memo(function IstioDestinationNode(props: NodeProps) {
+  const { host, port, subset } = props.data as {
+    host?: string;
+    port?: number | string;
+    subset?: string;
+  };
+  const accent = NODE_COLOR_PALETTE.istioDestination;
+  return (
+    <div
+      style={{
+        ...cardStyle,
+        borderLeft: `5px solid ${accent}`,
+        padding: "9px 13px",
+        minWidth: 184,
+        maxWidth: 308,
+        background: "#ecfeff",
+      }}
+    >
+      <Handle type="target" position={Position.Left} id="t-left" style={handle(accent, "left")} />
+      <div style={titleRow()}>
+        <span style={iconDot(accent)} />
+        <span>Destination</span>
+        <span style={pill("#cffafe", "#0e7490")}>VirtualService</span>
+      </div>
+      <div
+        style={{
+          marginTop: 4,
+          wordBreak: "break-all",
+          fontWeight: 800,
+          fontSize: 13,
+          lineHeight: 1.4,
+          color: "#134e4a",
+        }}
+      >
+        {host ?? "?"}
+      </div>
+      <div style={{ ...meta({ marginTop: 2 }), fontWeight: 650 }}>
+        端口：<span style={{ color: "#0f172a" }}>:{String(port ?? "?")}</span>
+      </div>
+      {subset ? (
+        <div style={{ marginTop: 4 }}>
+          <span style={pill("#fce7f3", "#be185d")}>subset {subset}</span>
+        </div>
+      ) : null}
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="s-right"
+        style={handle(accent, "right")}
+      />
+      <Handle type="source" position={Position.Left} id="s-left" style={handle(accent, "left")} />
+    </div>
+  );
+});
+
 export const RouteNode = memo(function RouteNode(props: NodeProps) {
   const {
     path,
@@ -587,9 +655,9 @@ export const RouteNode = memo(function RouteNode(props: NodeProps) {
       style={{
         ...cardStyle,
         borderLeft: `5px solid ${accent}`,
-        padding: "8px 12px",
-        minWidth: 220,
-        maxWidth: 340,
+        padding: "10px 13px",
+        minWidth: 228,
+        maxWidth: 352,
         background: "#fff7ed",
       }}
     >
@@ -613,11 +681,15 @@ export const RouteNode = memo(function RouteNode(props: NodeProps) {
           name: {istioRouteName}
         </div>
       ) : null}
-      <div style={{ marginTop: 4, fontWeight: 800, color: "#0f172a" }}>{path ?? "/"}</div>
+      <div
+        style={{ marginTop: 4, fontWeight: 800, color: "#0f172a", fontSize: 13, lineHeight: 1.42 }}
+      >
+        {path ?? "/"}
+      </div>
       {ingressKind === "VirtualService" && istioQueryParams?.length ? (
         <div style={{ ...meta({ marginTop: 6 }), color: "#334155" }}>
           <div style={{ fontWeight: 900, marginBottom: 2 }}>queryParams</div>
-          <div style={{ fontSize: 11, fontWeight: 650 }}>
+          <div style={{ fontSize: 12, fontWeight: 650 }}>
             {istioQueryParams
               .map((q) => `${q.key}.${q.op}${q.value !== undefined ? `=${q.value}` : ""}`)
               .join(", ")}
@@ -629,7 +701,7 @@ export const RouteNode = memo(function RouteNode(props: NodeProps) {
       Object.keys(istioRequestHeadersSet).length ? (
         <div style={{ ...meta({ marginTop: 6 }), color: "#334155" }}>
           <div style={{ fontWeight: 900, marginBottom: 2 }}>headers.request.set</div>
-          <div style={{ fontSize: 11, fontWeight: 650 }}>
+          <div style={{ fontSize: 12, fontWeight: 650 }}>
             {Object.entries(istioRequestHeadersSet)
               .map(([k, v]) => `${k}=${v}`)
               .join(", ")}
@@ -643,7 +715,7 @@ export const RouteNode = memo(function RouteNode(props: NodeProps) {
             style={{
               margin: 0,
               paddingLeft: 16,
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 600,
               color: "#334155",
             }}
@@ -668,6 +740,10 @@ export const RouteNode = memo(function RouteNode(props: NodeProps) {
               </li>
             ))}
           </ul>
+        </div>
+      ) : ingressKind === "VirtualService" ? (
+        <div style={{ ...meta({ marginTop: 6 }), color: "#57534e", fontWeight: 600 }}>
+          多目标拆分为后继 <strong>Destination</strong> 节点；<strong>权重</strong>在连线上标注。
         </div>
       ) : (
         <div style={{ ...meta(), marginTop: 4, color: "#1d4ed8", fontWeight: 700 }}>

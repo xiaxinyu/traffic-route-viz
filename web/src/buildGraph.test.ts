@@ -204,14 +204,23 @@ describe("buildFlowGraph Istio global gateway + weighted routes", () => {
     );
     expect(gwToVs).toBeTruthy();
 
-    const weighted = edges.filter(
-      (e) =>
-        typeof e.label === "string" && e.label.includes("subset=blue") && e.label.includes("w=70"),
-    );
-    expect(weighted.length).toBeGreaterThanOrEqual(1);
+    const destNodes = nodes.filter((n) => n.type === "istioDestination");
+    expect(destNodes).toHaveLength(2);
+    expect(
+      edges.some(
+        (e) => typeof e.label === "string" && e.label === "w=70" && e.source.includes("route-"),
+      ),
+    ).toBe(true);
+    expect(
+      edges.some(
+        (e) => typeof e.label === "string" && e.label === "w=30" && e.source.includes("route-"),
+      ),
+    ).toBe(true);
     const greenEdge = edges.find(
       (e) =>
-        typeof e.label === "string" && e.label.includes("subset=green") && e.label.includes("w=30"),
+        typeof e.label === "string" &&
+        e.label.includes("subset=green") &&
+        e.source.includes("vsdest-"),
     );
     expect(greenEdge).toBeTruthy();
   });
@@ -239,27 +248,17 @@ describe("buildFlowGraph edge dedupe", () => {
 });
 
 describe("buildFlowGraph parallel Route→Service edges", () => {
-  it("fans out overlapping edges with symmetric step offsets", () => {
+  it("fans out overlapping edges with symmetric step offsets (via Destination→Service fan-in)", () => {
     const parsed = parseK8sYaml(VS_SAME_SVC_WEIGHTED, "istio/same-svc.yaml");
     const { nodes, edges } = buildFlowGraph(parsed);
 
-    const blue = edges.find(
-      (e) =>
-        typeof e.label === "string" && e.label.includes("subset=blue") && e.label.includes("w=80"),
-    );
-    const green = edges.find(
-      (e) =>
-        typeof e.label === "string" && e.label.includes("subset=green") && e.label.includes("w=20"),
-    );
-    expect(blue).toBeTruthy();
-    expect(green).toBeTruthy();
-    expect(blue!.source).toBe(green!.source);
-    expect(blue!.target).toBe(green!.target);
+    expect(nodes.filter((n) => n.type === "istioDestination")).toHaveLength(2);
+    expect(edges.some((e) => e.label === "w=80" && e.source.startsWith("route-"))).toBe(true);
+    expect(edges.some((e) => e.label === "w=20" && e.source.startsWith("route-"))).toBe(true);
 
     const parallel = edges.filter(
       (e) =>
-        e.source === blue!.source &&
-        e.target === blue!.target &&
+        e.source.startsWith("vsdest-") &&
         e.type === "readableLabel" &&
         (e.data as { baseType?: string })?.baseType === "step",
     );
@@ -270,12 +269,8 @@ describe("buildFlowGraph parallel Route→Service edges", () => {
       .sort((a, b) => a - b);
     expect(offsets).toEqual([-7, 7]);
 
-    const routeId = blue!.source;
-    const svcId = blue!.target;
-    const route = nodes.find((n) => n.id === routeId);
-    const svc = nodes.find((n) => n.id === svcId);
-    expect(route?.type).toBe("route");
-    expect(svc?.type).toBe("service");
+    const svcId = parallel[0]!.target;
+    expect(nodes.find((n) => n.id === svcId)?.type).toBe("service");
   });
 });
 
@@ -362,14 +357,17 @@ spec:
           weight: 50
 `;
     const parsed = parseK8sYaml(VS_DUP, "istio/vs-dup.yaml");
-    const { nodes } = buildFlowGraph(parsed);
+    const { nodes, edges } = buildFlowGraph(parsed);
 
     const routeNodes = nodes.filter(
       (n) =>
         n.type === "route" && n.data?.ingressKind === "VirtualService" && n.data?.path === "/api",
     );
     expect(routeNodes).toHaveLength(1);
-    expect(routeNodes[0]?.data?.istioDestinations?.length).toBe(2);
+    expect(routeNodes[0]?.data?.istioDestinations ?? []).toHaveLength(0);
+    expect(nodes.filter((n) => n.type === "istioDestination")).toHaveLength(2);
+    const routeId = routeNodes[0]!.id as string;
+    expect(edges.filter((e) => e.source === routeId && e.label === "w=50")).toHaveLength(2);
   });
 
   it("does NOT dedupe VirtualService routes that differ by queryParams or name", () => {

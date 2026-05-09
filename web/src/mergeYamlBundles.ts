@@ -98,6 +98,7 @@ export function mergeParseResults(results: ParseResult[]): ParseResult {
       } else {
         drByKey.set(d.key, {
           ...prev,
+          serviceKey: (prev as any).serviceKey ?? (d as any).serviceKey,
           host: prev.host ?? d.host,
           subsets: prev.subsets.length ? prev.subsets : d.subsets,
           sourceFiles: [...new Set([...(prev.sourceFiles ?? []), ...(d.sourceFiles ?? [])])],
@@ -110,11 +111,15 @@ export function mergeParseResults(results: ParseResult[]): ParseResult {
       if (!prev) {
         svcByKey.set(s.key, s);
       } else {
+        const mergedSubsets = [
+          ...new Set([...(prev.istioSubsets ?? []), ...(s.istioSubsets ?? [])]),
+        ];
         svcByKey.set(s.key, {
           ...prev,
           type: prev.type ?? s.type,
           clusterIP: prev.clusterIP ?? s.clusterIP,
           ports: prev.ports.length ? prev.ports : s.ports,
+          ...(mergedSubsets.length ? { istioSubsets: mergedSubsets } : {}),
           sourceFiles: [...new Set([...(prev.sourceFiles ?? []), ...(s.sourceFiles ?? [])])],
         });
       }

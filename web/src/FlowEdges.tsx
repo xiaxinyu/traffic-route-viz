@@ -54,7 +54,7 @@ export function ReadableLabelEdge(props: EdgeProps) {
             style={{
               position: "absolute",
               transform: `translate(-50%, -50%) translate(${labelX + dx}px, ${labelY + dy}px)`,
-              fontSize: 11,
+              fontSize: 12,
               lineHeight: 1,
               padding: "2px 6px",
               borderRadius: 8,
