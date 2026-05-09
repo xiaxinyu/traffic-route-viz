@@ -629,7 +629,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     const vsUsesSplitDestinationChain =
       !isContourGateway &&
       ing.kind === "VirtualService" &&
-      (isIstioOnlyBundle || ingressRoutes.some((rr) => (rr.istioDestinations?.length ?? 0) > 1));
+      (isIstioOnlyBundle || ingressRoutes.some((rr) => (rr.istioDestinations?.length ?? 0) > 0));
     const istioDestColXForSplitVs =
       routeColBaseX + LAYOUT_ROUTE_CARD_MAX_W + LAYOUT_GAP_ROUTE_TO_ISTIO_DEST_X;
     const serviceColX = isContourGateway
@@ -905,9 +905,11 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         let routeYCursor = hostY + LAYOUT_EST_HOST_CARD_H + LAYOUT_ROUTE_BELOW_HOST;
         hostRoutes.forEach((r, routeIdx) => {
           const routeY = routeYCursor;
-          const multiIstioDest =
-            r.ingressKind === "VirtualService" && (r.istioDestinations?.length ?? 0) > 1;
-          const routeCardH = routeBlockCardHeightEst(r, multiIstioDest);
+          const splitVsDestChain =
+            r.ingressKind === "VirtualService" &&
+            vsUsesSplitDestinationChain &&
+            (r.istioDestinations?.length ?? 0) > 0;
+          const routeCardH = routeBlockCardHeightEst(r, splitVsDestChain);
           const routeId = `route-${sanitizeId(iid)}-${sanitizeId(host)}-${sanitizeId(
             `${r.path}-${String(r.servicePort)}-${r.serviceName}`,
           )}-${routeIdx}`;
@@ -952,7 +954,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
               upstreamServiceName: r.upstreamServiceName,
               upstreamServicePort: r.upstreamServicePort,
               ingressKind: r.ingressKind,
-              istioDestinations: multiIstioDest ? undefined : r.istioDestinations,
+              istioDestinations: splitVsDestChain ? undefined : r.istioDestinations,
               istioRouteName: r.istioRouteName,
               istioQueryParams: r.istioQueryParams,
               istioRequestHeadersSet: r.istioRequestHeadersSet,
@@ -997,7 +999,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
             edgeIdx++;
           };
 
-          if (multiIstioDest && r.istioDestinations) {
+          if (splitVsDestChain && r.istioDestinations) {
             const dests = r.istioDestinations;
             maxX = Math.max(maxX, istioDestX + cardMaxW);
             let destStackCursorY = routeY;
