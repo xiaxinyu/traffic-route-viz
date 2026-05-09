@@ -595,7 +595,7 @@ function AppInner() {
                 aria-label="搜索节点"
               />
 
-              <div className="search-nav">
+              <div className="search-nav" aria-label="聚焦导航">
                 <button
                   type="button"
                   onClick={() => jumpToMatch(matchCursor - 1)}
@@ -623,7 +623,7 @@ function AppInner() {
 
               <button
                 type="button"
-                className="btn-primary"
+                className="btn-primary btn-icon"
                 onClick={() => applyYaml(mergedImportedText ?? yamlText)}
                 title="重新解析 YAML 并刷新拓扑"
                 aria-label="刷新"
@@ -633,7 +633,7 @@ function AppInner() {
 
               <button
                 type="button"
-                className="btn-secondary"
+                className="btn-secondary btn-icon fit"
                 onClick={() => fitView({ padding: 0.05, duration: 240 })}
                 title="将拓扑重新适配到当前画布"
                 aria-label="适配"
@@ -670,7 +670,9 @@ function AppInner() {
 
               <button
                 type="button"
-                className={statusOpen ? "btn-secondary btn-pill-active" : "btn-secondary"}
+                className={
+                  statusOpen ? "btn-secondary btn-icon metric btn-pill-active" : "btn-secondary btn-icon metric"
+                }
                 onClick={() => setStatusOpen((v) => !v)}
                 title={statusOpen ? "收起指标" : "展开指标"}
                 aria-label="指标"
@@ -681,7 +683,7 @@ function AppInner() {
               {getRuntimeConfig().auth?.enabled !== false ? (
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className="btn-secondary btn-icon"
                   onClick={() => {
                     clearSession();
                     window.location.reload();
@@ -692,26 +694,23 @@ function AppInner() {
                   <Icon d="M10 17l1.41-1.41L9.83 14H20v-2H9.83l1.58-1.59L10 9l-5 5 5 3zM4 5h8V3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8v-2H4V5z" />
                 </button>
               ) : null}
-            </div>
 
-            {statusOpen ? (
-              <div
-                className="header-status-strip header-status-strip-compact"
-                data-testid="top-status-strip"
-              >
-                <span className="status-pill">节点 {graphMetrics.nodeCount}</span>
-                <span className="status-pill">边 {graphMetrics.edgeCount}</span>
-                <span className="status-pill">自动 {graphMetrics.autoEdgeCount}</span>
-                <span className="status-pill">手写 {graphMetrics.manualEdgeCount}</span>
-                <span className="status-pill">
-                  已选 {selectionMetrics.selectedNodeCount}/{selectionMetrics.selectedEdgeCount}
-                </span>
-                <span className="status-pill">
-                  刷新 {formatClockTime(lastAppliedAt)}
-                  {parsedMsg ? "（告警）" : "（正常）"}
-                </span>
-              </div>
-            ) : null}
+              {statusOpen ? (
+                <div className="header-status-strip header-status-strip-compact" data-testid="top-status-strip">
+                  <span className="status-pill">节点 {graphMetrics.nodeCount}</span>
+                  <span className="status-pill">边 {graphMetrics.edgeCount}</span>
+                  <span className="status-pill">自动 {graphMetrics.autoEdgeCount}</span>
+                  <span className="status-pill">手写 {graphMetrics.manualEdgeCount}</span>
+                  <span className="status-pill">
+                    已选 {selectionMetrics.selectedNodeCount}/{selectionMetrics.selectedEdgeCount}
+                  </span>
+                  <span className="status-pill">
+                    刷新 {formatClockTime(lastAppliedAt)}
+                    {parsedMsg ? "（告警）" : "（正常）"}
+                  </span>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       </header>
