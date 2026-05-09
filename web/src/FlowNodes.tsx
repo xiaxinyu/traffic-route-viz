@@ -526,6 +526,16 @@ export const IstioGatewayNode = memo(function IstioGatewayNode(props: NodeProps)
   );
 });
 
+/** Invisible anchor node used to aggregate edges (e.g. Istio Gateway trunk). */
+export const JunctionNode = memo(function JunctionNode() {
+  return (
+    <div style={{ width: 1, height: 1, opacity: 0, pointerEvents: "none" }}>
+      <Handle type="target" position={Position.Left} id="t-left" style={{ opacity: 0 }} />
+      <Handle type="source" position={Position.Right} id="s-right" style={{ opacity: 0 }} />
+    </div>
+  );
+});
+
 export const DestinationRuleNode = memo(function DestinationRuleNode(props: NodeProps) {
   const { label, subtitle, host, subsets } = props.data as {
     label?: string;

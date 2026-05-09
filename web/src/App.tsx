@@ -49,6 +49,7 @@ import {
   IngressRegionNode,
   IstioDestinationNode,
   IstioGatewayNode,
+  JunctionNode,
   RouteNode,
   ServiceNode,
 } from "./FlowNodes";
@@ -58,6 +59,7 @@ const nodeTypes = {
   ingressRegion: IngressRegionNode,
   ingress: IngressNode,
   istioGateway: IstioGatewayNode,
+  junction: JunctionNode,
   destinationRule: DestinationRuleNode,
   host: HostNode,
   httpProxy: HttpProxyNode,

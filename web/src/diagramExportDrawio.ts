@@ -43,7 +43,7 @@ export function exportToDrawioXml(
   diagramName = "traffic-route-viz",
 ): string {
   const byId = new Map(nodes.map((n) => [n.id, n]));
-  const realNodes = nodes.filter((n) => n.type !== "ingressRegion");
+  const realNodes = nodes.filter((n) => n.type !== "ingressRegion" && n.type !== "junction");
   const realIds = new Set(realNodes.map((n) => n.id));
 
   // draw.io cell ids must be numeric-ish or unique strings. We'll prefix.

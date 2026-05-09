@@ -412,6 +412,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   >();
   const pendingServiceToGatewayEdges: { serviceKey: string; gatewayNodeId: string }[] = [];
   const ingressPartitionMeta = new Map<string, { tierIndex?: 1 | 2 | 3 }>();
+  const regionIdByIngressId = new Map<string, string>();
   /** Istio Gateway node id + owning VirtualService partition (for URI rule intersection checks). */
   const globalIstioGatewayTargetsByGatewayName = new Map<
     string,
@@ -588,6 +589,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         selectable: true,
         draggable: true,
       }) as unknown as number) - 1;
+    regionIdByIngressId.set(iid, regionId);
 
     // Ingress / VirtualService / Contour Gateway node (child of region — moves with partition drag)
     // For Contour Gateway areas we enforce a strict left-to-right reading chain:
@@ -668,19 +670,8 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         const dedupeKey = `${gid}>${iid}`;
         if (seenGlobalGwToVs.has(dedupeKey)) continue;
         seenGlobalGwToVs.add(dedupeKey);
-        edges.push({
-          id: `e-${gid}-${iid}-gw-${edgeIdx++}`,
-          source: gid,
-          target: iid,
-          sourceHandle: "s-right",
-          targetHandle: "t-left",
-          type: edgeType,
-          label: "Gateway",
-          style: { stroke: "#0ea5e9", strokeWidth: 2.25 },
-          markerEnd: arrow("#0ea5e9"),
-          labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
-          labelBgStyle: { fill: "#e0f2fe", fillOpacity: 0.92 },
-        });
+        // NOTE: we defer actual Gateway->VS edge creation until after we compute a shared "junction"
+        // point per global gateway. This makes the wiring look like a single trunk line visually.
       }
     }
 
@@ -1359,44 +1350,87 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     }
   }
 
-  // Reposition merged Istio Gateway nodes based on connected VirtualService regions:
+  // Reposition merged Istio Gateway nodes and aggregate their VS wiring:
   // - X: place right before the left-most connected VS region to avoid overly long edges
   // - Y: vertical center on the median of connected VS region centers
-  const childToParent = new Map<string, string>();
-  for (const n of nodes) {
-    if (n.parentNode && typeof n.parentNode === "string") {
-      childToParent.set(n.id, n.parentNode);
-    }
-  }
-
+  // - Edges: render as a single trunk line (Gateway -> Junction) + short branches (Junction -> VS)
   for (const gwWire of sortedGlobalGwWireNames) {
     const gid = globalIstioGatewayNodeIdByWireName.get(gwWire);
     if (!gid) continue;
+
+    const targets = globalIstioGatewayTargetsByGatewayName.get(gwWire) ?? [];
     const centers: number[] = [];
     const xs: number[] = [];
-    for (const e of edges) {
-      if (e.source !== gid || e.label !== "Gateway") continue;
-      const rid = childToParent.get(e.target);
-      if (!rid) continue;
-      const rn = nodes.find((x) => x.id === rid);
+    const vsIds: string[] = [];
+
+    for (const t of targets) {
+      const vsId = t.vsPartitionId;
+      const regionId = regionIdByIngressId.get(vsId);
+      const rn = regionId ? nodes.find((x) => x.id === regionId) : undefined;
       if (!rn || rn.type !== "ingressRegion") continue;
       const py = rn.position?.y ?? 0;
       const rh = Number((rn.style as { height?: number })?.height ?? 760);
       centers.push(py + rh / 2);
       xs.push(rn.position?.x ?? baseX + layoutOffsetX);
+      vsIds.push(vsId);
     }
+
     if (!centers.length) continue;
     const midY = medianOf(centers, baseY);
     const minX = Math.min(...xs);
+
     const gwNode = nodes.find((n) => n.id === gid);
+    const gwCardW = 300;
+    const gap = 90;
+    const gx = Math.max(baseX, minX - (gwCardW + gap));
     if (gwNode) {
-      const gwCardW = 300;
-      const gap = 90;
-      const gx = Math.max(baseX, minX - (gwCardW + gap));
       gwNode.position = {
         x: gx,
         y: midY - LAYOUT_EST_ISTIO_GW_H / 2,
       };
+    }
+
+    // Junction node: invisible anchor where branches start (looks like one line).
+    const junctionId = `istio-gw-junction-${sanitizeId(gwWire)}`;
+    const jxMin = minX - 60;
+    const jx = Math.max(gx + gwCardW + 60, jxMin);
+    nodes.push({
+      id: junctionId,
+      type: "junction",
+      position: { x: jx, y: midY },
+      data: { nodeKey: nodeKey("junction", "istioGateway", gwWire) },
+      selectable: false,
+      draggable: false,
+    });
+
+    // Trunk: Gateway -> Junction (single edge)
+    edges.push({
+      id: `e-${gid}-${junctionId}-gw-trunk-${edgeIdx++}`,
+      source: gid,
+      target: junctionId,
+      sourceHandle: "s-right",
+      targetHandle: "t-left",
+      type: edgeType,
+      label: "Gateway",
+      style: { stroke: "#0ea5e9", strokeWidth: 2.25 },
+      markerEnd: arrow("#0ea5e9"),
+      labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
+      labelBgStyle: { fill: "#e0f2fe", fillOpacity: 0.92 },
+    });
+
+    // Branches: Junction -> VS (no label)
+    const uniqVs = [...new Set(vsIds)].sort();
+    for (const vsId of uniqVs) {
+      edges.push({
+        id: `e-${junctionId}-${vsId}-gw-branch-${edgeIdx++}`,
+        source: junctionId,
+        target: vsId,
+        sourceHandle: "s-right",
+        targetHandle: "t-left",
+        type: edgeType,
+        style: { stroke: "#0ea5e9", strokeWidth: 2.0, strokeDasharray: "6 4" },
+        markerEnd: arrow("#0ea5e9"),
+      });
     }
   }
 

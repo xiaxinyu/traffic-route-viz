@@ -22,7 +22,7 @@ function nodeLabel(n: Node): string {
  * - Region panels are omitted as nodes; edges are preserved.
  */
 export function exportToMermaid(nodes: Node[], edges: Edge[]): string {
-  const realNodes = nodes.filter((n) => n.type !== "ingressRegion");
+  const realNodes = nodes.filter((n) => n.type !== "ingressRegion" && n.type !== "junction");
   const nodeIds = new Set(realNodes.map((n) => n.id));
   const idMap = new Map<string, string>();
   for (const n of realNodes) idMap.set(n.id, safeId(n.id));

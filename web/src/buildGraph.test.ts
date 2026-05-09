@@ -199,10 +199,16 @@ describe("buildFlowGraph Istio global gateway + weighted routes", () => {
     const vsEntry = nodes.find((n) => n.type === "ingress" && n.data?.label === "vs-app");
     expect(vsEntry).toBeTruthy();
 
-    const gwToVs = edges.find(
-      (e) => e.source === globalGw!.id && e.target === vsEntry!.id && e.label === "Gateway",
+    const junction = nodes.find(
+      (n) => n.type === "junction" && n.id.startsWith("istio-gw-junction-"),
     );
-    expect(gwToVs).toBeTruthy();
+    expect(junction).toBeTruthy();
+    const gwToJunction = edges.find(
+      (e) => e.source === globalGw!.id && e.target === junction!.id && e.label === "Gateway",
+    );
+    expect(gwToJunction).toBeTruthy();
+    const branchToVs = edges.find((e) => e.source === junction!.id && e.target === vsEntry!.id);
+    expect(branchToVs).toBeTruthy();
 
     const destNodes = nodes.filter((n) => n.type === "istioDestination");
     expect(destNodes).toHaveLength(2);
@@ -240,9 +246,7 @@ describe("buildFlowGraph edge dedupe", () => {
     expect(globalGw).toBeTruthy();
     expect(vsEntry).toBeTruthy();
 
-    const gwEdges = edges.filter(
-      (e) => e.source === globalGw!.id && e.target === vsEntry!.id && e.label === "Gateway",
-    );
+    const gwEdges = edges.filter((e) => e.source === globalGw!.id && e.label === "Gateway");
     expect(gwEdges).toHaveLength(1);
   });
 });
@@ -320,7 +324,13 @@ describe("buildFlowGraph VirtualService column + gateway vertical center", () =>
     const gwCenterY = (globalGw!.position?.y ?? 0) + LAYOUT_EST_ISTIO_GW_H / 2;
     expect(Math.abs(gwCenterY - midY)).toBeLessThan(1.5);
 
-    expect(edges.filter((e) => e.source === globalGw!.id && e.label === "Gateway").length).toBe(2);
+    // Aggregated wiring: 1 trunk (gw->junction) + 2 branch edges (junction->vs)
+    const junction = nodes.find(
+      (n) => n.type === "junction" && n.id.startsWith("istio-gw-junction-"),
+    );
+    expect(junction).toBeTruthy();
+    expect(edges.filter((e) => e.source === globalGw!.id && e.label === "Gateway").length).toBe(1);
+    expect(edges.filter((e) => e.source === junction!.id).length).toBe(2);
   });
 
   it("dedupes identical VirtualService host+path routes into a single Route node", () => {
