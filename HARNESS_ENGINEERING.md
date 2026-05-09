@@ -63,6 +63,7 @@
 
 - 允许直接粘贴/编辑 YAML
 - 点击“解析并刷新图表”后更新画布
+- YAML 编辑区提供一级操作入口：文本统计（行数 / 文档数 / 字符数）、就地解析刷新、清空编辑、恢复示例、放大查看；空内容时解析刷新不可触发。
 
 ### 登录与发布（必须）
 
@@ -281,13 +282,14 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 
 - 左侧：YAML 输入/导入
 - 右侧：React Flow 画布（点阵背景、Controls、MiniMap、右上工具条）
+- 右上工具条必须把高频动作作为一级按钮展示，不依赖折叠菜单：边标签开关、适配视图、导出 PNG、导出 Mermaid、导出 draw.io、保存/打开画图文件、删除选中连线/元素，并显示当前选中节点/边数量。
 
 ### 7.2 React Flow 宿主约束（必须）
 
 - 首次适配：`onInit` + `fitView`（padding 按实现），**不做**常驻自动 fit（避免打断用户）
 - 缩放范围：`minZoom ≈ 0.2`，`maxZoom ≈ 1.8`
 - 背景：点阵 `Background`（`gap ≈ 14`）
-- 控件：Controls、MiniMap、右上 Panel（PNG/保存/打开）
+- 控件：Controls、MiniMap、右上 Panel（一级画布工具条：PNG/Mermaid/draw.io 导出、保存/打开、删除选中、边标签开关、适配视图）
 - 画布平移/缩放：React Flow 默认交互可用
 
 ### 7.3 节点类型映射（`nodeTypes`）
@@ -376,7 +378,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 
 ### 7.7 PNG 导出（必须）
 
-- 右上提供“导出 PNG”
+- 右上一级工具条提供“导出 PNG”
 - PNG 中排除：右上工具条、Controls、MiniMap、attribution
 - 失败要有用户可读提示
 

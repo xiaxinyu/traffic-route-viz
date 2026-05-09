@@ -29,10 +29,12 @@ test("smoke: loads app and can refresh topology", async ({ page }) => {
   await page.getByRole("button", { name: "刷新拓扑" }).click();
   await expect(page.locator(".react-flow").first()).toBeVisible();
 
-  await page.getByTestId("diagram-actions-toggle").click();
+  await expect(page.getByTestId("diagram-toolbar")).toBeVisible();
   await expect(page.getByTestId("export-png")).toBeVisible();
   await expect(page.getByTestId("save-diagram")).toBeVisible();
   await expect(page.getByTestId("delete-selected-edges")).toBeVisible();
+  await expect(page.getByTestId("open-diagram")).toBeVisible();
+  await expect(page.getByTestId("diagram-selection-count")).toContainText("已选 0 节点 / 0 边");
 });
 
 test("yaml popout: open edit close syncs content", async ({ page }) => {
@@ -53,4 +55,20 @@ test("yaml popout: open edit close syncs content", async ({ page }) => {
   await expect(page.getByTestId("yaml-popout")).toHaveCount(0);
 
   await expect(page.getByTestId("yaml-textarea")).toContainText(marker);
+});
+
+test("yaml editor: inline actions expose parse clear and restore", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByText("Traffic Route Viz")).toBeVisible({ timeout: 20_000 });
+
+  await page.getByRole("button", { name: "YAML", exact: true }).first().click();
+  await expect(page.getByTestId("yaml-editor-stats")).toContainText("文档");
+
+  await page.getByTestId("yaml-clear").click();
+  await expect(page.getByTestId("yaml-textarea")).toHaveValue("");
+  await expect(page.getByTestId("yaml-inline-refresh")).toBeDisabled();
+
+  await page.getByTestId("yaml-restore-sample").click();
+  await expect(page.getByTestId("yaml-textarea")).toContainText("kind: Ingress");
+  await expect(page.getByTestId("yaml-inline-refresh")).toBeEnabled();
 });

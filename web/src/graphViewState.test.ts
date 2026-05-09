@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { Edge, Node } from "reactflow";
 
 import {
+  applyCanvasSelection,
   buildGraphMetrics,
   buildGraphPresentation,
+  buildSelectionMetrics,
+  buildYamlTextStats,
   formatClockTime,
   nodeTypeLabel,
 } from "./graphViewState";
@@ -36,6 +39,72 @@ describe("buildGraphMetrics", () => {
     expect(metrics.autoEdgeCount).toBe(1);
     expect(metrics.typeCounts.ingress).toBe(1);
     expect(metrics.typeCounts.service).toBe(2);
+  });
+});
+
+describe("buildSelectionMetrics", () => {
+  it("counts selected nodes and edges", () => {
+    const nodes: Node[] = [
+      { ...node("n-1", "ingress", {}), selected: true },
+      node("n-2", "service", {}),
+    ];
+    const edges: Edge[] = [
+      { id: "e-1", source: "n-1", target: "n-2", selected: true },
+      { id: "e-2", source: "n-2", target: "n-1" },
+    ];
+
+    expect(buildSelectionMetrics(nodes, edges)).toEqual({
+      selectedNodeCount: 1,
+      selectedEdgeCount: 1,
+    });
+  });
+});
+
+describe("buildYamlTextStats", () => {
+  it("counts lines, characters and YAML documents", () => {
+    const text = "apiVersion: v1\nkind: Service\n---\napiVersion: v1\nkind: Endpoints\n";
+
+    expect(buildYamlTextStats(text)).toEqual({
+      lineCount: 6,
+      characterCount: text.length,
+      documentCount: 2,
+      hasContent: true,
+    });
+  });
+
+  it("treats whitespace-only YAML as empty", () => {
+    expect(buildYamlTextStats(" \n ")).toEqual({
+      lineCount: 2,
+      characterCount: 3,
+      documentCount: 0,
+      hasContent: false,
+    });
+  });
+});
+
+describe("applyCanvasSelection", () => {
+  it("selects one item and clears the rest", () => {
+    const out = applyCanvasSelection([{ id: "a", selected: true }, { id: "b" }], "b", false);
+
+    expect(out.map((x) => x.selected === true)).toEqual([false, true]);
+  });
+
+  it("toggles selected item in additive mode", () => {
+    const out = applyCanvasSelection(
+      [
+        { id: "a", selected: true },
+        { id: "b", selected: true },
+      ],
+      "b",
+      true,
+    );
+
+    expect(out.map((x) => x.selected === true)).toEqual([true, false]);
+  });
+
+  it("clears all items when selected id is null", () => {
+    const out = applyCanvasSelection([{ id: "a", selected: true }], null, false);
+    expect(out[0].selected).toBe(false);
   });
 });
 

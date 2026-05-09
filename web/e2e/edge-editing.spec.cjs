@@ -17,8 +17,8 @@ test("edge editing: auto edge can be selected and deleted", async ({ page }) => 
   await expect(page.locator(".react-flow").first()).toBeVisible();
 
   // Regression guard: global UI scale should not break edge SVG layer visibility/interactions.
-  await page.getByTitle("全局缩小").click();
-  await page.getByTitle("全局放大").click();
+  await page.getByTitle("缩小侧栏与拓扑（含文字）").click();
+  await page.getByTitle("放大侧栏与拓扑（含文字）").click();
 
   const edges = page.locator(".react-flow__edge");
   const before = await edges.count();
@@ -39,15 +39,27 @@ test("element editing: selected node can be deleted from toolbar", async ({ page
   await page.getByRole("button", { name: "刷新拓扑" }).click();
   await expect(page.locator(".react-flow").first()).toBeVisible();
 
-  // Open toolbar first so clicking it doesn't clear selection.
-  await page.getByTestId("diagram-actions-toggle").click();
+  // Toolbar actions are first-level controls and should be visible without expanding a menu.
   await expect(page.getByTestId("delete-selected-elements")).toBeVisible();
 
-  const nodeLocator = page.locator(".react-flow__node:not(.parent)").first();
-  const before = await page.locator(".react-flow__node:not(.parent)").count();
+  const allNodes = page.locator(".react-flow__node:not(.parent)");
+  const before = await allNodes.count();
   expect(before).toBeGreaterThan(0);
-  await nodeLocator.click({ force: true });
+
+  let nodeLocator = null;
+  for (let i = 0; i < before; i += 1) {
+    const candidate = allNodes.nth(i);
+    const box = await candidate.boundingBox();
+    if (box && box.x > 420 && box.y > 130) {
+      nodeLocator = candidate;
+      break;
+    }
+  }
+  if (!nodeLocator) throw new Error("No clickable graph node found in the visible canvas area");
+
+  await nodeLocator.click();
   await expect(nodeLocator).toHaveClass(/selected/);
+  await expect(page.getByTestId("diagram-selection-count")).toContainText("已选 1 节点");
   await page.getByTestId("delete-selected-elements").click();
 
   await expect

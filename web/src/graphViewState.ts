@@ -75,6 +75,53 @@ export function buildGraphMetrics(nodes: Node[], edges: Edge[]) {
   };
 }
 
+export function buildSelectionMetrics(nodes: Node[], edges: Edge[]) {
+  return {
+    selectedNodeCount: nodes.filter((n) => n.selected).length,
+    selectedEdgeCount: edges.filter((e) => e.selected).length,
+  };
+}
+
+export function buildYamlTextStats(text: string) {
+  const normalized = text.replace(/\r\n?/g, "\n");
+  const trimmed = normalized.trim();
+  const documentCount = trimmed
+    ? normalized
+        .split(/^---\s*$/m)
+        .map((part) => part.trim())
+        .filter(Boolean).length
+    : 0;
+
+  return {
+    lineCount: normalized ? normalized.split("\n").length : 0,
+    characterCount: text.length,
+    documentCount,
+    hasContent: trimmed.length > 0,
+  };
+}
+
+export function applyCanvasSelection<T extends { id: string; selected?: boolean }>(
+  items: T[],
+  selectedId: string | null,
+  additive: boolean,
+): T[] {
+  return items.map((item) => {
+    const currentlySelected = item.selected === true;
+    const nextSelected =
+      selectedId === null
+        ? false
+        : item.id === selectedId
+          ? additive
+            ? !currentlySelected
+            : true
+          : additive
+            ? currentlySelected
+            : false;
+
+    return currentlySelected === nextSelected ? item : { ...item, selected: nextSelected };
+  });
+}
+
 export type GraphViewOptions = {
   query: string;
   typeFilter: NodeTypeFilter;
