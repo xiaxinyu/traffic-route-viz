@@ -80,9 +80,9 @@ body {
 
 .header-right {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -101,10 +101,22 @@ body {
 
 .header-main-controls {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
   align-items: center;
   justify-content: flex-end;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.header-main-controls::-webkit-scrollbar {
+  height: 6px;
+}
+
+.header-main-controls::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 999px;
 }
 
 .search-input {
@@ -132,6 +144,7 @@ body {
   border-radius: 12px;
   border: 1px solid var(--line);
   background: var(--surface);
+  flex-shrink: 0;
 }
 
 .search-nav button {
@@ -224,6 +237,42 @@ body {
   border: 1px solid rgba(220, 38, 38, 0.25);
   background: #fff1f2;
   color: var(--warn);
+}
+
+.btn-icon {
+  padding: 8px 10px;
+}
+
+.btn-icon.btn-primary {
+  background: var(--brand);
+}
+
+.btn-icon.btn-secondary {
+  background: #fff;
+}
+
+.btn-icon.btn-secondary.nav {
+  color: #6d28d9;
+  border-color: rgba(109, 40, 217, 0.22);
+  background: rgba(109, 40, 217, 0.06);
+}
+
+.btn-icon.btn-secondary.fit {
+  color: #1d4ed8;
+  border-color: rgba(29, 78, 216, 0.22);
+  background: rgba(29, 78, 216, 0.06);
+}
+
+.btn-icon.btn-secondary.zoom {
+  color: #0f172a;
+  border-color: rgba(15, 23, 42, 0.14);
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.btn-icon.btn-secondary.metric {
+  color: #0f766e;
+  border-color: rgba(15, 118, 110, 0.26);
+  background: rgba(15, 118, 110, 0.08);
 }
 
 .header-status-strip {
