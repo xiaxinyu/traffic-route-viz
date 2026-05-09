@@ -6,7 +6,6 @@ import {
   type SetStateAction,
   useCallback,
   useRef,
-  useState,
 } from "react";
 import { Panel, useReactFlow } from "reactflow";
 import type { Edge, Node } from "reactflow";
@@ -68,16 +67,6 @@ function downloadText(filename: string, content: string, mime = "text/plain;char
   }, 250);
 }
 
-const btnCompact: CSSProperties = {
-  ...btnPrimary,
-  padding: "8px 10px",
-  borderRadius: 999,
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 8,
-  boxShadow: "0 2px 12px rgba(15,23,42,0.10)",
-};
-
 function parseBannerForYaml(yt: string, files: ImportedYamlFile[] | null): string | null {
   const p = files?.length
     ? mergeParseResults(files.map((f) => parseK8sYaml(f.text, f.name)))
@@ -103,9 +92,12 @@ export function DiagramActions(props: Props) {
     setEdgeLabelsEnabled,
   } = props;
 
-  const { getViewport, setViewport } = useReactFlow();
+  const { fitView, getViewport, setViewport } = useReactFlow();
   const loadInputRef = useRef<HTMLInputElement | null>(null);
-  const [open, setOpen] = useState(false);
+  const selectedNodeCount = nodes.filter((n) => n.selected).length;
+  const selectedEdgeCount = edges.filter((e) => e.selected).length;
+  const hasSelectedEdges = selectedEdgeCount > 0;
+  const hasSelectedElements = selectedNodeCount > 0 || selectedEdgeCount > 0;
 
   const onSaveDiagramJson = useCallback(() => {
     const vp = getViewport();
@@ -215,168 +207,123 @@ export function DiagramActions(props: Props) {
   const onDeleteSelectedElements = useCallback(() => {
     setNodes((prevNodes) => {
       const selectedNodeIds = new Set(prevNodes.filter((n) => n.selected).map((n) => n.id));
-      if (!selectedNodeIds.size) return prevNodes;
       setEdges((prevEdges) =>
         prevEdges.filter(
           (e) => !e.selected && !selectedNodeIds.has(e.source) && !selectedNodeIds.has(e.target),
         ),
       );
+      if (!selectedNodeIds.size) return prevNodes;
       return prevNodes.filter((n) => !selectedNodeIds.has(n.id));
     });
   }, [setEdges, setNodes]);
 
   return (
-    <Panel position="top-right" style={{ marginRight: 8, marginTop: 8 }}>
+    <Panel
+      position="top-right"
+      style={{ marginRight: 8, marginTop: 8, maxWidth: "min(720px, 72vw)" }}
+    >
       <div
         data-save-png-hide="true"
         data-testid="diagram-toolbar"
         className="diagram-toolbar-panel"
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 6,
-          padding: open ? "8px 10px" : 0,
-          background: open ? "rgba(255,255,255,0.96)" : "transparent",
-          borderRadius: open ? 12 : 999,
-          border: open ? "1px solid #dbe4ea" : "none",
-          boxShadow: open ? "0 2px 12px rgba(15,23,42,0.08)" : "none",
-          minWidth: open ? 156 : undefined,
-          fontFamily: '"Avenir Next", "Segoe UI", "PingFang SC", sans-serif',
-        }}
       >
-        <button
-          type="button"
-          style={btnCompact}
-          onClick={() => setOpen((v) => !v)}
-          data-testid="diagram-actions-toggle"
-          aria-expanded={open}
-          title="画布操作"
-        >
-          <span style={{ fontWeight: 800 }}>操作</span>
-          <span style={{ opacity: 0.9, fontWeight: 900 }}>{open ? "×" : "⋯"}</span>
-        </button>
+        <div className="diagram-toolbar-head">
+          <span>画布工具</span>
+          <span data-testid="diagram-selection-count">
+            已选 {selectedNodeCount} 节点 / {selectedEdgeCount} 边
+          </span>
+        </div>
 
-        {open ? (
-          <>
-            <div
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                color: "#4b5563",
-                letterSpacing: 0.3,
-                marginTop: 2,
-              }}
-            >
-              画布工具
-            </div>
-
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 12,
-                color: "#334155",
-                padding: "4px 2px",
-                userSelect: "none",
-              }}
-            >
-              <input
-                data-testid="toggle-edge-labels"
-                type="checkbox"
-                checked={edgeLabelsEnabled}
-                onChange={(e) => setEdgeLabelsEnabled(e.target.checked)}
-              />
-              显示边标签
-            </label>
-
-            <button
-              type="button"
-              style={btnPrimary}
-              onClick={async () => {
-                await onExportPng();
-                setOpen(false);
-              }}
-              data-testid="export-png"
-            >
-              导出 PNG
-            </button>
-            <button
-              type="button"
-              style={btnGhost}
-              onClick={() => {
-                onExportMermaid();
-                setOpen(false);
-              }}
-              data-testid="export-mermaid"
-            >
-              导出 Mermaid
-            </button>
-            <button
-              type="button"
-              style={btnGhost}
-              onClick={() => {
-                onExportDrawio();
-                setOpen(false);
-              }}
-              data-testid="export-drawio"
-            >
-              导出 draw.io
-            </button>
-            <button
-              type="button"
-              style={btnGhost}
-              onClick={() => {
-                onSaveDiagramJson();
-                setOpen(false);
-              }}
-              data-testid="save-diagram"
-            >
-              保存画图文件
-            </button>
-            <button
-              type="button"
-              style={btnGhost}
-              onClick={() => {
-                onDeleteSelectedEdges();
-              }}
-              data-testid="delete-selected-edges"
-              title="先点击选中连线，再点此按钮删除；也支持键盘 Delete/Backspace"
-            >
-              删除选中连线
-            </button>
-            <button
-              type="button"
-              style={btnGhost}
-              onClick={() => {
-                onDeleteSelectedElements();
-              }}
-              data-testid="delete-selected-elements"
-              title="删除当前选中的节点与连线（同时会清理其关联边）"
-            >
-              删除选中元素
-            </button>
-            <button
-              type="button"
-              style={btnGhost}
-              onClick={() => loadInputRef.current?.click()}
-              data-testid="open-diagram"
-            >
-              打开画图文件…
-            </button>
+        <div className="diagram-toolbar-row">
+          <label className="diagram-toolbar-check">
             <input
-              ref={loadInputRef}
-              type="file"
-              accept=".traffic-viz.json,application/json,.json"
-              style={{ display: "none" }}
-              onChange={onDiagramFileChosen}
+              data-testid="toggle-edge-labels"
+              type="checkbox"
+              checked={edgeLabelsEnabled}
+              onChange={(e) => setEdgeLabelsEnabled(e.target.checked)}
             />
-            <div style={{ fontSize: 10, color: "#94a3b8", lineHeight: 1.35 }}>
-              画图文件（React Flow JSON）：可用 VS Code/Cursor 打开；可导出 Mermaid / draw.io
-              供第三方工具打开。
-            </div>
-          </>
-        ) : null}
+            边标签
+          </label>
+
+          <button
+            type="button"
+            style={btnGhost}
+            onClick={() => fitView({ padding: 0.05, duration: 240 })}
+            data-testid="canvas-fit-view"
+          >
+            适配视图
+          </button>
+          <button type="button" style={btnPrimary} onClick={onExportPng} data-testid="export-png">
+            导出 PNG
+          </button>
+          <button
+            type="button"
+            style={btnGhost}
+            onClick={onExportMermaid}
+            data-testid="export-mermaid"
+          >
+            Mermaid
+          </button>
+          <button
+            type="button"
+            style={btnGhost}
+            onClick={onExportDrawio}
+            data-testid="export-drawio"
+          >
+            draw.io
+          </button>
+          <button
+            type="button"
+            style={btnGhost}
+            onClick={onSaveDiagramJson}
+            data-testid="save-diagram"
+          >
+            保存画图
+          </button>
+          <button
+            type="button"
+            style={{
+              ...btnGhost,
+              cursor: hasSelectedEdges ? "pointer" : "not-allowed",
+              opacity: hasSelectedEdges ? 1 : 0.55,
+            }}
+            onClick={onDeleteSelectedEdges}
+            data-testid="delete-selected-edges"
+            disabled={!hasSelectedEdges}
+            title="删除当前选中的连线；也支持键盘 Delete/Backspace"
+          >
+            删除连线
+          </button>
+          <button
+            type="button"
+            style={{
+              ...btnGhost,
+              cursor: hasSelectedElements ? "pointer" : "not-allowed",
+              opacity: hasSelectedElements ? 1 : 0.55,
+            }}
+            onClick={onDeleteSelectedElements}
+            data-testid="delete-selected-elements"
+            disabled={!hasSelectedElements}
+            title="删除当前选中的节点与连线（同时会清理其关联边）"
+          >
+            删除元素
+          </button>
+          <button
+            type="button"
+            style={btnGhost}
+            onClick={() => loadInputRef.current?.click()}
+            data-testid="open-diagram"
+          >
+            打开画图
+          </button>
+        </div>
+        <input
+          ref={loadInputRef}
+          type="file"
+          accept=".traffic-viz.json,application/json,.json"
+          style={{ display: "none" }}
+          onChange={onDiagramFileChosen}
+        />
       </div>
     </Panel>
   );

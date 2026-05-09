@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type MouseEvent as ReactMouseEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import ReactFlow, {
   Background,
   ConnectionMode,
@@ -12,6 +19,7 @@ import ReactFlow, {
   type Connection,
   type Edge,
   type EdgeChange,
+  type Node as FlowNode,
 } from "reactflow";
 import "reactflow/dist/style.css";
 
@@ -20,8 +28,11 @@ import { DiagramActions } from "./DiagramActions";
 import { buildFlowGraph } from "./buildGraph";
 import { edgeTypes } from "./FlowEdges";
 import {
+  applyCanvasSelection,
   buildGraphMetrics,
   buildGraphPresentation,
+  buildSelectionMetrics,
+  buildYamlTextStats,
   formatClockTime,
   NODE_TYPE_ORDER,
   nodeTypeLabel,
@@ -235,6 +246,8 @@ function AppInner() {
   const [edges, setEdges] = useEdgesState(initialEdges);
 
   const graphMetrics = useMemo(() => buildGraphMetrics(nodes, edges), [nodes, edges]);
+  const selectionMetrics = useMemo(() => buildSelectionMetrics(nodes, edges), [nodes, edges]);
+  const yamlTextStats = useMemo(() => buildYamlTextStats(yamlText), [yamlText]);
 
   const graphPresentation = useMemo(
     () =>
@@ -271,6 +284,77 @@ function AppInner() {
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => setEdges((eds) => applyEdgeChanges(changes, eds)),
     [setEdges],
+  );
+
+  const isAdditiveSelection = useCallback(
+    (e: { shiftKey: boolean; metaKey: boolean; ctrlKey: boolean }) =>
+      e.shiftKey || e.metaKey || e.ctrlKey,
+    [],
+  );
+
+  const onNodeClick = useCallback(
+    (e: ReactMouseEvent, node: FlowNode) => {
+      const additive = isAdditiveSelection(e);
+      setNodes((prev) => applyCanvasSelection(prev, node.id, additive));
+      if (!additive) setEdges((prev) => applyCanvasSelection(prev, null, false));
+    },
+    [isAdditiveSelection, setEdges, setNodes],
+  );
+
+  const onEdgeClick = useCallback(
+    (e: ReactMouseEvent, edge: Edge) => {
+      const additive = isAdditiveSelection(e);
+      setEdges((prev) => applyCanvasSelection(prev, edge.id, additive));
+      if (!additive) setNodes((prev) => applyCanvasSelection(prev, null, false));
+    },
+    [isAdditiveSelection, setEdges, setNodes],
+  );
+
+  const onCanvasMouseDownCapture = useCallback(
+    (e: ReactMouseEvent) => {
+      const target = e.target instanceof Element ? e.target : null;
+      if (!target) return;
+
+      const nodeEl = target.closest<HTMLElement>(".react-flow__node[data-id]");
+      if (nodeEl) {
+        const additive = isAdditiveSelection(e);
+        const nodeId = nodeEl.dataset.id ?? null;
+        window.setTimeout(() => {
+          setNodes((prev) => applyCanvasSelection(prev, nodeId, additive));
+          if (!additive) setEdges((prev) => applyCanvasSelection(prev, null, false));
+        }, 0);
+        return;
+      }
+
+      const edgeEl = target.closest<HTMLElement>(".react-flow__edge[data-id]");
+      if (edgeEl) {
+        const additive = isAdditiveSelection(e);
+        const edgeId = edgeEl.dataset.id ?? null;
+        window.setTimeout(() => {
+          setEdges((prev) => applyCanvasSelection(prev, edgeId, additive));
+          if (!additive) setNodes((prev) => applyCanvasSelection(prev, null, false));
+        }, 0);
+      }
+    },
+    [isAdditiveSelection, setEdges, setNodes],
+  );
+
+  const updateYamlText = useCallback(
+    (next: string) => {
+      setYamlText(next);
+      if (importedFiles && activeFileIndex !== null) {
+        setImportedFiles((prev) => {
+          if (!prev) return prev;
+          if (activeFileIndex < 0 || activeFileIndex >= prev.length) return prev;
+          const copy = [...prev];
+          const current = copy[activeFileIndex];
+          if (!current) return prev;
+          copy[activeFileIndex] = { ...current, text: next };
+          return copy;
+        });
+      }
+    },
+    [activeFileIndex, importedFiles],
   );
 
   const applyYaml = useCallback(
@@ -547,6 +631,10 @@ function AppInner() {
             <span className="status-pill">自动边 {graphMetrics.autoEdgeCount}</span>
             <span className="status-pill">手写边 {graphMetrics.manualEdgeCount}</span>
             <span className="status-pill">
+              已选 {selectionMetrics.selectedNodeCount} 节点 / {selectionMetrics.selectedEdgeCount}{" "}
+              边
+            </span>
+            <span className="status-pill">
               最近刷新 {formatClockTime(lastAppliedAt)}
               {parsedMsg ? "（有告警）" : "（正常）"}
             </span>
@@ -766,37 +854,73 @@ function AppInner() {
             ) : (
               <>
                 <div className="yaml-editor-actions">
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => setYamlPopoutOpen(true)}
-                    data-testid="yaml-popout-open"
-                    title="放大查看 YAML（Esc 关闭）"
-                  >
-                    放大查看
-                  </button>
+                  <div className="yaml-editor-stats" data-testid="yaml-editor-stats">
+                    {yamlTextStats.lineCount} 行 · {yamlTextStats.documentCount} 文档 ·{" "}
+                    {yamlTextStats.characterCount} 字符
+                  </div>
+                  <div className="yaml-editor-action-buttons">
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={() => applyYaml(yamlText, importedFiles)}
+                      data-testid="yaml-inline-refresh"
+                      disabled={!yamlTextStats.hasContent}
+                      title="解析当前 YAML 并刷新拓扑"
+                    >
+                      解析刷新
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => updateYamlText("")}
+                      data-testid="yaml-clear"
+                      disabled={!yamlTextStats.hasContent}
+                    >
+                      清空
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => {
+                        setImportedFiles(null);
+                        setActiveFileIndex(null);
+                        updateYamlText(SAMPLE);
+                        setParsedMsg(null);
+                        setLeftMode("yaml");
+                        applyYaml(SAMPLE, null);
+                      }}
+                      data-testid="yaml-restore-sample"
+                    >
+                      恢复示例
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => setYamlPopoutOpen(true)}
+                      data-testid="yaml-popout-open"
+                      title="放大查看 YAML（Esc 关闭）"
+                    >
+                      放大查看
+                    </button>
+                  </div>
                 </div>
-                <textarea
-                  value={yamlText}
-                  data-testid="yaml-textarea"
-                  onChange={(e) => {
-                    const next = e.target.value;
-                    setYamlText(next);
-                    if (importedFiles && activeFileIndex !== null) {
-                      setImportedFiles((prev) => {
-                        if (!prev) return prev;
-                        if (activeFileIndex < 0 || activeFileIndex >= prev.length) return prev;
-                        const copy = [...prev];
-                        const current = copy[activeFileIndex];
-                        if (!current) return prev;
-                        copy[activeFileIndex] = { ...current, text: next };
-                        return copy;
-                      });
-                    }
-                  }}
-                  spellCheck={false}
-                  className="yaml-editor"
-                />
+                <div className="yaml-editor-shell">
+                  <div className="yaml-gutter" aria-hidden="true">
+                    {Array.from(
+                      { length: Math.min(Math.max(yamlTextStats.lineCount, 1), 999) },
+                      (_, i) => (
+                        <span key={i + 1}>{i + 1}</span>
+                      ),
+                    )}
+                  </div>
+                  <textarea
+                    value={yamlText}
+                    data-testid="yaml-textarea"
+                    onChange={(e) => updateYamlText(e.target.value)}
+                    spellCheck={false}
+                    className="yaml-editor"
+                  />
+                </div>
               </>
             )}
           </section>
@@ -811,6 +935,9 @@ function AppInner() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onReconnect={onReconnect}
+            onMouseDownCapture={onCanvasMouseDownCapture}
+            onNodeClick={onNodeClick}
+            onEdgeClick={onEdgeClick}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             onInit={(instance) => {
@@ -891,21 +1018,7 @@ function AppInner() {
             <textarea
               autoFocus
               value={yamlText}
-              onChange={(e) => {
-                const next = e.target.value;
-                setYamlText(next);
-                if (importedFiles && activeFileIndex !== null) {
-                  setImportedFiles((prev) => {
-                    if (!prev) return prev;
-                    if (activeFileIndex < 0 || activeFileIndex >= prev.length) return prev;
-                    const copy = [...prev];
-                    const current = copy[activeFileIndex];
-                    if (!current) return prev;
-                    copy[activeFileIndex] = { ...current, text: next };
-                    return copy;
-                  });
-                }
-              }}
+              onChange={(e) => updateYamlText(e.target.value)}
               spellCheck={false}
               className="yaml-editor yaml-editor-popout"
             />

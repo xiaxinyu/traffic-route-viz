@@ -17,7 +17,7 @@ test("export png: can download full-graph image", async ({ page }) => {
 
   await page.getByRole("button", { name: "刷新拓扑" }).click();
   await expect(page.locator(".react-flow").first()).toBeVisible();
-  await page.getByTestId("diagram-actions-toggle").click();
+  await expect(page.getByTestId("diagram-toolbar")).toBeVisible();
 
   const [download] = await Promise.all([
     page.waitForEvent("download"),

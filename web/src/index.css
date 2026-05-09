@@ -465,8 +465,59 @@ body {
 
 .yaml-editor-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-bottom: 8px;
+}
+
+.yaml-editor-stats {
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.yaml-editor-action-buttons {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.yaml-editor-actions button:disabled,
+.diagram-toolbar-panel button:disabled {
+  cursor: not-allowed;
+}
+
+.yaml-editor-shell {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+}
+
+.yaml-gutter {
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  background: #eef6f7;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.89;
+  padding: 14px 8px 14px 0;
+  text-align: right;
+  user-select: none;
+}
+
+.yaml-gutter span {
+  display: block;
+}
+
+.yaml-editor-shell .yaml-editor {
+  border-radius: 0 10px 10px 0;
 }
 
 .trv-modal-overlay {
@@ -527,6 +578,52 @@ body {
 
 .diagram-toolbar-panel {
   font-family: "Avenir Next", "Segoe UI", "PingFang SC", sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px 10px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #dbe4ea;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+}
+
+.diagram-toolbar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.diagram-toolbar-head span:last-child {
+  color: var(--text-soft);
+  font-weight: 800;
+}
+
+.diagram-toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.diagram-toolbar-check {
+  min-height: 31px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+  user-select: none;
 }
 
 @media (max-width: 1100px) {
@@ -546,6 +643,10 @@ body {
     overflow: auto;
     border-right: none;
     border-bottom: 1px solid var(--line);
+  }
+
+  .diagram-toolbar-panel {
+    max-width: calc(100vw - 28px);
   }
 }
 
@@ -665,10 +766,13 @@ body {
 }
 
 .trv-region-resizer-handle {
+  /* biome-ignore lint/complexity/noImportantStyles: React Flow injects resize-control defaults with high specificity. */
   width: 7px !important;
+  /* biome-ignore lint/complexity/noImportantStyles: React Flow injects resize-control defaults with high specificity. */
   height: 7px !important;
 }
 
 .trv-region-resizer-line {
+  /* biome-ignore lint/complexity/noImportantStyles: React Flow injects resize-control defaults with high specificity. */
   border-color: #64748b !important;
 }
