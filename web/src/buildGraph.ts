@@ -537,6 +537,10 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         : "来源文件：当前为编辑器内 YAML 文本（未绑定本地文件名）";
 
     const ingressRoutes = routesByIngress.get(iid) ?? [];
+    const istioOnlyNoDestinations =
+      isIstioOnlyBundle &&
+      ing.kind === "VirtualService" &&
+      !ingressRoutes.some((r) => (r.istioDestinations?.length ?? 0) > 0);
     const vsGatewayRefs =
       ing.kind === "VirtualService"
         ? [...new Set(ingressRoutes.flatMap((r) => r.gateways ?? []))].filter(
@@ -565,6 +569,11 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           namespace: ing.namespace ?? "—",
           sourceSummary,
           sourceFiles,
+          ...(istioOnlyNoDestinations
+            ? {
+                hint: "未发现 VirtualService 的 route.destination（或尚未导入 VS）。DestinationRule 需要挂在 Destination 后才会显示；请先导入 VirtualService（vs-*.yaml / virtualservices.yaml）。",
+              }
+            : {}),
           tierCode: tier?.tierCode,
           tierHint: tier?.effectiveFolderHint,
           swimlaneBand: swimlane.band,
@@ -716,6 +725,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     const serviceIdByKey = new Map<string, string>();
     const endpointIdByKey = new Map<string, string>();
     const renderedDrNodeIds = new Set<string>();
+    const referencedDrServiceKeys = new Set<string>();
 
     const renderDestinationRulesForServiceKey = (
       sourceNodeId: string,
@@ -724,6 +734,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     ) => {
       const drs = drsByServiceKey.get(serviceKey) ?? [];
       if (!drs.length) return;
+      referencedDrServiceKeys.add(serviceKey);
       const ordered = [...drs].sort((a, b) =>
         resourceKey(a.namespace, a.name).localeCompare(resourceKey(b.namespace, b.name)),
       );
@@ -1142,6 +1153,8 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
 
     if (isIstioOnlyBundle) {
       // Istio-only view: no Service/Endpoints nodes. DestinationRule nodes are rendered from destinations.
+      // DR should hang off Destination nodes. If no destinations exist, keep the view clean and
+      // guide the user to import VirtualService first (see region hint above).
     } else {
       // 2) Place service nodes near median of their routes, then collision-resolve
       const serviceEntries = [...serviceIdByKey.entries()].map(([svcScoped, sid]) => {
@@ -1346,17 +1359,21 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     }
   }
 
-  // Vertical center of merged Istio Gateway nodes on all connected VirtualService partition regions.
+  // Reposition merged Istio Gateway nodes based on connected VirtualService regions:
+  // - X: place right before the left-most connected VS region to avoid overly long edges
+  // - Y: vertical center on the median of connected VS region centers
   const childToParent = new Map<string, string>();
   for (const n of nodes) {
     if (n.parentNode && typeof n.parentNode === "string") {
       childToParent.set(n.id, n.parentNode);
     }
   }
+
   for (const gwWire of sortedGlobalGwWireNames) {
     const gid = globalIstioGatewayNodeIdByWireName.get(gwWire);
     if (!gid) continue;
     const centers: number[] = [];
+    const xs: number[] = [];
     for (const e of edges) {
       if (e.source !== gid || e.label !== "Gateway") continue;
       const rid = childToParent.get(e.target);
@@ -1366,13 +1383,18 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       const py = rn.position?.y ?? 0;
       const rh = Number((rn.style as { height?: number })?.height ?? 760);
       centers.push(py + rh / 2);
+      xs.push(rn.position?.x ?? baseX + layoutOffsetX);
     }
     if (!centers.length) continue;
     const midY = medianOf(centers, baseY);
+    const minX = Math.min(...xs);
     const gwNode = nodes.find((n) => n.id === gid);
     if (gwNode) {
+      const gwCardW = 300;
+      const gap = 90;
+      const gx = Math.max(baseX, minX - (gwCardW + gap));
       gwNode.position = {
-        x: baseX,
+        x: gx,
         y: midY - LAYOUT_EST_ISTIO_GW_H / 2,
       };
     }

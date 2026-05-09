@@ -231,6 +231,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
   - **Route 不得在 Host 卡内部起笔**：首张 Route 的 `y` 必须位于为该 Host **预留的整块卡片估算高度之下**再加间隙（不得再使用 Host 顶端 + 极小偏移的旧模式）。
   - **多 Host 纵向串联**：下一个 Host 的顶边必须在前一 Host **子树底边**（该 Host 下最后一条 Route 的底边，或「无 Route 时」Host 卡底边）**再加块间留白**之后开始；**禁止**仅用固定常量 `hostGap` 推导而不考虑上一 Host **实际路由条数**。
   - **Istio Gateway（全局合并）**：凡 VirtualService 引用的 Gateway（过滤 `mesh`）在画布 **左侧独立列**按名称合并为全局节点；初始纵向位置按名称占位堆叠后，在 **全部 VS 分区定位完成** 后再做一次 **垂直居中**：使每个全局 Gateway 卡片的垂直中心与「所有与之相连的 VirtualService 分区（`ingressRegion`）」垂直中心的 **中位数**对齐（多块 Gateway 名称时各自独立计算）；**分区宽度预留**左侧 Gateway 列，避免与分区重叠；Host 带起始高度仍与 **Ingress/VirtualService 头条 + 估算底边**对齐（分区内不再叠放多块 Gateway 卡）。
+  - **Gateway→VS 连线长度（必须）**：全局 Gateway 的 **x** 不固定死在 `baseX`。在所有 VS 分区定位完成后，Gateway 节点 **自动贴近其连接到的 VS 列左侧**：\(x = \max(baseX,\; \min(\text{connected VS region }x) - (\text{gwCardW} + gap))\)。这样当 VS 列更靠左/靠右时，连线会自动变短/变长，避免永远拉一根超长线。
   - **VirtualService 竖列**：当 bundle 内存在 **至少一条** VirtualService 引用非 `mesh` 的 Istio Gateway，或 **VirtualService 入口对象 ≥ 2** 时，各 VirtualService 分区在画布上置于 **`01/02/03` Example 三列右侧的第四列**（与 Ingress / HTTPProxy 分区列分离），按导入排序 **纵向堆叠**；非 tier 导入时同样使用该竖列（与 fallback 网格中的 Ingress 分区分离）。
   - **画布泳道（启发式）**：依据导入路径推断 **Global / Worker / 默认** band（实现：`web/src/swimlaneInfer.ts`）；同一 Example tier 列内若 band 切换，插入额外垂直间距（`SWIMLANE_BAND_GAP`）；分区页眉展示 **泳道文案**（`swimlaneLabel`），与现有 `Level 01–03`、文件夹 hint 并存。
   - **多 Service**：在按 Route `y` median 初值对齐后，须按 **预估 Service 卡高 + gap** 做纵向碰撞-resolve，并保持 **DestinationRule** 占位在对应 Service **估算高度之下的独立留白带**。
