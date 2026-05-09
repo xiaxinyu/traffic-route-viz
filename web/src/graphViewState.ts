@@ -1,5 +1,7 @@
 import type { Edge, Node } from "reactflow";
 
+import { countYamlTextLines, normalizeYamlNewlines } from "./yamlLineStats";
+
 export type NodeTypeFilter =
   | "all"
   | "ingressRegion"
@@ -83,7 +85,7 @@ export function buildSelectionMetrics(nodes: Node[], edges: Edge[]) {
 }
 
 export function buildYamlTextStats(text: string) {
-  const normalized = text.replace(/\r\n?/g, "\n");
+  const normalized = normalizeYamlNewlines(text);
   const trimmed = normalized.trim();
   const documentCount = trimmed
     ? normalized
@@ -93,7 +95,7 @@ export function buildYamlTextStats(text: string) {
     : 0;
 
   return {
-    lineCount: normalized ? normalized.split("\n").length : 0,
+    lineCount: countYamlTextLines(text),
     characterCount: text.length,
     documentCount,
     hasContent: trimmed.length > 0,

@@ -51,6 +51,7 @@ import {
   type ImportedYamlFile,
 } from "./mergeYamlBundles";
 import { parseK8sYaml } from "./k8sParser";
+import { summarizeImportedYamlLines } from "./yamlLineStats";
 import {
   DestinationRuleNode,
   EndpointsNode,
@@ -405,6 +406,11 @@ function AppInner() {
     return importedFiles ? mergeYamlFiles(importedFiles) : null;
   }, [importedFiles]);
 
+  const importedLinesSummary = useMemo(() => {
+    if (!importedFiles?.length) return null;
+    return summarizeImportedYamlLines(importedFiles);
+  }, [importedFiles]);
+
   const switchLeftMode = useCallback(
     (next: "files" | "yaml") => {
       setLeftMode(next);
@@ -730,9 +736,28 @@ function AppInner() {
               <div>
                 <div className="block-title">输入与数据源</div>
                 <div className="block-subtitle">
-                  {importedFiles?.length
-                    ? `已导入 ${importedFiles.length} 个文件（默认合并解析）`
-                    : "可粘贴 YAML，或导入多文件/文件夹进行合并解析"}
+                  {importedFiles?.length ? (
+                    <>
+                      已导入 {importedFiles.length} 个文件（默认合并解析）
+                      {importedLinesSummary ? (
+                        <>
+                          {" "}
+                          · 各文件合计 {importedLinesSummary.sumOfFileLines} 行 · 合并后{" "}
+                          {importedLinesSummary.mergedLineCount} 行
+                        </>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      可粘贴 YAML，或导入多文件/文件夹进行合并解析
+                      {yamlTextStats.hasContent ? (
+                        <span className="block-subtitle-muted">
+                          {" "}
+                          · 当前 YAML {yamlTextStats.lineCount} 行（文档/字符见「YAML」页签）
+                        </span>
+                      ) : null}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -894,6 +919,7 @@ function AppInner() {
                     const active = activeFileIndex === idx;
                     const p = displayPath(f);
                     const folderHint = f.relPath ? displayFolderHint(f.relPath) : "";
+                    const lineCount = importedLinesSummary?.perFile[idx]?.lineCount ?? 0;
                     return (
                       <div
                         key={p + idx}
@@ -911,11 +937,29 @@ function AppInner() {
                         title={p}
                         className={active ? "file-item active" : "file-item"}
                       >
-                        <div className="file-item-title">{f.name}</div>
-                        {folderHint ? <div className="file-item-hint">{folderHint}</div> : null}
+                        <div className="file-item-row">
+                          <div className="file-item-main">
+                            <div className="file-item-title">{f.name}</div>
+                            {folderHint ? <div className="file-item-hint">{folderHint}</div> : null}
+                          </div>
+                          <span className="file-item-lines" title="该文件 text 行数（含空行）">
+                            {lineCount} 行
+                          </span>
+                        </div>
                       </div>
                     );
                   })}
+                  {importedLinesSummary && importedFiles.length > 1 ? (
+                    <div
+                      className="import-line-stats-note"
+                      data-testid="import-line-stats-note"
+                      title="合并文本由 mergeYamlFiles 以换行 + --- + 换行连接；与各文件行数之和可能因分隔行与首尾换行而不相等。"
+                    >
+                      行数口径：各文件行数相加 vs 合并拼接（<code className="import-line-stats-code">---</code>
+                      ）后行数可能不同；与左侧 YAML 编辑区行数统计一致（<code className="import-line-stats-code">\n</code>
+                      分段，含空行）。
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div className="empty-box">尚未导入。可拖入文件/目录，或点击上方“导文/导夹”。</div>

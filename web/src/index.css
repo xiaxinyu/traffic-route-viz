@@ -324,6 +324,11 @@ body {
   line-height: 1.35;
 }
 
+.block-subtitle-muted {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
 .mode-switch {
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -479,6 +484,42 @@ body {
   margin-top: 2px;
   color: #64748b;
   font-size: 11px;
+}
+
+.file-item-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.file-item-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.file-item-lines {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748b;
+}
+
+.import-line-stats-note {
+  padding: 8px 10px;
+  font-size: 10px;
+  color: #94a3b8;
+  line-height: 1.4;
+  border-top: 1px solid #edf2f7;
+  background: #fafbfc;
+}
+
+.import-line-stats-code {
+  font-size: 10px;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #475569;
 }
 
 .empty-box {
