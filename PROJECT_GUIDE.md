@@ -76,6 +76,10 @@ pnpm run preview
 - YAML 编辑器：显示行数/文档数/字符数，并提供就地解析刷新、清空、恢复示例、放大查看
 - 详细设计与测试沉淀：`docs/UX_OPTIMIZATION_2026-05.md`
 
+## 性能基线与 Profiling（Issue #12）
+
+当节点规模超过 **300+** 时，请参考 `docs/PERFORMANCE_BASELINE.md` 建立可复现的性能基线，并用浏览器 Performance / React Profiler 定位瓶颈。
+
 ---
 
 ## 给 Agent 的短提示（复制用）
