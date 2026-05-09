@@ -5,6 +5,7 @@ import {
   type RefObject,
   type SetStateAction,
   useCallback,
+  useState,
   useRef,
 } from "react";
 import { Panel, useReactFlow } from "reactflow";
@@ -94,6 +95,7 @@ export function DiagramActions(props: Props) {
 
   const { fitView, getViewport, setViewport } = useReactFlow();
   const loadInputRef = useRef<HTMLInputElement | null>(null);
+  const [collapsed, setCollapsed] = useState(false);
   const selectedNodeCount = nodes.filter((n) => n.selected).length;
   const selectedEdgeCount = edges.filter((e) => e.selected).length;
   const hasSelectedEdges = selectedEdgeCount > 0;
@@ -232,91 +234,102 @@ export function DiagramActions(props: Props) {
           <span data-testid="diagram-selection-count">
             已选 {selectedNodeCount} 节点 / {selectedEdgeCount} 边
           </span>
+          <button
+            type="button"
+            style={btnGhost}
+            onClick={() => setCollapsed((v) => !v)}
+            aria-label={collapsed ? "展开画布工具" : "收起画布工具"}
+            title={collapsed ? "展开" : "收起"}
+          >
+            {collapsed ? "展开" : "收起"}
+          </button>
         </div>
 
-        <div className="diagram-toolbar-row">
-          <label className="diagram-toolbar-check">
-            <input
-              data-testid="toggle-edge-labels"
-              type="checkbox"
-              checked={edgeLabelsEnabled}
-              onChange={(e) => setEdgeLabelsEnabled(e.target.checked)}
-            />
-            边标签
-          </label>
+        {!collapsed ? (
+          <div className="diagram-toolbar-row">
+            <label className="diagram-toolbar-check">
+              <input
+                data-testid="toggle-edge-labels"
+                type="checkbox"
+                checked={edgeLabelsEnabled}
+                onChange={(e) => setEdgeLabelsEnabled(e.target.checked)}
+              />
+              边标签
+            </label>
 
-          <button
-            type="button"
-            style={btnGhost}
-            onClick={() => fitView({ padding: 0.05, duration: 240 })}
-            data-testid="canvas-fit-view"
-          >
-            适配视图
-          </button>
-          <button type="button" style={btnPrimary} onClick={onExportPng} data-testid="export-png">
-            导出 PNG
-          </button>
-          <button
-            type="button"
-            style={btnGhost}
-            onClick={onExportMermaid}
-            data-testid="export-mermaid"
-          >
-            Mermaid
-          </button>
-          <button
-            type="button"
-            style={btnGhost}
-            onClick={onExportDrawio}
-            data-testid="export-drawio"
-          >
-            draw.io
-          </button>
-          <button
-            type="button"
-            style={btnGhost}
-            onClick={onSaveDiagramJson}
-            data-testid="save-diagram"
-          >
-            保存画图
-          </button>
-          <button
-            type="button"
-            style={{
-              ...btnGhost,
-              cursor: hasSelectedEdges ? "pointer" : "not-allowed",
-              opacity: hasSelectedEdges ? 1 : 0.55,
-            }}
-            onClick={onDeleteSelectedEdges}
-            data-testid="delete-selected-edges"
-            disabled={!hasSelectedEdges}
-            title="删除当前选中的连线；也支持键盘 Delete/Backspace"
-          >
-            删除连线
-          </button>
-          <button
-            type="button"
-            style={{
-              ...btnGhost,
-              cursor: hasSelectedElements ? "pointer" : "not-allowed",
-              opacity: hasSelectedElements ? 1 : 0.55,
-            }}
-            onClick={onDeleteSelectedElements}
-            data-testid="delete-selected-elements"
-            disabled={!hasSelectedElements}
-            title="删除当前选中的节点与连线（同时会清理其关联边）"
-          >
-            删除元素
-          </button>
-          <button
-            type="button"
-            style={btnGhost}
-            onClick={() => loadInputRef.current?.click()}
-            data-testid="open-diagram"
-          >
-            打开画图
-          </button>
-        </div>
+            <button
+              type="button"
+              style={btnGhost}
+              onClick={() => fitView({ padding: 0.05, duration: 240 })}
+              data-testid="canvas-fit-view"
+            >
+              适配
+            </button>
+            <button type="button" style={btnPrimary} onClick={onExportPng} data-testid="export-png">
+              PNG
+            </button>
+            <button
+              type="button"
+              style={btnGhost}
+              onClick={onExportMermaid}
+              data-testid="export-mermaid"
+            >
+              Mermaid
+            </button>
+            <button
+              type="button"
+              style={btnGhost}
+              onClick={onExportDrawio}
+              data-testid="export-drawio"
+            >
+              draw.io
+            </button>
+            <button
+              type="button"
+              style={btnGhost}
+              onClick={onSaveDiagramJson}
+              data-testid="save-diagram"
+            >
+              保存
+            </button>
+            <button
+              type="button"
+              style={{
+                ...btnGhost,
+                cursor: hasSelectedEdges ? "pointer" : "not-allowed",
+                opacity: hasSelectedEdges ? 1 : 0.55,
+              }}
+              onClick={onDeleteSelectedEdges}
+              data-testid="delete-selected-edges"
+              disabled={!hasSelectedEdges}
+              title="删除当前选中的连线；也支持键盘 Delete/Backspace"
+            >
+              删线
+            </button>
+            <button
+              type="button"
+              style={{
+                ...btnGhost,
+                cursor: hasSelectedElements ? "pointer" : "not-allowed",
+                opacity: hasSelectedElements ? 1 : 0.55,
+              }}
+              onClick={onDeleteSelectedElements}
+              data-testid="delete-selected-elements"
+              disabled={!hasSelectedElements}
+              title="删除当前选中的节点与连线（同时会清理其关联边）"
+            >
+              删除
+            </button>
+            <button
+              type="button"
+              style={btnGhost}
+              onClick={() => loadInputRef.current?.click()}
+              data-testid="open-diagram"
+            >
+              打开
+            </button>
+          </div>
+        ) : null}
         <input
           ref={loadInputRef}
           type="file"

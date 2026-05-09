@@ -257,7 +257,12 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     focusable: e.focusable ?? true,
     interactionWidth: e.interactionWidth ?? 40,
   });
-  const arrow = (color: string) => ({ type: MarkerType.ArrowClosed as const, color });
+  const arrow = (color: string) => ({
+    type: MarkerType.ArrowClosed as const,
+    color,
+    width: 18,
+    height: 18,
+  });
 
   const serviceByKey = new Map<string, (typeof parsed.services)[0]>();
   for (const s of parsed.services) {
@@ -367,7 +372,9 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     }
   }
 
-  const GLOBAL_GW_LANE_W = 320;
+  // Reserve enough left gutter for merged global Istio Gateways + trunk/branches.
+  // (Users asked for more spacing between Gateway and VS areas.)
+  const GLOBAL_GW_LANE_W = 420;
   const sortedGlobalGwWireNames = [...globalGwWireNames].sort();
   const layoutOffsetX = sortedGlobalGwWireNames.length ? GLOBAL_GW_LANE_W : 0;
 
@@ -1381,7 +1388,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
 
     const gwNode = nodes.find((n) => n.id === gid);
     const gwCardW = 300;
-    const gap = 90;
+    const gap = 220;
     const gx = Math.max(baseX, minX - (gwCardW + gap));
     if (gwNode) {
       gwNode.position = {
@@ -1392,8 +1399,10 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
 
     // Junction node: invisible anchor where branches start (looks like one line).
     const junctionId = `istio-gw-junction-${sanitizeId(gwWire)}`;
-    const jxMin = minX - 60;
-    const jx = Math.max(gx + gwCardW + 60, jxMin);
+    // Keep some breathing room so VS doesn't "stick" to the gateway wiring.
+    const branchGap = 160;
+    const jxMin = minX - branchGap;
+    const jx = Math.max(gx + gwCardW + 40, jxMin);
     nodes.push({
       id: junctionId,
       type: "junction",
@@ -1412,7 +1421,13 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       targetHandle: "t-left",
       type: edgeType,
       label: "Gateway",
-      style: { stroke: "#0ea5e9", strokeWidth: 2.25 },
+        style: {
+          stroke: "#0ea5e9",
+          strokeWidth: 2.35,
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+          shapeRendering: "geometricPrecision",
+        },
       markerEnd: arrow("#0ea5e9"),
       labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
       labelBgStyle: { fill: "#e0f2fe", fillOpacity: 0.92 },
@@ -1428,7 +1443,14 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         sourceHandle: "s-right",
         targetHandle: "t-left",
         type: edgeType,
-        style: { stroke: "#0ea5e9", strokeWidth: 2.0, strokeDasharray: "6 4" },
+        style: {
+          stroke: "#0ea5e9",
+          strokeWidth: 2.1,
+          strokeDasharray: "7 5",
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+          shapeRendering: "geometricPrecision",
+        },
         markerEnd: arrow("#0ea5e9"),
       });
     }
