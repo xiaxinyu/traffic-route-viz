@@ -147,6 +147,10 @@ function toCorpus(v: unknown): string {
   return "";
 }
 
+// Perf: buildGraphPresentation runs often during interactions (selection/drag/search).
+// We keep a WeakMap cache keyed by object identity to avoid repeatedly stringifying large node.data blobs.
+const nodeCorpusCache = new WeakMap<object, string>();
+
 export function buildGraphPresentation(
   baseNodes: Node[],
   baseEdges: Edge[],
@@ -172,7 +176,12 @@ export function buildGraphPresentation(
       continue;
     }
 
-    const corpus = `${n.id} ${n.type ?? ""} ${toCorpus(n.data)}`.toLowerCase();
+    const cacheKey = (n as unknown as object) ?? null;
+    let corpus = cacheKey ? nodeCorpusCache.get(cacheKey) : undefined;
+    if (!corpus) {
+      corpus = `${n.id} ${n.type ?? ""} ${toCorpus(n.data)}`.toLowerCase();
+      if (cacheKey) nodeCorpusCache.set(cacheKey, corpus);
+    }
     if (corpus.includes(query)) matched.add(n.id);
   }
 

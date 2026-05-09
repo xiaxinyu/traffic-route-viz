@@ -870,7 +870,7 @@ function AppInner() {
           <section className="left-panel-block grow">
             <div className="panel-list-title">
               <span>{leftMode === "files" ? "文件" : "YAML"}</span>
-              <div className="mode-switch" aria-label="文件与 YAML 切换">
+              <div className="mode-switch" role="group" aria-label="文件与 YAML 切换">
                 <button
                   type="button"
                   className={leftMode === "files" ? "active" : ""}
@@ -888,40 +888,38 @@ function AppInner() {
               </div>
             </div>
             {leftMode === "files" ? (
-              <>
-                {importedFiles?.length ? (
-                  <div className="file-list">
-                    {importedFiles.map((f, idx) => {
-                      const active = activeFileIndex === idx;
-                      const p = displayPath(f);
-                      const folderHint = f.relPath ? displayFolderHint(f.relPath) : "";
-                      return (
-                        <div
-                          key={p + idx}
-                          onClick={() => {
-                            setActiveFileIndex(idx);
-                            focusRegionByImportedFile(f);
-                          }}
-                          onDoubleClick={() => {
-                            setActiveFileIndex(idx);
-                            setYamlText(f.text);
-                            setLeftMode("yaml");
-                          }}
-                          role="button"
-                          tabIndex={0}
-                          title={p}
-                          className={active ? "file-item active" : "file-item"}
-                        >
-                          <div className="file-item-title">{f.name}</div>
-                          {folderHint ? <div className="file-item-hint">{folderHint}</div> : null}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="empty-box">尚未导入。可拖入文件/目录，或点击上方“导文/导夹”。</div>
-                )}
-              </>
+              importedFiles?.length ? (
+                <div className="file-list">
+                  {importedFiles.map((f, idx) => {
+                    const active = activeFileIndex === idx;
+                    const p = displayPath(f);
+                    const folderHint = f.relPath ? displayFolderHint(f.relPath) : "";
+                    return (
+                      <div
+                        key={p + idx}
+                        onClick={() => {
+                          setActiveFileIndex(idx);
+                          focusRegionByImportedFile(f);
+                        }}
+                        onDoubleClick={() => {
+                          setActiveFileIndex(idx);
+                          setYamlText(f.text);
+                          setLeftMode("yaml");
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        title={p}
+                        className={active ? "file-item active" : "file-item"}
+                      >
+                        <div className="file-item-title">{f.name}</div>
+                        {folderHint ? <div className="file-item-hint">{folderHint}</div> : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="empty-box">尚未导入。可拖入文件/目录，或点击上方“导文/导夹”。</div>
+              )
             ) : (
               <>
                 <div className="yaml-editor-actions">
