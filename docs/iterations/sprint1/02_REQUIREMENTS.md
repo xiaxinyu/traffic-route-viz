@@ -69,17 +69,53 @@
 |----|------|--------|
 | FR-2.1 | 提供入口（如侧栏或模态）触发「分析」 | 🔴 MUST |
 | FR-2.2 | 输出 **建议列表**：每条含类型（Ingress/VS）、涉及资源、理由、预估可减少行数（估算即可） | 🔴 MUST |
-| FR-2.3 | v1 **规则范围**须写死并在 UI 展示（例如：仅同 namespace；仅非冲突 path；不含 Gateway API） | 🔴 MUST |
+| FR-2.3 | v1 **规则范围**须写死并在 UI 展示；不满足边界的对象只能输出「需人工处理」或「不可安全合并」 | 🔴 MUST |
 | FR-2.4 | 用户可生成 **候选合并 YAML**（一个或多个文件内容），可复制或下载 | 🔴 MUST |
 | FR-2.5 | 候选 YAML **重新导入**后须能被现有解析器解析并 **渲染画布**（与 `HARNESS_ENGINEERING.md` 范围内 kind 一致） | 🔴 MUST |
 | FR-2.6 | 存在冲突或不确定时 **禁止静默合并**，须标记为「需人工处理」 | 🔴 MUST |
 | FR-2.7 | 不扩展 `HARNESS_ENGINEERING.md` 当前 Out-of-Scope 资源种类作为合并输入 | 🔴 MUST |
+| FR-2.8 | 推荐功能默认是 **dry-run**：不修改编辑器内容、不覆盖导入文件、不自动写回文件系统或集群 | 🔴 MUST |
+| FR-2.9 | 候选 YAML 生成前须展示影响摘要：来源资源、保留资源、合并后资源名、风险等级、warnings、预计行数变化 | 🔴 MUST |
+| FR-2.10 | 若缺少生成安全 YAML 所需的原始字段（例如注解、TLS、headers、match 扩展字段），必须降级为「只建议，不生成候选 YAML」 | 🔴 MUST |
+
+#### FR-2 v1 安全边界（必须）
+
+**共同边界**
+
+- 仅处理 `HARNESS_ENGINEERING.md` In Scope 中的 `Ingress` 与 Istio `VirtualService`；不处理 Gateway API / EndpointSlice / 任意 CRD 扩展。
+- 仅同 `namespace` 内合并；跨 namespace 一律标记为「需人工处理」。
+- 推荐结果仅生成新的候选 YAML，不删除原文件、不自动替换编辑器内容。
+- 发现任意冲突、不完整字段或无法判断语义等价时，**不得生成自动合并 YAML**，只能输出解释性建议。
+
+**Ingress v1 边界**
+
+- 仅同 `namespace` + 同 `ingressClassName` + 同 `rules[].host` 的 Ingress 可进入候选。
+- `metadata.annotations`、`spec.tls`、`defaultBackend`、`pathType` 需相同或可无损合并；否则降级为人工处理。
+- 同一 `host + path + pathType` 不得指向不同 backend；冲突时只报告，不合并。
+- 候选 YAML 以一个新的 Ingress 承载多条 `http.paths`；保留必要 metadata，并在名称上使用可追溯后缀（如 `*-merged-candidate`）。
+
+**VirtualService v1 边界**
+
+- 仅同 `namespace` + 同 `hosts` 集合 + 同 `gateways` 集合的 VirtualService 可进入候选。
+- v1 仅合并 `spec.http[]` route 列表；`tcp`、`tls`、`exportTo`、`delegate`、`mirror`、`corsPolicy`、`retries`、`fault`、`timeout` 等复杂字段若存在且无法完整保留，降级为人工处理。
+- `http.match` 中 URI 可比较；存在 headers / queryParams / method / withoutHeaders 等扩展条件时，必须完整保留到候选 YAML，否则不生成候选。
+- 同一 URI 匹配规则不能指向不同 destination/weight/subset；冲突时只报告，不合并。
+
+#### 推荐级别
+
+| Level | 含义 | 行为 |
+|-------|------|------|
+| Safe | 满足 v1 全部边界，且能生成可解析候选 YAML | 可复制/下载候选 YAML |
+| Review | 有潜在收益，但字段复杂或语义不完全确定 | 仅展示建议、原因、人工检查点 |
+| Blocked | 存在明确冲突或超出范围 | 不生成 YAML，只展示冲突说明 |
 
 **验收**
 
 - [ ] 对官方样例或仓库内 `traffic/` 示例能跑出至少一种建议或明确「无安全建议」。  
 - [ ] 导出的建议 YAML 可导入且无解析崩溃。  
 - [ ] 文档记录 v1 规则边界。  
+- [ ] 冲突样例不会生成候选 YAML，并能展示冲突原因。
+- [ ] 候选 YAML 重新导入后，`parseK8sYaml` 与 `buildFlowGraph` 均能完成。
 
 ---
 

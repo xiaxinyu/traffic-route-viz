@@ -62,6 +62,16 @@
   - 每个已导入文件在文件列表中显示其 `text` 的**行数**（与 YAML 编辑区统计口径一致：换行统一为 `\n` 后按 `\n` 分段计数，**含空行**）。
   - 在「输入与数据源」副标题中展示 **各文件行数合计** 与 **`mergeYamlFiles` 合并拼接后的行数**；二者可能因 `\n---\n` 分隔行与各文件首尾换行而不相等，以列表下方脚注说明。
   - **未导入文件**且编辑区有内容时，副标题可提示当前 YAML 行数；完整「行 / 文档 / 字符」仍以 YAML 编辑区一级统计为准。
+- **路由合并推荐（Sprint1 v1，必须遵守 dry-run）**：
+  - 推荐入口只能做 **分析与候选导出**：不得自动覆盖 YAML 编辑区、不得修改导入文件、不得写回集群或 Git。
+  - 推荐结果分为 **Safe / Review / Blocked**：
+    - **Safe**：满足 v1 全部边界，允许生成候选 YAML。
+    - **Review**：存在潜在收益但字段复杂或语义无法完整确认，只展示建议与人工检查点。
+    - **Blocked**：存在明确冲突或超出范围，不生成 YAML。
+  - **Ingress v1 Safe 边界**：仅同 namespace、同 `ingressClassName`、同 `rules[].host`；annotations/TLS/defaultBackend/pathType 必须相同或可无损合并；同一 `host + path + pathType` 不得指向不同 backend。
+  - **VirtualService v1 Safe 边界**：仅同 namespace、`hosts` 集合一致、`gateways` 集合一致；v1 只合并 `spec.http[]`；复杂字段（如 `tcp`/`tls`/`exportTo`/`delegate`/`mirror`/`corsPolicy`/`retries`/`fault`/`timeout` 等）若无法完整保留，必须降级为 Review。
+  - 候选 YAML 生成必须基于 **原始 YAML document/AST** 保留字段；`ParseResult` 只作为候选发现和画布闭环验证依据。缺少原始 doc 或无法安全序列化时，不得生成候选 YAML。
+  - 候选 YAML 必须可重新导入：`parseK8sYaml` 不崩溃，`buildFlowGraph` 可渲染入口/路由链路。冲突样例必须验证不会生成 `candidateYaml`。
 
 ### 文本输入（必须）
 
