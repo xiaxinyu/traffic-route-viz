@@ -61,6 +61,7 @@ import { useRouteMergeAnalysis } from "../features/route-merge/useRouteMergeAnal
 import { summarizeImportedYamlLines } from "../domain/yamlLineStats";
 import { getRuntimeConfig } from "../domain/runtimeConfig";
 import { flowNodeTypes } from "./nodeTypes";
+import { AppHeader } from "./AppHeader";
 import { SAMPLE_YAML } from "./sampleYaml";
 import { TRV_ICONS } from "./trvIcons";
 import {
@@ -463,260 +464,84 @@ export function AppInner() {
         }}
       />
 
-      <header className="app-header">
-        <div className="header-app-row">
-          <div className="header-seg header-seg--brand">
-            <div className="header-title-wrap">
-              <h1 title="专业化流量拓扑工作台：导入、解析、筛选、定位、导出一体化">
-                Traffic Route Viz
-              </h1>
-              <p className="header-tagline">
-                专业化流量拓扑工作台：导入、解析、筛选、定位、导出一体化
-              </p>
-            </div>
-          </div>
-
-          <section
-            className="header-seg header-seg--import"
-            aria-label="输入与数据源"
-            title={
-              importedFiles?.length
-                ? `已导入 ${importedFiles.length} 个文件` +
-                  (importedLinesSummary
-                    ? `；各文件合计 ${importedLinesSummary.sumOfFileLines} 行，合并后 ${importedLinesSummary.mergedLineCount} 行`
-                    : "")
-                : yamlTextStats.hasContent
-                  ? `可合并解析多文件；当前 YAML ${yamlTextStats.lineCount} 行（文档/字符见侧栏「YAML」）`
-                  : "可粘贴 YAML，或导入多文件/文件夹进行合并解析"
-            }
-          >
-            <span className="header-import-meta">
-              {importedFiles?.length ? (
-                <>
-                  {importedFiles.length} 文件
-                  {importedLinesSummary ? (
-                    <>
-                      {" "}
-                      · 合计 {importedLinesSummary.sumOfFileLines} 行 · 合并{" "}
-                      {importedLinesSummary.mergedLineCount} 行
-                    </>
-                  ) : null}
-                </>
-              ) : yamlTextStats.hasContent ? (
-                <>未导入文件 · 当前 {yamlTextStats.lineCount} 行</>
-              ) : (
-                <>拖入或点选导入</>
-              )}
+      <AppHeader
+        Icon={Icon}
+        icons={{
+          docFile: TRV_ICONS.docFile,
+          folder: TRV_ICONS.folder,
+          trash: TRV_ICONS.trash,
+          chevLeft: TRV_ICONS.chevLeft,
+          chevRight: TRV_ICONS.chevRight,
+          refresh: TRV_ICONS.refresh,
+          fit: TRV_ICONS.fit,
+          minus: TRV_ICONS.minus,
+          plus: TRV_ICONS.plus,
+          chart: TRV_ICONS.chart,
+          logout: TRV_ICONS.logout,
+        }}
+        importedFiles={importedFiles}
+        importedLinesSummary={importedLinesSummary}
+        yamlTextStats={yamlTextStats}
+        onClickImportFiles={() => fileInputRef.current?.click()}
+        onClickImportFolder={() => folderInputRef.current?.click()}
+        onClearImported={() => {
+          setImportedFiles(null);
+          setActiveFileIndex(null);
+          setYamlText(SAMPLE_YAML);
+          setParsedMsg(null);
+          setLeftMode("yaml");
+          applyYaml(SAMPLE_YAML, null);
+        }}
+        onDropImport={async (dt) => {
+          const incoming = await readDroppedFiles(dt);
+          if (!incoming?.length) return;
+          const combined = mergeImportedFiles(importedFiles, incoming);
+          setImportedFiles(combined);
+          setActiveFileIndex(null);
+          setLeftMode("files");
+          const merged = mergeYamlFiles(combined);
+          setYamlText(merged);
+          applyYaml(merged, combined);
+        }}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        matchLabel={
+          graphPresentation.matchedNodeIds.length
+            ? `${matchCursor + 1}/${graphPresentation.matchedNodeIds.length}`
+            : "0/0"
+        }
+        onPrevMatch={() => jumpToMatch(matchCursor - 1)}
+        onNextMatch={() => jumpToMatch(matchCursor + 1)}
+        hasMatches={Boolean(graphPresentation.matchedNodeIds.length)}
+        onRefresh={() => applyYaml(mergedImportedText ?? yamlText)}
+        onFit={() => fitView({ padding: 0.05, duration: 240 })}
+        uiScalePct={Math.round(uiScale * 100)}
+        onZoomOut={() => setUiScale((v) => clampUiScale(v - UI_SCALE_STEP))}
+        onZoomReset={() => setUiScale(1)}
+        onZoomIn={() => setUiScale((v) => clampUiScale(v + UI_SCALE_STEP))}
+        statusOpen={statusOpen}
+        toggleStatusOpen={() => setStatusOpen((v) => !v)}
+        canLogout={getRuntimeConfig().auth?.enabled !== false}
+        onLogout={() => {
+          clearSession();
+          window.location.reload();
+        }}
+        statusStrip={
+          <div className="header-status-strip header-status-strip-compact" data-testid="top-status-strip">
+            <span className="status-pill">节点 {graphMetrics.nodeCount}</span>
+            <span className="status-pill">边 {graphMetrics.edgeCount}</span>
+            <span className="status-pill">自动 {graphMetrics.autoEdgeCount}</span>
+            <span className="status-pill">手写 {graphMetrics.manualEdgeCount}</span>
+            <span className="status-pill">
+              已选 {selectionMetrics.selectedNodeCount}/{selectionMetrics.selectedEdgeCount}
             </span>
-            <div
-              data-testid="import-dropzone"
-              className="import-dropzone import-dropzone--header import-dropzone--inline"
-              onDragOver={(ev) => ev.preventDefault()}
-              onDrop={async (ev) => {
-                ev.preventDefault();
-                const incoming = await readDroppedFiles(ev.dataTransfer);
-                if (!incoming?.length) return;
-                const combined = mergeImportedFiles(importedFiles, incoming);
-                setImportedFiles(combined);
-                setActiveFileIndex(null);
-                setLeftMode("files");
-                const merged = mergeYamlFiles(combined);
-                setYamlText(merged);
-                applyYaml(merged, combined);
-              }}
-              onClick={() => fileInputRef.current?.click()}
-              role="button"
-              tabIndex={0}
-            >
-              <span className="dropzone-title">拖入 / 点击</span>
-              <span className="dropzone-desc">追加 · 去重 · 刷新</span>
-            </div>
-            <div className="header-import-tools" role="group" aria-label="导入 YAML">
-              <button
-                type="button"
-                className="btn-secondary btn-with-icon header-import-btn"
-                onClick={() => fileInputRef.current?.click()}
-                title="导入一个或多个 YAML 文件"
-                aria-label="导入文件"
-              >
-                <Icon d={TRV_ICONS.docFile} className="trv-icon trv-icon--sm" />
-                文件
-              </button>
-              <button
-                type="button"
-                className="btn-secondary btn-with-icon header-import-btn"
-                onClick={() => folderInputRef.current?.click()}
-                title="导入文件夹（保留相对路径）"
-                aria-label="导入文件夹"
-              >
-                <Icon d={TRV_ICONS.folder} className="trv-icon trv-icon--sm" />
-                文件夹
-              </button>
-              {importedFiles?.length ? (
-                <button
-                  type="button"
-                  className="btn-secondary btn-with-icon header-import-btn header-import-btn--danger"
-                  onClick={() => {
-                    setImportedFiles(null);
-                    setActiveFileIndex(null);
-                    setYamlText(SAMPLE_YAML);
-                    setParsedMsg(null);
-                    setLeftMode("yaml");
-                    applyYaml(SAMPLE_YAML, null);
-                  }}
-                  aria-label="清空已导入"
-                  title="清空已导入与编辑区"
-                >
-                  <Icon d={TRV_ICONS.trash} className="trv-icon trv-icon--sm" />
-                  清空
-                </button>
-              ) : null}
-            </div>
-          </section>
-
-          <div className="header-seg header-seg--tools">
-            <div className="header-main-controls">
-              <div className="header-tool-cluster header-tool-cluster--search">
-                <input
-                  className="search-input"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") jumpToMatch(matchCursor + 1);
-                  }}
-                  placeholder="搜索节点（name / host / path / service）"
-                  aria-label="搜索节点"
-                />
-              </div>
-
-              <div className="header-tool-cluster" role="group" aria-label="匹配与画布">
-                <div className="search-nav" role="navigation" aria-label="聚焦导航">
-                <button
-                  type="button"
-                  onClick={() => jumpToMatch(matchCursor - 1)}
-                  disabled={!graphPresentation.matchedNodeIds.length}
-                  aria-label="上一个"
-                  title="上一个"
-                >
-                  <Icon d={TRV_ICONS.chevLeft} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => jumpToMatch(matchCursor + 1)}
-                  disabled={!graphPresentation.matchedNodeIds.length}
-                  aria-label="下一个"
-                  title="下一个"
-                >
-                  <Icon d={TRV_ICONS.chevRight} />
-                </button>
-                <span>
-                  {graphPresentation.matchedNodeIds.length
-                    ? `${matchCursor + 1}/${graphPresentation.matchedNodeIds.length}`
-                    : "0/0"}
-                </span>
-                </div>
-
-                <button
-                  type="button"
-                  className="btn-primary btn-icon"
-                  onClick={() => applyYaml(mergedImportedText ?? yamlText)}
-                  title="重新解析 YAML 并刷新拓扑"
-                  aria-label="刷新"
-                >
-                  <Icon d={TRV_ICONS.refresh} />
-                </button>
-
-                <button
-                  type="button"
-                  className="btn-secondary btn-icon fit"
-                  onClick={() => fitView({ padding: 0.05, duration: 240 })}
-                  title="将拓扑重新适配到当前画布"
-                  aria-label="适配"
-                >
-                  <Icon d={TRV_ICONS.fit} />
-                </button>
-
-                <div className="search-nav" role="group" aria-label="全局缩放控制">
-                  <button
-                    type="button"
-                    onClick={() => setUiScale((v) => clampUiScale(v - UI_SCALE_STEP))}
-                    title="缩小侧栏与拓扑（含文字）"
-                    aria-label="缩小"
-                  >
-                    <Icon d={TRV_ICONS.minus} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setUiScale(1)}
-                    title="将侧栏与拓扑缩放设为 100%"
-                    aria-label="重置缩放"
-                  >
-                    <span className="trv-icon-btn-text">{Math.round(uiScale * 100)}%</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setUiScale((v) => clampUiScale(v + UI_SCALE_STEP))}
-                    title="放大侧栏与拓扑（含文字）"
-                    aria-label="放大"
-                  >
-                    <Icon d={TRV_ICONS.plus} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="header-tool-cluster header-tool-cluster--status" role="group" aria-label="指标与账号">
-                <button
-                  type="button"
-                  className={
-                    statusOpen
-                      ? "btn-secondary btn-icon metric btn-pill-active"
-                      : "btn-secondary btn-icon metric"
-                  }
-                  onClick={() => setStatusOpen((v) => !v)}
-                  title={statusOpen ? "收起指标" : "展开指标"}
-                  aria-label="指标"
-                >
-                  <Icon d={TRV_ICONS.chart} />
-                </button>
-
-                {getRuntimeConfig().auth?.enabled !== false ? (
-                  <button
-                    type="button"
-                    className="btn-secondary btn-icon"
-                    onClick={() => {
-                      clearSession();
-                      window.location.reload();
-                    }}
-                    title="退出登录"
-                    aria-label="退出"
-                  >
-                    <Icon d={TRV_ICONS.logout} />
-                  </button>
-                ) : null}
-
-                {statusOpen ? (
-                  <div
-                    className="header-status-strip header-status-strip-compact"
-                    data-testid="top-status-strip"
-                  >
-                    <span className="status-pill">节点 {graphMetrics.nodeCount}</span>
-                    <span className="status-pill">边 {graphMetrics.edgeCount}</span>
-                    <span className="status-pill">自动 {graphMetrics.autoEdgeCount}</span>
-                    <span className="status-pill">手写 {graphMetrics.manualEdgeCount}</span>
-                    <span className="status-pill">
-                      已选 {selectionMetrics.selectedNodeCount}/{selectionMetrics.selectedEdgeCount}
-                    </span>
-                    <span className="status-pill">
-                      刷新 {formatClockTime(lastAppliedAt)}
-                      {parsedMsg ? "（告警）" : "（正常）"}
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-            </div>
+            <span className="status-pill">
+              刷新 {formatClockTime(lastAppliedAt)}
+              {parsedMsg ? "（告警）" : "（正常）"}
+            </span>
           </div>
-        </div>
-      </header>
+        }
+      />
 
       {parsedMsg ? (
         <div className="parse-warning" data-testid="parse-warning">
