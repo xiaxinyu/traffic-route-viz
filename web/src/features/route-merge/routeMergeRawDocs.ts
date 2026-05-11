@@ -2,6 +2,7 @@ import { parseAllDocuments, stringify } from "yaml";
 
 import type { ImportedYamlFile } from "../../domain/mergeYamlBundles";
 import { mergeYamlFiles } from "../../domain/mergeYamlBundles";
+import { stripK8sMetadataNoise } from "../../domain/yamlLineStats";
 
 export type RawK8sObject = Record<string, unknown>;
 
@@ -30,10 +31,11 @@ function resourceRefKey(kind: string, ns: string | undefined, name: string | und
  * Parse YAML text into per-document records with round-trip YAML for candidate generation.
  */
 export function extractIndexedDocsFromText(text: string, sourceFile?: string): IndexedRawDoc[] {
-  if (!text.trim()) return [];
+  const sanitized = stripK8sMetadataNoise(text);
+  if (!sanitized.trim()) return [];
   const out: IndexedRawDoc[] = [];
   try {
-    const docs = parseAllDocuments(text);
+    const docs = parseAllDocuments(sanitized);
     for (const doc of docs) {
       const js = doc.toJS();
       const o = asRecord(js);

@@ -58,7 +58,7 @@ import {
 } from "../features/route-merge/routeMergeAiConfig";
 import { useRouteMergeAi } from "../features/route-merge/useRouteMergeAi";
 import { useRouteMergeAnalysis } from "../features/route-merge/useRouteMergeAnalysis";
-import { summarizeImportedYamlLines } from "../domain/yamlLineStats";
+import { stripK8sMetadataNoise, summarizeImportedYamlLines } from "../domain/yamlLineStats";
 import { getRuntimeConfig } from "../domain/runtimeConfig";
 import { flowNodeTypes } from "./nodeTypes";
 import { AppHeader } from "./AppHeader";
@@ -228,8 +228,21 @@ export function AppInner() {
 
   const applyYaml = useCallback(
     (overrideText?: string, importedFilesOverride?: ImportedYamlFile[] | null) => {
-      const src = overrideText ?? yamlText;
-      const effectiveFiles = importedFilesOverride ?? importedFiles;
+      const srcRaw = overrideText ?? yamlText;
+      const src = stripK8sMetadataNoise(srcRaw);
+      const effectiveFilesRaw = importedFilesOverride ?? importedFiles;
+      const effectiveFiles = effectiveFilesRaw?.length
+        ? effectiveFilesRaw.map((f) => ({ ...f, text: stripK8sMetadataNoise(f.text) }))
+        : null;
+
+      if (src !== srcRaw) {
+        updateYamlText(src);
+      }
+      if (effectiveFilesRaw?.length) {
+        const changed = effectiveFiles!.some((f, i) => f.text !== effectiveFilesRaw[i]!.text);
+        if (changed) setImportedFiles(effectiveFiles);
+      }
+
       const p = effectiveFiles?.length
         ? mergeParseResults(effectiveFiles.map((f) => parseK8sYaml(f.text, f.relPath ?? f.name)))
         : parseK8sYaml(src);
@@ -251,7 +264,8 @@ export function AppInner() {
   const handleImportFileList = useCallback(
     async (list: FileList | null) => {
       if (!list?.length) return;
-      const incoming = await readImportedYamlFiles(list);
+      const incomingRaw = await readImportedYamlFiles(list);
+      const incoming = incomingRaw.map((f) => ({ ...f, text: stripK8sMetadataNoise(f.text) }));
       const combined = mergeImportedFiles(importedFiles, incoming);
       setImportedFiles(combined);
       setActiveFileIndex(null);
