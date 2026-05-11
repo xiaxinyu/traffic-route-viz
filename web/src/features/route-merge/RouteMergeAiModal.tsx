@@ -23,14 +23,6 @@ type DiffDisplayRow =
       count: number;
     };
 
-type DiffStats = {
-  added: number;
-  deleted: number;
-  modified: number;
-  unchanged: number;
-  hidden: number;
-};
-
 type DiffOp =
   | { kind: "equal"; oldIndex: number; newIndex: number }
   | { kind: "delete"; oldIndex: number }
@@ -193,19 +185,6 @@ function lineRangeLabel(start: number | null, end: number | null): string {
   return start === end ? String(start) : `${start}-${end}`;
 }
 
-function buildDiffStats(rows: DiffRow[], hidden = 0): DiffStats {
-  return rows.reduce<DiffStats>(
-    (acc, row) => {
-      if (row.kind === "add") acc.added += 1;
-      else if (row.kind === "delete") acc.deleted += 1;
-      else if (row.kind === "modify") acc.modified += 1;
-      else acc.unchanged += 1;
-      return acc;
-    },
-    { added: 0, deleted: 0, modified: 0, unchanged: 0, hidden },
-  );
-}
-
 function buildDiffDisplayRows(rows: DiffRow[]): { rows: DiffDisplayRow[]; hidden: number } {
   const context = 4;
   const maxRenderedRows = 2_400;
@@ -290,12 +269,14 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
     [hasOptimizedYaml, sourceYaml, optimizedYaml],
   );
   const diffDisplay = useMemo(() => buildDiffDisplayRows(diffRows), [diffRows]);
-  const diffStats = useMemo(
-    () => buildDiffStats(diffRows, diffDisplay.hidden),
-    [diffRows, diffDisplay.hidden],
-  );
   const sourceLineCount = useMemo(() => countYamlLines(sourceYaml), [sourceYaml]);
   const optimizedLineCount = useMemo(() => countYamlLines(optimizedYaml), [optimizedYaml]);
+  const sourceLines = useMemo(() => splitYamlLines(sourceYaml), [sourceYaml]);
+  const optimizedLines = useMemo(() => splitYamlLines(optimizedYaml), [optimizedYaml]);
+  const lineDigits = useMemo(
+    () => String(Math.max(sourceLines.length, optimizedLines.length, 1)).length,
+    [sourceLines.length, optimizedLines.length],
+  );
 
   if (!open) return null;
 
@@ -338,9 +319,9 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
           {!payload && !busy && !error ? (
             <div className="route-merge-ai-preview">
               <div className="route-merge-ai-preview-head">
-                <strong>发送前预览</strong>
+                <strong>将发送的 YAML 片段（预览）</strong>
                 <span className="route-merge-ai-preview-hint">
-                  点击「开始分析」后将把下方预览内容发送到你配置的模型端点。
+                  点击「开始分析」后会把完整输入发送到模型；此处仅展示关键 YAML 片段供你核对。
                 </span>
               </div>
               <div className="route-merge-ai-preview-actions">
@@ -416,63 +397,94 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                   ))}
                 </ul>
               ) : null}
-              {hasOptimizedYaml ? (
-                <>
-                  <div className="route-merge-ai-yaml-actions">
-                    <strong className="route-merge-ai-yaml-title">YAML Diff 对比</strong>
-                    <span className="route-merge-ai-diff-stat route-merge-ai-diff-stat--add">
-                      +{diffStats.added}
-                    </span>
-                    <span className="route-merge-ai-diff-stat route-merge-ai-diff-stat--delete">
-                      -{diffStats.deleted}
-                    </span>
-                    <span className="route-merge-ai-diff-stat route-merge-ai-diff-stat--modify">
-                      改 {diffStats.modified}
-                    </span>
-                    {diffStats.hidden ? (
-                      <span className="route-merge-ai-diff-stat">折叠 {diffStats.hidden} 行</span>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="btn-link"
-                      onClick={() => void navigator.clipboard.writeText(optimizedYaml)}
-                    >
-                      复制右侧完整 YAML
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-link"
-                      onClick={() =>
-                        downloadText(
-                          `route-merge-ai-${Date.now()}.yaml`,
-                          optimizedYaml,
-                          "text/yaml;charset=utf-8",
-                        )
-                      }
-                    >
-                      下载
-                    </button>
-                  </div>
-                  {aiYamlCheck ? (
-                    <div
-                      className={
-                        aiYamlCheck.ok ? "route-merge-validate ok" : "route-merge-validate bad"
-                      }
-                    >
-                      本地校验：{aiYamlCheck.detail}
-                    </div>
-                  ) : null}
-                  <div
-                    className="route-merge-ai-diff"
-                    role="region"
-                    aria-label="原始 YAML 与 AI 生成 YAML 差异对比"
+              <div className="route-merge-ai-yaml-area" role="region" aria-label="原始与优化后的 YAML">
+                <div className="route-merge-ai-yaml-actions">
+                  <strong className="route-merge-ai-yaml-title">YAML 输出</strong>
+                  <span className="route-merge-ai-diff-stat">左 {sourceLineCount} 行</span>
+                  <span className="route-merge-ai-diff-stat">右 {optimizedLineCount} 行</span>
+                  <button
+                    type="button"
+                    className="btn-link"
+                    onClick={() => void navigator.clipboard.writeText(sourceYaml)}
                   >
+                    复制原始 YAML
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-link"
+                    onClick={() => void navigator.clipboard.writeText(optimizedYaml)}
+                    disabled={!hasOptimizedYaml}
+                  >
+                    复制优化后 YAML
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-link"
+                    onClick={() =>
+                      downloadText(
+                        `route-merge-ai-${Date.now()}.yaml`,
+                        optimizedYaml,
+                        "text/yaml;charset=utf-8",
+                      )
+                    }
+                    disabled={!hasOptimizedYaml}
+                  >
+                    下载优化后 YAML
+                  </button>
+                </div>
+
+                {aiYamlCheck ? (
+                  <div className={aiYamlCheck.ok ? "route-merge-validate ok" : "route-merge-validate bad"}>
+                    本地校验：{aiYamlCheck.detail}
+                  </div>
+                ) : null}
+
+                {!hasOptimizedYaml ? (
+                  <div className="route-merge-ai-empty-yaml">
+                    本次 AI 输出未包含完整 optimizedYaml。已保留原始 YAML（左侧）；请重试或调整模型配置后再次分析。
+                  </div>
+                ) : null}
+
+                <div className="route-merge-ai-yaml-grid" role="region" aria-label="原始 YAML 与优化后 YAML">
+                  <div className="route-merge-ai-yaml-pane">
+                    <div className="route-merge-ai-yaml-head">
+                      <span>原始 YAML</span>
+                      <span>{sourceLineCount} 行</span>
+                    </div>
+                    <div className="route-merge-ai-code-shell">
+                      <div className="route-merge-ai-code-gutter" aria-hidden="true">
+                        {sourceLines.map((_, i) => (
+                          <span key={`old-${i}`}>{String(i + 1).padStart(lineDigits, " ")}</span>
+                        ))}
+                      </div>
+                      <pre className="route-merge-ai-code-pre">{sourceLines.join("\n") || " "}</pre>
+                    </div>
+                  </div>
+
+                  <div className="route-merge-ai-yaml-pane">
+                    <div className="route-merge-ai-yaml-head">
+                      <span>优化后 YAML</span>
+                      <span>{optimizedLineCount} 行</span>
+                    </div>
+                    <div className="route-merge-ai-code-shell">
+                      <div className="route-merge-ai-code-gutter" aria-hidden="true">
+                        {optimizedLines.map((_, i) => (
+                          <span key={`new-${i}`}>{String(i + 1).padStart(lineDigits, " ")}</span>
+                        ))}
+                      </div>
+                      <pre className="route-merge-ai-code-pre">{optimizedLines.join("\n") || " "}</pre>
+                    </div>
+                  </div>
+                </div>
+
+                {hasOptimizedYaml ? (
+                  <div className="route-merge-ai-diff" role="region" aria-label="原始 YAML 与 AI 生成 YAML 差异对比">
                     <div className="route-merge-ai-diff-head route-merge-ai-diff-head--old">
-                      <span>原有内容</span>
+                      <span>Diff（原始）</span>
                       <span>{sourceLineCount} 行</span>
                     </div>
                     <div className="route-merge-ai-diff-head route-merge-ai-diff-head--new">
-                      <span>新生成代码</span>
+                      <span>Diff（优化后）</span>
                       <span>{optimizedLineCount} 行</span>
                     </div>
                     {diffDisplay.rows.map((row, index) =>
@@ -493,28 +505,19 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                           key={`${row.kind}-${row.oldLineNo ?? "x"}-${row.newLineNo ?? "x"}-${index}`}
                         >
                           <div className="route-merge-ai-diff-cell route-merge-ai-diff-cell--old">
-                            <span className="route-merge-ai-diff-line-no">
-                              {row.oldLineNo ?? ""}
-                            </span>
+                            <span className="route-merge-ai-diff-line-no">{row.oldLineNo ?? ""}</span>
                             <code>{row.oldText || " "}</code>
                           </div>
                           <div className="route-merge-ai-diff-cell route-merge-ai-diff-cell--new">
-                            <span className="route-merge-ai-diff-line-no">
-                              {row.newLineNo ?? ""}
-                            </span>
+                            <span className="route-merge-ai-diff-line-no">{row.newLineNo ?? ""}</span>
                             <code>{row.newText || " "}</code>
                           </div>
                         </div>
                       ),
                     )}
                   </div>
-                </>
-              ) : (
-                <div className="route-merge-ai-empty-yaml">
-                  AI 未返回完整新
-                  YAML。通常表示模型认为当前建议需要人工确认，或输入过大无法保证输出完整结果。
-                </div>
-              )}
+                ) : null}
+              </div>
               {payload.disclaimer ? (
                 <div className="route-merge-disclaimer">{payload.disclaimer}</div>
               ) : null}

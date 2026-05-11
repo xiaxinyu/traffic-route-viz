@@ -39,31 +39,22 @@ export type BuildRouteMergeAiUserContentOptions = {
 
 /**
  * Preview content shown to users before sending to model.
- * Intentionally focuses on human-relevant YAML snippets (Ingress/VirtualService/DestinationRule),
- * without embedding the full YAML corpus.
+ * Intentionally shows only raw YAML snippets (no rule-engine jargon),
+ * while the actual request still includes full constraints + merged YAML.
  */
 export function buildRouteMergeAiPreviewContent(
-  analysis: RouteMergeAnalysis,
   indexed: IndexedRawDoc[],
   options?: BuildRouteMergeAiUserContentOptions,
 ): string {
   const maxTotalChars = options?.maxTotalChars ?? 120_000;
-  const scopeHeading = options?.scopeHeading?.trim();
-  const perKindBudget = Math.floor(maxTotalChars / 3);
-  const ing = collectKindYaml(indexed, "Ingress", perKindBudget);
+  const perKindBudget = Math.floor(maxTotalChars);
   const vs = collectKindYaml(indexed, "VirtualService", perKindBudget);
   const dr = collectKindYaml(indexed, "DestinationRule", perKindBudget);
-  const rules = analysis.recommendations
-    .map(
-      (r) =>
-        `- [${r.level}] ${r.kind} ${r.resourceRefs.join(", ")}: ${r.rationale} (Δ行≈${r.estimatedLineDelta})`,
-    )
-    .join("\n");
-  const core = clip(
-    `${scopeHeading ? `## 分析范围\n${scopeHeading}\n\n` : ""}## 规则引擎摘要\n${rules}\n\n## VirtualService YAML\n${vs || "(无)"}\n\n## Ingress YAML\n${ing || "(无)"}\n\n## DestinationRule YAML\n${dr || "(无)"}`,
+  const ing = collectKindYaml(indexed, "Ingress", perKindBudget);
+  return clip(
+    `## VirtualService YAML\n${vs || "(无)"}\n\n## DestinationRule YAML\n${dr || "(无)"}\n\n## Ingress YAML\n${ing || "(无)"}`,
     maxTotalChars,
   );
-  return core;
 }
 
 export function buildRouteMergeAiUserContent(

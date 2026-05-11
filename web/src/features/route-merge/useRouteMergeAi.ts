@@ -63,7 +63,7 @@ export function useRouteMergeAi(yamlText: string, importedFiles: ImportedYamlFil
       ? "当前为**合并视图**：规则引擎摘要覆盖所有已导入文件；「当前完整 YAML」为所有文件拼接后的最终输入。若输出 optimizedYaml，必须输出合并视图下建议后的完整新 YAML。"
       : "当前为**仅编辑器 YAML**（未使用多文件导入）。若输出 optimizedYaml，必须输出当前编辑区建议后的完整新 YAML；不要假设存在未出现在 YAML 中的其它清单文件。";
     const user = buildRouteMergeAiUserContent(analysis, indexed, mergedYaml, { scopeHeading });
-    const preview = buildRouteMergeAiPreviewContent(analysis, indexed, { scopeHeading });
+    const preview = buildRouteMergeAiPreviewContent(indexed, { scopeHeading });
     setPreparedCfg(cfg);
     setPreparedUserContent(user);
     setPreviewUserContent(preview);
@@ -110,7 +110,7 @@ export function useRouteMergeAi(yamlText: string, importedFiles: ImportedYamlFil
       const user = buildRouteMergeAiUserContent(analysisSubset, indexedSubset, mergedFile, {
         scopeHeading,
       });
-      const preview = buildRouteMergeAiPreviewContent(analysisSubset, indexedSubset, { scopeHeading });
+      const preview = buildRouteMergeAiPreviewContent(indexedSubset, { scopeHeading });
       setPreparedCfg(cfg);
       setPreparedUserContent(user);
       setPreviewUserContent(preview);

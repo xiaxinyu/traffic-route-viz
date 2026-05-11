@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import type { RouteMergeAnalysis } from "./routeMergeTypes";
 
@@ -20,13 +20,36 @@ export function RouteMergeHelpTrigger(props: RouteMergeHelpTriggerProps) {
   const { analysis, variant = "compact" } = props;
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  const btnRef = useRef<HTMLButtonElement | null>(null);
   const id = useId();
   const tipId = `${id}-route-merge-help`;
+  const [pos, setPos] = useState<{ left: number; top: number; width: number } | null>(null);
 
   const close = useCallback(() => setOpen(false), []);
 
+  const clamp = useCallback((v: number, min: number, max: number) => Math.max(min, Math.min(max, v)), []);
+
+  const computePos = useCallback(() => {
+    const btn = btnRef.current;
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const targetWidth = Math.min(520, Math.floor(vw * 0.92));
+    const margin = 10;
+    const left =
+      variant === "toolbar"
+        ? clamp(r.left, margin, vw - targetWidth - margin)
+        : clamp(r.right - targetWidth, margin, vw - targetWidth - margin);
+    const top = clamp(r.bottom + 8, margin, vh - 120);
+    setPos({ left, top, width: targetWidth });
+  }, [clamp, variant]);
+
+  const hasContent = useMemo(() => analysis.recommendations.length > 0, [analysis.recommendations.length]);
+
   useEffect(() => {
     if (!open) return;
+    computePos();
     const onDoc = (e: MouseEvent) => {
       const t = e.target as Node;
       if (!wrapRef.current?.contains(t)) close();
@@ -36,17 +59,23 @@ export function RouteMergeHelpTrigger(props: RouteMergeHelpTriggerProps) {
     };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
+    const onWin = () => computePos();
+    window.addEventListener("resize", onWin);
+    window.addEventListener("scroll", onWin, true);
     return () => {
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onWin);
+      window.removeEventListener("scroll", onWin, true);
     };
-  }, [open, close]);
+  }, [open, close, computePos]);
 
   return (
     <div className={`route-merge-help-wrap route-merge-help-wrap--${variant}`} ref={wrapRef}>
       <button
         type="button"
         className="route-merge-help-btn"
+        ref={btnRef}
         aria-label="路由合并建议（v1）说明"
         aria-expanded={open}
         aria-controls={tipId}
@@ -58,10 +87,15 @@ export function RouteMergeHelpTrigger(props: RouteMergeHelpTriggerProps) {
       {open ? (
         <div
           id={tipId}
-          className="route-merge-help-popover"
+          className="route-merge-help-popover route-merge-help-popover--fixed"
           role="dialog"
           aria-label="路由合并建议（v1）"
           onMouseDown={(e) => e.stopPropagation()}
+          style={
+            pos
+              ? { position: "fixed", left: `${pos.left}px`, top: `${pos.top}px`, width: `${pos.width}px` }
+              : undefined
+          }
         >
           <div className="route-merge-help-popover-head">
             <span className="route-merge-help-popover-title">路由合并建议（v1）</span>
@@ -72,7 +106,7 @@ export function RouteMergeHelpTrigger(props: RouteMergeHelpTriggerProps) {
           <div className="route-merge-help-popover-body">
             <p className="route-merge-help-reminder">{analysis.v1RulesReminder}</p>
             <p className="route-merge-help-hint">dry-run；不修改编辑器；规则引擎仅分析与导出候选。</p>
-            {analysis.recommendations.length === 0 ? (
+            {!hasContent ? (
               <p className="route-merge-help-empty">当前无规则引擎条目。</p>
             ) : (
               <ul className="route-merge-help-list">
