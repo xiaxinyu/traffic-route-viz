@@ -6,6 +6,23 @@ export type RuntimeConfig = {
     /** Session TTL in hours */
     ttlHours?: number;
   };
+  /**
+   * 可选：路由合并「AI 助手」调用 Azure OpenAI（浏览器直连或 dev 代理）。
+   * apiKey 出现在浏览器可见配置中，仅限可信内网；生产更推荐网关或 Vite 代理注入。
+   */
+  routeMergeAi?: {
+    enabled?: boolean;
+    /** 例如 `https://<resource>.cognitiveservices.azure.com/openai` */
+    baseUrl?: string;
+    deployment?: string;
+    apiVersion?: string;
+    apiKey?: string;
+    /**
+     * 开发模式：请求发往同源 `/trv-azure-openai`，由 Vite 代理转发并在服务端加 `api-key`
+     *（见 web/.env 中 `AZURE_OPENAI_API_KEY`）。
+     */
+    useDevProxy?: boolean;
+  };
 };
 
 declare global {

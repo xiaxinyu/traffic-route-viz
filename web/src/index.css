@@ -966,6 +966,192 @@ body {
   height: 7px !important;
 }
 
+.route-merge-panel {
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.route-merge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.route-merge-auto-hint,
+.route-merge-hint {
+  margin-top: 6px;
+  font-size: 10px;
+  color: #64748b;
+  line-height: 1.35;
+}
+
+.route-merge-v1 {
+  margin-top: 6px;
+  font-size: 10px;
+  color: #475569;
+  line-height: 1.35;
+}
+
+.route-merge-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.route-merge-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 6px;
+  background: #fafbfc;
+}
+
+.route-merge-item.level-safe {
+  border-color: #86efac;
+}
+
+.route-merge-item.level-review {
+  border-color: #fde047;
+}
+
+.route-merge-item.level-blocked {
+  border-color: #fca5a5;
+}
+
+.route-merge-item-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.route-merge-badge {
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #0f172a;
+}
+
+.route-merge-kind {
+  font-size: 10px;
+  font-weight: 800;
+  color: #64748b;
+}
+
+.route-merge-rationale {
+  font-size: 11px;
+  color: #0f172a;
+  line-height: 1.35;
+}
+
+.route-merge-refs {
+  margin-top: 4px;
+  font-size: 10px;
+  color: #64748b;
+}
+
+.route-merge-warn {
+  margin: 4px 0 0 16px;
+  padding: 0;
+  font-size: 10px;
+  color: #b45309;
+}
+
+.route-merge-candidate-actions {
+  margin-top: 6px;
+  display: flex;
+  gap: 10px;
+}
+
+.route-merge-ai {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #e2e8f0;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.route-merge-ai-title {
+  font-size: 12px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.route-merge-ai-summary {
+  font-size: 11px;
+  color: #334155;
+  margin: 6px 0;
+}
+
+.route-merge-ai-block {
+  font-size: 11px;
+  margin-top: 6px;
+}
+
+.route-merge-ai-block ul {
+  margin: 4px 0 0 16px;
+  padding: 0;
+}
+
+.route-merge-ai-suggestions {
+  margin: 6px 0 0 16px;
+  padding: 0;
+  font-size: 11px;
+}
+
+.route-merge-risk {
+  color: #b45309;
+  font-weight: 700;
+}
+
+.route-merge-ai-yaml-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.route-merge-validate {
+  margin-top: 4px;
+  font-size: 10px;
+}
+
+.route-merge-validate.ok {
+  color: #15803d;
+}
+
+.route-merge-validate.bad {
+  color: #b91c1c;
+}
+
+.route-merge-ai-pre {
+  margin-top: 6px;
+  max-height: 120px;
+  overflow: auto;
+  font-size: 10px;
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.route-merge-disclaimer {
+  margin-top: 6px;
+  font-size: 10px;
+  color: #64748b;
+}
+
+.route-merge-error {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #b91c1c;
+}
+
 .trv-region-resizer-line {
   /* biome-ignore lint/complexity/noImportantStyles: React Flow injects resize-control defaults with high specificity. */
   border-color: #64748b !important;

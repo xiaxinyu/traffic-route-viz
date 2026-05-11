@@ -72,6 +72,7 @@
   - **VirtualService v1 Safe 边界**：仅同 namespace、`hosts` 集合一致、`gateways` 集合一致；v1 只合并 `spec.http[]`；复杂字段（如 `tcp`/`tls`/`exportTo`/`delegate`/`mirror`/`corsPolicy`/`retries`/`fault`/`timeout` 等）若无法完整保留，必须降级为 Review。
   - 候选 YAML 生成必须基于 **原始 YAML document/AST** 保留字段；`ParseResult` 只作为候选发现和画布闭环验证依据。缺少原始 doc 或无法安全序列化时，不得生成候选 YAML。
   - 候选 YAML 必须可重新导入：`parseK8sYaml` 不崩溃，`buildFlowGraph` 可渲染入口/路由链路。冲突样例必须验证不会生成 `candidateYaml`。
+  - **AI 优化建议（可选）**：在 `config.json` / `VITE_*` 中启用并配置 Azure OpenAI（`baseUrl`、`deployment`、`api-version`、密钥）后，用户可将当前 Ingress / VirtualService / DestinationRule 片段与规则引擎摘要一并发送给模型，获取领域化建议与可选 `optimizedYaml`。**启用即表示 YAML 会离开浏览器到达配置的模型端点**；密钥写入 `config.json` 会在客户端可见，仅限可信环境；本地开发推荐使用 Vite 代理（`routeMergeAi.useDevProxy` + `web/.env` 中 `AZURE_OPENAI_API_KEY`）。AI 输出须经人工复核，本地面板会尝试对 `optimizedYaml` 做 `parseK8sYaml` + `buildFlowGraph` 校验并展示结果。
 
 ### 文本输入（必须）
 

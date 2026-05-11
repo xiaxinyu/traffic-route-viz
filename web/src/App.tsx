@@ -51,6 +51,7 @@ import {
   type ImportedYamlFile,
 } from "./mergeYamlBundles";
 import { parseK8sYaml } from "./k8sParser";
+import { RouteMergePanel } from "./RouteMergePanel";
 import { summarizeImportedYamlLines } from "./yamlLineStats";
 import {
   DestinationRuleNode,
@@ -601,7 +602,7 @@ function AppInner() {
                 aria-label="搜索节点"
               />
 
-              <div className="search-nav" aria-label="聚焦导航">
+              <div className="search-nav" role="navigation" aria-label="聚焦导航">
                 <button
                   type="button"
                   onClick={() => jumpToMatch(matchCursor - 1)}
@@ -849,6 +850,8 @@ function AppInner() {
               ) : null}
             </div>
           </section>
+
+          <RouteMergePanel yamlText={yamlText} importedFiles={importedFiles} />
 
           <section className="left-panel-block compact">
             <div className="block-title-row">
