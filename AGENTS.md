@@ -15,15 +15,19 @@
 
 ## 代码入口（最常改的）
 
-- 解析：`web/src/k8sParser.ts`
-- 多文件合并：`web/src/mergeYamlBundles.ts`
-- 构图/布局：`web/src/buildGraph.ts`
-- Ingress ↔ Istio URI 相交判定：`web/src/istioIngressPathMatch.ts`（由 `buildGraph` 调用）
-- 节点 UI：`web/src/FlowNodes.tsx`
-- 画布宿主：`web/src/App.tsx`
-- 手写边/会话文件：`web/src/diagramPersist.ts`
-- PNG：`web/src/diagramExportPng.ts`
-- 画布操作条：`web/src/DiagramActions.tsx`
+目录分层见 `web/src/README.md`（`app/`、`features/`、`domain/`）。
+
+- 解析：`web/src/domain/k8sParser.ts`
+- 多文件合并：`web/src/domain/mergeYamlBundles.ts`
+- 构图/布局：`web/src/domain/buildGraph.ts`
+- Ingress ↔ Istio URI 相交判定：`web/src/domain/istioIngressPathMatch.ts`（由 `buildGraph` 调用）
+- 节点 UI：`web/src/features/diagram/FlowNodes.tsx`
+- 画布宿主：`web/src/app/AppInner.tsx`（根 `web/src/App.tsx` 仅 re-export）
+- 手写边/会话文件：`web/src/domain/diagramPersist.ts`
+- PNG：`web/src/domain/diagramExportPng.ts`
+- 画布操作条：`web/src/features/diagram/DiagramActions.tsx`
+- 路由合并 v1 规则引擎：`web/src/features/route-merge/routeMergeRecommend.ts`；展示由 `web/src/features/route-merge/RouteMergeHelpTrigger.tsx` + `useRouteMergeAnalysis.ts`（「?」浮层）。
+- 路由合并 AI：`web/src/features/route-merge/`（`RouteMergeAiModal.tsx`、`useRouteMergeAi.ts`、`routeMergeAi.ts`、`routeMergeAiPrompt.ts` 等）
 
 ## 常用命令
 

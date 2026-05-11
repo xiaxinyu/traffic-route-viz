@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "aoai:chat": "node scripts/aoai-chat.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "format": "biome format --write .",
     "format:check": "biome format .",
@@ -28,13 +29,15 @@
     "yaml": "^2.6.1"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.14",
+    "@playwright/test": "1.53.0",
+    "@types/node": "^22.15.3",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
-    "@types/node": "^22.15.3",
     "@vitejs/plugin-react": "^4.3.4",
-    "@playwright/test": "1.53.0",
-    "@biomejs/biome": "^2.4.14",
+    "dotenv": "^17.4.2",
     "jsdom": "^26.1.0",
+    "openai": "^6.37.0",
     "typescript": "~5.6.3",
     "vite": "^6.0.3",
     "vitest": "^3.2.4"

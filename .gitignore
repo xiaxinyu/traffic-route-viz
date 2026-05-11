@@ -23,3 +23,7 @@ web/public/config.json
 
 # pnpm store/cache (must not commit)
 .pnpm-store/
+
+config.json
+
+.env

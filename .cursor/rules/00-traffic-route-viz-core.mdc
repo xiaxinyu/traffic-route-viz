@@ -15,10 +15,10 @@ alwaysApply: true
 - Treat `HARNESS_ENGINEERING.md` as acceptance criteria. If behavior conflicts, update code **and** update the doc in the same change.
 - Prefer small, reviewable changes. After meaningful edits, ensure `web/` builds (`pnpm run build`) and no new lints.
 - Keep changes aligned with current architecture:
-  - Parse: `web/src/k8sParser.ts`
-  - Graph/layout: `web/src/buildGraph.ts`
-  - Node UI: `web/src/FlowNodes.tsx`
-  - Import/UI: `web/src/App.tsx`
+  - Parse: `web/src/domain/k8sParser.ts`
+  - Graph/layout: `web/src/domain/buildGraph.ts`
+  - Node UI: `web/src/features/diagram/FlowNodes.tsx`
+  - App shell / import UI: `web/src/app/AppInner.tsx`
 
 ## Non-goals (unless explicitly requested)
 

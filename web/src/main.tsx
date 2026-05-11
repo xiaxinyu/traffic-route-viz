@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import App from "./App";
-import { loadRuntimeConfig } from "./runtimeConfig";
+import { loadRuntimeConfig } from "./domain/runtimeConfig";
 
 import "./index.css";
 
