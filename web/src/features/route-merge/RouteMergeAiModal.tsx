@@ -1,14 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 
 import { buildFlowGraph } from "../../domain/buildGraph";
 import { parseK8sYaml } from "../../domain/k8sParser";
-import {
-  ROUTE_MERGE_AI_SYSTEM_PROMPT_BUILTIN,
-  clearLocalRouteMergeAiSystemPrompt,
-  describeRouteMergeAiPromptSource,
-  resolveRouteMergeAiSystemPrompt,
-  writeLocalRouteMergeAiSystemPrompt,
-} from "./routeMergeAiPrompt";
 import type { RouteMergeAiPayload } from "./routeMergeTypes";
 
 type DiffKind = "equal" | "add" | "delete" | "modify";
@@ -269,24 +262,12 @@ export type RouteMergeAiModalProps = {
   error: string | null;
   scopeLabel: string | null;
   sourceYaml: string;
+  previewUserContent: string;
+  onConfirmRun: () => void;
 };
 
-function promptSourceLabel(src: ReturnType<typeof describeRouteMergeAiPromptSource>): string {
-  if (src === "local") return "本浏览器已保存的模版";
-  if (src === "config") return "config.json 中的 systemPrompt";
-  return "内置默认";
-}
-
 export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
-  const { open, onClose, busy, payload, error, scopeLabel, sourceYaml } = props;
-  const [promptDraft, setPromptDraft] = useState("");
-  const [promptStamp, setPromptStamp] = useState(0);
-
-  useEffect(() => {
-    if (open) {
-      setPromptDraft(resolveRouteMergeAiSystemPrompt());
-    }
-  }, [open, promptStamp]);
+  const { open, onClose, busy, payload, error, scopeLabel, sourceYaml, previewUserContent, onConfirmRun } = props;
 
   useEffect(() => {
     if (!open) return;
@@ -302,7 +283,6 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
     return validateYamlForGraph(payload.optimizedYaml);
   }, [payload]);
 
-  const effectiveSource = useMemo(() => describeRouteMergeAiPromptSource(), [promptStamp]);
   const optimizedYaml = payload?.optimizedYaml ?? "";
   const hasOptimizedYaml = optimizedYaml.trim().length > 0;
   const diffRows = useMemo(
@@ -353,6 +333,43 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
 
           {error ? (
             <div className="route-merge-error route-merge-ai-modal-error">{error}</div>
+          ) : null}
+
+          {!payload && !busy && !error ? (
+            <div className="route-merge-ai-preview">
+              <div className="route-merge-ai-preview-head">
+                <strong>发送前预览</strong>
+                <span className="route-merge-ai-preview-hint">
+                  点击「开始分析」后将把下方预览内容发送到你配置的模型端点。
+                </span>
+              </div>
+              <div className="route-merge-ai-preview-actions">
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => onConfirmRun()}
+                  disabled={!previewUserContent.trim()}
+                >
+                  开始分析
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => void navigator.clipboard.writeText(previewUserContent)}
+                  disabled={!previewUserContent.trim()}
+                >
+                  复制预览输入
+                </button>
+              </div>
+              <textarea
+                className="route-merge-ai-preview-textarea"
+                value={previewUserContent}
+                readOnly
+                spellCheck={false}
+                rows={14}
+                aria-label="将发送给模型的用户内容预览"
+              />
+            </div>
           ) : null}
 
           {payload ? (
@@ -504,47 +521,6 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
             </div>
           ) : null}
 
-          <details className="route-merge-ai-template-details">
-            <summary>系统提示模版（影响下一次请求）</summary>
-            <p className="route-merge-ai-template-meta">
-              当前生效来源：<strong>{promptSourceLabel(effectiveSource)}</strong>
-              。优先级：此处保存到浏览器 &gt;{" "}
-              <code className="route-merge-ai-code">config.json</code>{" "}
-              <code className="route-merge-ai-code">routeMergeAi.systemPrompt</code> &gt;
-              内置。须让模型仍只输出与面板兼容的 JSON，否则无法解析。
-            </p>
-            <textarea
-              className="route-merge-ai-template-textarea"
-              spellCheck={false}
-              value={promptDraft}
-              onChange={(e) => setPromptDraft(e.target.value)}
-              rows={12}
-              aria-label="系统提示模版"
-            />
-            <div className="route-merge-ai-template-actions">
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => {
-                  writeLocalRouteMergeAiSystemPrompt(promptDraft);
-                  setPromptStamp((n) => n + 1);
-                }}
-              >
-                保存到本浏览器
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => {
-                  clearLocalRouteMergeAiSystemPrompt();
-                  setPromptDraft(ROUTE_MERGE_AI_SYSTEM_PROMPT_BUILTIN);
-                  setPromptStamp((n) => n + 1);
-                }}
-              >
-                清除浏览器覆盖并填入内置
-              </button>
-            </div>
-          </details>
         </div>
       </div>
     </div>

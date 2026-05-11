@@ -104,6 +104,10 @@ export function AppInner() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
   const flowContainerRef = useRef<HTMLDivElement | null>(null);
+  const yamlGutterRef = useRef<HTMLDivElement | null>(null);
+  const yamlTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const yamlPopoutGutterRef = useRef<HTMLDivElement | null>(null);
+  const yamlPopoutTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const { fitView, setCenter } = useReactFlow();
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
@@ -452,6 +456,25 @@ export function AppInner() {
     [],
   );
 
+  const syncYamlGutterScroll = useCallback(() => {
+    const ta = yamlTextareaRef.current;
+    const gutter = yamlGutterRef.current;
+    if (!ta || !gutter) return;
+    if (gutter.scrollTop !== ta.scrollTop) gutter.scrollTop = ta.scrollTop;
+  }, []);
+
+  const syncYamlPopoutGutterScroll = useCallback(() => {
+    const ta = yamlPopoutTextareaRef.current;
+    const gutter = yamlPopoutGutterRef.current;
+    if (!ta || !gutter) return;
+    if (gutter.scrollTop !== ta.scrollTop) gutter.scrollTop = ta.scrollTop;
+  }, []);
+
+  useEffect(() => {
+    syncYamlGutterScroll();
+    syncYamlPopoutGutterScroll();
+  }, [yamlTextStats.lineCount, yamlPopoutOpen, syncYamlGutterScroll, syncYamlPopoutGutterScroll]);
+
   return (
     <div className="app-shell">
       <input
@@ -628,7 +651,7 @@ export function AppInner() {
                     className={`btn-ai panel-list-ai-all${routeMergeAi.busy ? " btn-ai--busy" : ""}`}
                     disabled={!canRouteMergeAi || routeMergeAi.busy}
                     title={routeMergeAiHint ?? "基于所有已导入文件合并上下文请求 AI"}
-                    onClick={() => void routeMergeAi.runAll()}
+                    onClick={() => routeMergeAi.prepareAll()}
                   >
                     <Icon d={TRV_ICONS.aiStar} className="trv-icon trv-icon--sm" />
                     <span>全部</span>
@@ -714,7 +737,7 @@ export function AppInner() {
                                   }
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    void routeMergeAi.runForImportedFileIndex(idx);
+                                    routeMergeAi.prepareForImportedFileIndex(idx);
                                   }}
                                 >
                                   <Icon d={TRV_ICONS.aiStar} className="trv-icon trv-icon--sm" />
@@ -782,7 +805,7 @@ export function AppInner() {
                             routeMergeAiHint ??
                             "将当前编辑区 YAML 与规则引擎摘要发给模型（未使用多文件导入时）"
                           }
-                          onClick={() => void routeMergeAi.runAll()}
+                          onClick={() => routeMergeAi.prepareAll()}
                         >
                           <Icon d={TRV_ICONS.aiStar} className="trv-icon trv-icon--sm" />
                           {routeMergeAi.busy ? "请求中" : "AI 优化"}
@@ -829,7 +852,7 @@ export function AppInner() {
                   </div>
                 </div>
                 <div className="yaml-editor-shell">
-                  <div className="yaml-gutter" aria-hidden="true">
+                  <div className="yaml-gutter" aria-hidden="true" ref={yamlGutterRef}>
                     {Array.from(
                       { length: Math.min(Math.max(yamlTextStats.lineCount, 1), 999) },
                       (_, i) => (
@@ -838,9 +861,11 @@ export function AppInner() {
                     )}
                   </div>
                   <textarea
+                    ref={yamlTextareaRef}
                     value={yamlText}
                     data-testid="yaml-textarea"
                     onChange={(e) => updateYamlText(e.target.value)}
+                    onScroll={syncYamlGutterScroll}
                     spellCheck={false}
                     wrap="off"
                     className="yaml-editor"
@@ -940,14 +965,26 @@ export function AppInner() {
               </div>
             </div>
 
-            <textarea
-              autoFocus
-              value={yamlText}
-              onChange={(e) => updateYamlText(e.target.value)}
-              spellCheck={false}
-              wrap="off"
-              className="yaml-editor yaml-editor-popout"
-            />
+            <div className="yaml-editor-shell yaml-editor-shell--popout">
+              <div className="yaml-gutter" aria-hidden="true" ref={yamlPopoutGutterRef}>
+                {Array.from(
+                  { length: Math.min(Math.max(yamlTextStats.lineCount, 1), 9999) },
+                  (_, i) => (
+                    <span key={i + 1}>{i + 1}</span>
+                  ),
+                )}
+              </div>
+              <textarea
+                ref={yamlPopoutTextareaRef}
+                autoFocus
+                value={yamlText}
+                onChange={(e) => updateYamlText(e.target.value)}
+                onScroll={syncYamlPopoutGutterScroll}
+                spellCheck={false}
+                wrap="off"
+                className="yaml-editor yaml-editor-popout"
+              />
+            </div>
           </div>
         </div>
       ) : null}
@@ -960,6 +997,8 @@ export function AppInner() {
         error={routeMergeAi.error}
         scopeLabel={routeMergeAi.scopeLabel}
         sourceYaml={routeMergeAi.sourceYaml}
+        previewUserContent={routeMergeAi.previewUserContent}
+        onConfirmRun={() => void routeMergeAi.runPrepared()}
       />
     </div>
   );
