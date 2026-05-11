@@ -3,6 +3,16 @@ import type { RouteMergeAiResolved } from "./routeMergeAiConfig";
 import type { IndexedRawDoc } from "./routeMergeRawDocs";
 import { ROUTE_MERGE_AI_SYSTEM_PROMPT_BUILTIN } from "./routeMergeAiPrompt";
 
+function devLog(label: string, data: Record<string, unknown>) {
+  if (!import.meta.env.DEV) return;
+  try {
+    // eslint-disable-next-line no-console
+    console.info(`[routeMergeAi] ${label}`, data);
+  } catch {
+    // ignore
+  }
+}
+
 function clip(s: string, max: number): string {
   if (s.length <= max) return s;
   return `${s.slice(0, max)}\n\n…(已截断，共 ${s.length} 字符)`;
@@ -104,10 +114,8 @@ export async function callRouteMergeAi(
     typeof opts?.systemPrompt === "string" && opts.systemPrompt.trim().length > 0
       ? opts.systemPrompt
       : ROUTE_MERGE_AI_SYSTEM_PROMPT_BUILTIN;
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (cfg.apiKey) headers["api-key"] = cfg.apiKey;
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (cfg.authHeader) headers[cfg.authHeader.name] = cfg.authHeader.value;
 
   const body: Record<string, unknown> = {
     messages: [
@@ -117,6 +125,25 @@ export async function callRouteMergeAi(
     temperature: 0.2,
     max_completion_tokens: 8192,
   };
+  if (cfg.apiStyle === "openai-v1") {
+    body.model = cfg.modelId;
+    body.reasoning_effort = "medium";
+  }
+  if (cfg.apiStyle === "azure-responses") {
+    // Azure OpenAI Responses API (2025-04-01-preview+): `model` + Bearer auth
+    body.model = cfg.modelId;
+    body.max_completion_tokens = 16384;
+  }
+
+  devLog("request", {
+    requestUrl: cfg.requestUrl,
+    apiStyle: cfg.apiStyle,
+    modelId: cfg.modelId,
+    apiVersion: cfg.apiVersion,
+    authHeader: cfg.authHeader?.name ?? null,
+    userChars: userContent.length,
+    systemChars: system.length,
+  });
 
   let res = await fetch(cfg.requestUrl, {
     method: "POST",
@@ -127,6 +154,12 @@ export async function callRouteMergeAi(
 
   if (!res.ok) {
     const t = await res.text();
+    devLog("response:not-ok", {
+      status: res.status,
+      statusText: res.statusText,
+      requestId: res.headers.get("x-ms-request-id") ?? res.headers.get("apim-request-id"),
+      bodyPreview: t.slice(0, 1200),
+    });
     // Older deployments may reject max_completion_tokens
     if (res.status === 400 && String(t).includes("max_completion_tokens")) {
       delete body.max_completion_tokens;
@@ -139,14 +172,24 @@ export async function callRouteMergeAi(
       });
     }
     if (!res.ok) {
-      throw new Error(`Azure OpenAI HTTP ${res.status}: ${t.slice(0, 500)}`);
+      throw new Error(
+        `Azure OpenAI HTTP ${res.status} (${cfg.requestUrl}): ${t.slice(0, 800)}`,
+      );
     }
   }
 
-  const json = (await res.json()) as {
-    choices?: { message?: { content?: string | null } }[];
-  };
-  const content = json.choices?.[0]?.message?.content;
+  const json = (await res.json()) as
+    | { choices?: { message?: { content?: string | null } }[] }
+    | { output_text?: string | null }
+    | Record<string, unknown>;
+  const content =
+    // chat/completions
+    typeof (json as any).choices?.[0]?.message?.content === "string"
+      ? ((json as any).choices[0].message.content as string)
+      : // responses api common shape
+        typeof (json as any).output_text === "string"
+        ? ((json as any).output_text as string)
+        : null;
   if (typeof content !== "string" || !content.trim()) {
     throw new Error("模型返回空内容");
   }

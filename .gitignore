@@ -10,3 +10,7 @@ Thumbs.db
 
 # pnpm store/cache (must not commit)
 .pnpm-store/
+
+config.json
+
+.env
