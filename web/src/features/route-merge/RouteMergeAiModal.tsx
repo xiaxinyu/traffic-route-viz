@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { buildFlowGraph } from "../../domain/buildGraph";
 import { parseK8sYaml } from "../../domain/k8sParser";
@@ -261,6 +261,7 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
     previewUserContent,
     onConfirmRun,
   } = props;
+  const [activeYamlTab, setActiveYamlTab] = useState<"yaml" | "diff">("yaml");
 
   useEffect(() => {
     if (!open) return;
@@ -504,6 +505,28 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                   <strong className="route-merge-ai-yaml-title">YAML 输出</strong>
                   <span className="route-merge-ai-diff-stat">左 {sourceLineCount} 行</span>
                   <span className="route-merge-ai-diff-stat">右 {optimizedLineCount} 行</span>
+                  <div className="route-merge-ai-yaml-tabs" role="tablist" aria-label="YAML 视图">
+                    <button
+                      type="button"
+                      className={activeYamlTab === "yaml" ? "btn-secondary btn-pill-active" : "btn-secondary"}
+                      onClick={() => setActiveYamlTab("yaml")}
+                      role="tab"
+                      aria-selected={activeYamlTab === "yaml"}
+                    >
+                      代码
+                    </button>
+                    <button
+                      type="button"
+                      className={activeYamlTab === "diff" ? "btn-secondary btn-pill-active" : "btn-secondary"}
+                      onClick={() => setActiveYamlTab("diff")}
+                      role="tab"
+                      aria-selected={activeYamlTab === "diff"}
+                      disabled={!hasOptimizedYaml}
+                      title={!hasOptimizedYaml ? "需要 AI 返回 optimizedYaml 才能对比" : "Diff 对比"}
+                    >
+                      Diff
+                    </button>
+                  </div>
                   <button
                     type="button"
                     className="btn-link"
@@ -552,92 +575,84 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                   </div>
                 ) : null}
 
-                <div
-                  className="route-merge-ai-yaml-grid"
-                  role="region"
-                  aria-label="原始 YAML 与优化后 YAML"
-                >
-                  <div className="route-merge-ai-yaml-pane">
-                    <div className="route-merge-ai-yaml-head">
-                      <span>原始 YAML</span>
-                      <span>{sourceLineCount} 行</span>
-                    </div>
-                    <div className="route-merge-ai-code-shell">
-                      <div className="route-merge-ai-code-gutter" aria-hidden="true">
-                        {sourceLines.map((_, i) => (
-                          <span key={`old-${i}`}>{String(i + 1).padStart(lineDigits, " ")}</span>
-                        ))}
+                <div className="route-merge-ai-yaml-body" role="region" aria-label="YAML 详情">
+                  {activeYamlTab === "yaml" ? (
+                    <div
+                      className="route-merge-ai-yaml-grid"
+                      role="region"
+                      aria-label="原始 YAML 与优化后 YAML"
+                    >
+                      <div className="route-merge-ai-yaml-pane">
+                        <div className="route-merge-ai-yaml-head">
+                          <span>原始 YAML</span>
+                          <span>{sourceLineCount} 行</span>
+                        </div>
+                        <div className="route-merge-ai-code-shell">
+                          <div className="route-merge-ai-code-gutter" aria-hidden="true">
+                            {sourceLines.map((_, i) => (
+                              <span key={`old-${i}`}>{String(i + 1).padStart(lineDigits, " ")}</span>
+                            ))}
+                          </div>
+                          <pre className="route-merge-ai-code-pre">{sourceLines.join("\n") || " "}</pre>
+                        </div>
                       </div>
-                      <pre className="route-merge-ai-code-pre">{sourceLines.join("\n") || " "}</pre>
-                    </div>
-                  </div>
 
-                  <div className="route-merge-ai-yaml-pane">
-                    <div className="route-merge-ai-yaml-head">
-                      <span>优化后 YAML</span>
-                      <span>{optimizedLineCount} 行</span>
-                    </div>
-                    <div className="route-merge-ai-code-shell">
-                      <div className="route-merge-ai-code-gutter" aria-hidden="true">
-                        {optimizedLines.map((_, i) => (
-                          <span key={`new-${i}`}>{String(i + 1).padStart(lineDigits, " ")}</span>
-                        ))}
+                      <div className="route-merge-ai-yaml-pane">
+                        <div className="route-merge-ai-yaml-head">
+                          <span>优化后 YAML</span>
+                          <span>{optimizedLineCount} 行</span>
+                        </div>
+                        <div className="route-merge-ai-code-shell">
+                          <div className="route-merge-ai-code-gutter" aria-hidden="true">
+                            {optimizedLines.map((_, i) => (
+                              <span key={`new-${i}`}>{String(i + 1).padStart(lineDigits, " ")}</span>
+                            ))}
+                          </div>
+                          <pre className="route-merge-ai-code-pre">{optimizedLines.join("\n") || " "}</pre>
+                        </div>
                       </div>
-                      <pre className="route-merge-ai-code-pre">
-                        {optimizedLines.join("\n") || " "}
-                      </pre>
                     </div>
-                  </div>
+                  ) : hasOptimizedYaml ? (
+                    <div className="route-merge-ai-diff" role="region" aria-label="原始 YAML 与 AI 生成 YAML 差异对比">
+                      <div className="route-merge-ai-diff-head route-merge-ai-diff-head--old">
+                        <span>Diff（原始）</span>
+                        <span>{sourceLineCount} 行</span>
+                      </div>
+                      <div className="route-merge-ai-diff-head route-merge-ai-diff-head--new">
+                        <span>Diff（优化后）</span>
+                        <span>{optimizedLineCount} 行</span>
+                      </div>
+                      {diffDisplay.rows.map((row, index) =>
+                        row.kind === "skip" ? (
+                          <div
+                            className="route-merge-ai-diff-row route-merge-ai-diff-row--skip"
+                            key={`skip-${row.oldLabel}-${row.newLabel}-${index}`}
+                          >
+                            <div className="route-merge-ai-diff-skip">
+                              <span>{row.oldLabel ? `左 ${row.oldLabel}` : "中间内容"}</span>
+                              <strong>已折叠 {row.count} 行未变化内容</strong>
+                              <span>{row.newLabel ? `右 ${row.newLabel}` : ""}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            className={`route-merge-ai-diff-row route-merge-ai-diff-row--${row.kind}`}
+                            key={`${row.kind}-${row.oldLineNo ?? "x"}-${row.newLineNo ?? "x"}-${index}`}
+                          >
+                            <div className="route-merge-ai-diff-cell route-merge-ai-diff-cell--old">
+                              <span className="route-merge-ai-diff-line-no">{row.oldLineNo ?? ""}</span>
+                              <code>{row.oldText || " "}</code>
+                            </div>
+                            <div className="route-merge-ai-diff-cell route-merge-ai-diff-cell--new">
+                              <span className="route-merge-ai-diff-line-no">{row.newLineNo ?? ""}</span>
+                              <code>{row.newText || " "}</code>
+                            </div>
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  ) : null}
                 </div>
-
-                {hasOptimizedYaml ? (
-                  <div
-                    className="route-merge-ai-diff"
-                    role="region"
-                    aria-label="原始 YAML 与 AI 生成 YAML 差异对比"
-                  >
-                    <div className="route-merge-ai-diff-head route-merge-ai-diff-head--old">
-                      <span>Diff（原始）</span>
-                      <span>{sourceLineCount} 行</span>
-                    </div>
-                    <div className="route-merge-ai-diff-head route-merge-ai-diff-head--new">
-                      <span>Diff（优化后）</span>
-                      <span>{optimizedLineCount} 行</span>
-                    </div>
-                    {diffDisplay.rows.map((row, index) =>
-                      row.kind === "skip" ? (
-                        <div
-                          className="route-merge-ai-diff-row route-merge-ai-diff-row--skip"
-                          key={`skip-${row.oldLabel}-${row.newLabel}-${index}`}
-                        >
-                          <div className="route-merge-ai-diff-skip">
-                            <span>{row.oldLabel ? `左 ${row.oldLabel}` : "中间内容"}</span>
-                            <strong>已折叠 {row.count} 行未变化内容</strong>
-                            <span>{row.newLabel ? `右 ${row.newLabel}` : ""}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div
-                          className={`route-merge-ai-diff-row route-merge-ai-diff-row--${row.kind}`}
-                          key={`${row.kind}-${row.oldLineNo ?? "x"}-${row.newLineNo ?? "x"}-${index}`}
-                        >
-                          <div className="route-merge-ai-diff-cell route-merge-ai-diff-cell--old">
-                            <span className="route-merge-ai-diff-line-no">
-                              {row.oldLineNo ?? ""}
-                            </span>
-                            <code>{row.oldText || " "}</code>
-                          </div>
-                          <div className="route-merge-ai-diff-cell route-merge-ai-diff-cell--new">
-                            <span className="route-merge-ai-diff-line-no">
-                              {row.newLineNo ?? ""}
-                            </span>
-                            <code>{row.newText || " "}</code>
-                          </div>
-                        </div>
-                      ),
-                    )}
-                  </div>
-                ) : null}
               </div>
               {payload.disclaimer ? (
                 <div className="route-merge-disclaimer">{payload.disclaimer}</div>
