@@ -8,5 +8,18 @@ k8s/
 .DS_Store
 Thumbs.db
 
+# Environment / local secrets (never commit)
+.env
+.env.*
+!.env.example
+
+# Web runtime config (local, may contain secrets)
+web/public/config.json
+
+# Editor / IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
 # pnpm store/cache (must not commit)
 .pnpm-store/
