@@ -285,6 +285,7 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
   const diffDisplay = useMemo(() => buildDiffDisplayRows(diffRows), [diffRows]);
   const sourceLineCount = useMemo(() => countYamlLines(sourceYaml), [sourceYaml]);
   const optimizedLineCount = useMemo(() => countYamlLines(optimizedYaml), [optimizedYaml]);
+  const previewLines = useMemo(() => splitYamlLines(previewUserContent), [previewUserContent]);
   const sourceLines = useMemo(() => splitYamlLines(sourceYaml), [sourceYaml]);
   const optimizedLines = useMemo(() => splitYamlLines(optimizedYaml), [optimizedYaml]);
   const optimizationPlan = useMemo(
@@ -302,6 +303,10 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
   const lineDigits = useMemo(
     () => String(Math.max(sourceLines.length, optimizedLines.length, 1)).length,
     [sourceLines.length, optimizedLines.length],
+  );
+  const previewLineDigits = useMemo(
+    () => String(Math.max(previewLines.length, 1)).length,
+    [previewLines.length],
   );
 
   if (!open) return null;
@@ -345,9 +350,9 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
           {!payload && !busy && !error ? (
             <div className="route-merge-ai-preview">
               <div className="route-merge-ai-preview-head">
-                <strong>将发送的 YAML 片段（预览）</strong>
+                <strong>原始 YAML 预览</strong>
                 <span className="route-merge-ai-preview-hint">
-                  点击「开始分析」后会把完整输入发送到模型；此处仅展示关键 YAML 片段供你核对。
+                  这里只展示当前范围的原始 YAML；点击「开始分析」后会附带规则摘要发送给模型。
                 </span>
               </div>
               <div className="route-merge-ai-preview-actions">
@@ -365,17 +370,21 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                   onClick={() => void navigator.clipboard.writeText(previewUserContent)}
                   disabled={!previewUserContent.trim()}
                 >
-                  复制预览输入
+                  复制原始 YAML
                 </button>
               </div>
-              <textarea
-                className="route-merge-ai-preview-textarea"
-                value={previewUserContent}
-                readOnly
-                spellCheck={false}
-                rows={14}
-                aria-label="将发送给模型的用户内容预览"
-              />
+              <div className="route-merge-ai-preview-editor" role="region" aria-label="原始 YAML 预览">
+                <div className="route-merge-ai-code-shell">
+                  <div className="route-merge-ai-code-gutter" aria-hidden="true">
+                    {previewLines.map((_, i) => (
+                      <span key={`preview-${i}`}>
+                        {String(i + 1).padStart(previewLineDigits, " ")}
+                      </span>
+                    ))}
+                  </div>
+                  <pre className="route-merge-ai-code-pre">{previewLines.join("\n") || " "}</pre>
+                </div>
+              </div>
             </div>
           ) : null}
 

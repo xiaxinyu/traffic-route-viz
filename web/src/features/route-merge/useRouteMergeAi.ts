@@ -2,11 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { mergeParseResults, type ImportedYamlFile } from "../../domain/mergeYamlBundles";
 import { parseK8sYaml } from "../../domain/k8sParser";
-import {
-  buildRouteMergeAiPreviewContent,
-  buildRouteMergeAiUserContent,
-  callRouteMergeAi,
-} from "./routeMergeAi";
+import { buildRouteMergeAiUserContent, callRouteMergeAi } from "./routeMergeAi";
 import {
   resolveRouteMergeAiConfig,
   type RouteMergeAiResolved,
@@ -67,10 +63,9 @@ export function useRouteMergeAi(yamlText: string, importedFiles: ImportedYamlFil
       ? "当前为**合并视图**：目标是压缩所有已导入文件中的 VS/DR/Ingress，并保持功能等价。若输入过大无法完整发送，仍须输出非空 optimizedYaml，并明确建议用户按单文件运行以得到完整可替换结果。"
       : "当前为**仅编辑器 YAML**（未使用多文件导入）。目标是压缩当前 YAML 内的 VS/DR/Ingress，optimizedYaml 必须是完整可替换的新 YAML；不要假设存在未出现在 YAML 中的其它资源。";
     const user = buildRouteMergeAiUserContent(analysis, indexed, mergedYaml, { scopeHeading });
-    const preview = buildRouteMergeAiPreviewContent(indexed, { scopeHeading });
     setPreparedCfg(cfg);
     setPreparedUserContent(user);
-    setPreviewUserContent(preview);
+    setPreviewUserContent(mergedYaml);
   }, [analysis, importedFiles, indexed, mergedYaml]);
 
   const prepareForImportedFileIndex = useCallback(
@@ -114,10 +109,9 @@ export function useRouteMergeAi(yamlText: string, importedFiles: ImportedYamlFil
       const user = buildRouteMergeAiUserContent(analysisSubset, indexedSubset, mergedFile, {
         scopeHeading,
       });
-      const preview = buildRouteMergeAiPreviewContent(indexedSubset, { scopeHeading });
       setPreparedCfg(cfg);
       setPreparedUserContent(user);
-      setPreviewUserContent(preview);
+      setPreviewUserContent(mergedFile);
     },
     [importedFiles, indexed],
   );

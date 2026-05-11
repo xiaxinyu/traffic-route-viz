@@ -37,26 +37,6 @@ export type BuildRouteMergeAiUserContentOptions = {
   scopeHeading?: string;
 };
 
-/**
- * Preview content shown to users before sending to model.
- * Intentionally shows only raw YAML snippets (no rule-engine jargon),
- * while the actual request still includes full constraints + merged YAML.
- */
-export function buildRouteMergeAiPreviewContent(
-  indexed: IndexedRawDoc[],
-  options?: BuildRouteMergeAiUserContentOptions,
-): string {
-  const maxTotalChars = options?.maxTotalChars ?? 120_000;
-  const perKindBudget = Math.floor(maxTotalChars);
-  const vs = collectKindYaml(indexed, "VirtualService", perKindBudget);
-  const dr = collectKindYaml(indexed, "DestinationRule", perKindBudget);
-  const ing = collectKindYaml(indexed, "Ingress", perKindBudget);
-  return clip(
-    `## VirtualService YAML\n${vs || "(无)"}\n\n## DestinationRule YAML\n${dr || "(无)"}\n\n## Ingress YAML\n${ing || "(无)"}`,
-    maxTotalChars,
-  );
-}
-
 export function buildRouteMergeAiUserContent(
   analysis: RouteMergeAnalysis,
   indexed: IndexedRawDoc[],
