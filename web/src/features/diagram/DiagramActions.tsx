@@ -1,6 +1,5 @@
 import {
   type ChangeEvent,
-  type CSSProperties,
   type Dispatch,
   type RefObject,
   type SetStateAction,
@@ -12,13 +11,13 @@ import {
 import { Panel, useReactFlow } from "reactflow";
 import type { Edge, Node } from "reactflow";
 
-import { exportDiagramToPng } from "./diagramExportPng";
-import { exportToDrawioXml } from "./diagramExportDrawio";
-import { exportToMermaid } from "./diagramExportMermaid";
-import type { DiagramFileV1, ImportedFilePersist } from "./diagramPersist";
-import { DIAGRAM_FILE_EXTENSION, parseDiagramFileJson, serializeDiagram } from "./diagramPersist";
-import { mergeParseResults, type ImportedYamlFile } from "./mergeYamlBundles";
-import { parseK8sYaml } from "./k8sParser";
+import { exportDiagramToPng } from "../../domain/diagramExportPng";
+import { exportToDrawioXml } from "../../domain/diagramExportDrawio";
+import { exportToMermaid } from "../../domain/diagramExportMermaid";
+import type { DiagramFileV1, ImportedFilePersist } from "../../domain/diagramPersist";
+import { DIAGRAM_FILE_EXTENSION, parseDiagramFileJson, serializeDiagram } from "../../domain/diagramPersist";
+import { mergeParseResults, type ImportedYamlFile } from "../../domain/mergeYamlBundles";
+import { parseK8sYaml } from "../../domain/k8sParser";
 
 type Props = {
   yamlText: string;
@@ -35,24 +34,6 @@ type Props = {
   flowContainerRef: RefObject<HTMLDivElement | null>;
   edgeLabelsEnabled: boolean;
   setEdgeLabelsEnabled: Dispatch<SetStateAction<boolean>>;
-};
-
-const btnPrimary: CSSProperties = {
-  padding: "6px 10px",
-  borderRadius: 8,
-  border: "none",
-  background: "#0f766e",
-  color: "#fff",
-  fontWeight: 600,
-  fontSize: 12,
-  cursor: "pointer",
-};
-
-const btnGhost: CSSProperties = {
-  ...btnPrimary,
-  background: "#fff",
-  color: "#334155",
-  border: "1px solid #e2e8f0",
 };
 
 function downloadText(filename: string, content: string, mime = "text/plain;charset=utf-8") {
@@ -103,8 +84,8 @@ export function DiagramActions(props: Props) {
   const hasSelectedEdges = selectedEdgeCount > 0;
   const hasSelectedElements = selectedNodeCount > 0 || selectedEdgeCount > 0;
 
-  const Icon = ({ d }: { d: string }) => (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="trv-icon">
+  const Icon = ({ d, className }: { d: string; className?: string }) => (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className ?? "trv-icon"}>
       <path d={d} fill="currentColor" />
     </svg>
   );
@@ -269,7 +250,7 @@ export function DiagramActions(props: Props) {
           </span>
           <button
             type="button"
-            style={btnGhost}
+            className="btn-secondary btn-icon diagram-toolbar-icon-btn"
             onClick={toggleFullscreen}
             aria-label={isFullscreen ? "退出全屏" : "全屏"}
             title={isFullscreen ? "退出全屏（Esc）" : "全屏"}
@@ -284,7 +265,7 @@ export function DiagramActions(props: Props) {
           </button>
           <button
             type="button"
-            style={btnGhost}
+            className="btn-secondary btn-icon diagram-toolbar-icon-btn"
             onClick={() => setCollapsed((v) => !v)}
             aria-label={collapsed ? "展开画布工具" : "收起画布工具"}
             title={collapsed ? "展开" : "收起"}
@@ -307,7 +288,7 @@ export function DiagramActions(props: Props) {
 
             <button
               type="button"
-              style={btnGhost}
+              className="btn-secondary btn-icon diagram-toolbar-icon-btn"
               onClick={() => fitView({ padding: 0.05, duration: 240 })}
               data-testid="canvas-fit-view"
               aria-label="适配"
@@ -315,14 +296,19 @@ export function DiagramActions(props: Props) {
             >
               <Icon d="M4 7V4h3v2H6v1H4zm14-1V4h3v3h-2V6h-1zm1 15h2v-3h-2v1h-1v2h1zm-15 0v-3h2v1h1v2H4z" />
             </button>
-            <button type="button" style={btnPrimary} onClick={onExportPng} data-testid="export-png">
-              <span aria-hidden="true" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                <Icon d="M21 19H3V5h18v14zm-2-2V7H5v10h14zM7 15l2.5-3 2 2.5L15 10l2 5H7z" />
-              </span>
+            <button
+              type="button"
+              className="btn-primary btn-icon diagram-toolbar-icon-btn"
+              onClick={onExportPng}
+              data-testid="export-png"
+              title="导出 PNG"
+              aria-label="导出 PNG"
+            >
+              <Icon d="M21 19H3V5h18v14zm-2-2V7H5v10h14zM7 15l2.5-3 2 2.5L15 10l2 5H7z" />
             </button>
             <button
               type="button"
-              style={btnGhost}
+              className="btn-secondary btn-icon diagram-toolbar-icon-btn"
               onClick={onExportMermaid}
               data-testid="export-mermaid"
               aria-label="Mermaid"
@@ -332,7 +318,7 @@ export function DiagramActions(props: Props) {
             </button>
             <button
               type="button"
-              style={btnGhost}
+              className="btn-secondary btn-icon diagram-toolbar-icon-btn"
               onClick={onExportDrawio}
               data-testid="export-drawio"
               aria-label="draw.io"
@@ -342,7 +328,7 @@ export function DiagramActions(props: Props) {
             </button>
             <button
               type="button"
-              style={btnGhost}
+              className="btn-secondary btn-icon diagram-toolbar-icon-btn"
               onClick={onSaveDiagramJson}
               data-testid="save-diagram"
               aria-label="保存"
@@ -352,11 +338,7 @@ export function DiagramActions(props: Props) {
             </button>
             <button
               type="button"
-              style={{
-                ...btnGhost,
-                cursor: hasSelectedEdges ? "pointer" : "not-allowed",
-                opacity: hasSelectedEdges ? 1 : 0.55,
-              }}
+              className="btn-secondary btn-icon diagram-toolbar-icon-btn"
               onClick={onDeleteSelectedEdges}
               data-testid="delete-selected-edges"
               disabled={!hasSelectedEdges}
@@ -367,11 +349,7 @@ export function DiagramActions(props: Props) {
             </button>
             <button
               type="button"
-              style={{
-                ...btnGhost,
-                cursor: hasSelectedElements ? "pointer" : "not-allowed",
-                opacity: hasSelectedElements ? 1 : 0.55,
-              }}
+              className="btn-secondary btn-icon diagram-toolbar-icon-btn"
               onClick={onDeleteSelectedElements}
               data-testid="delete-selected-elements"
               disabled={!hasSelectedElements}
@@ -382,7 +360,7 @@ export function DiagramActions(props: Props) {
             </button>
             <button
               type="button"
-              style={btnGhost}
+              className="btn-secondary btn-icon diagram-toolbar-icon-btn"
               onClick={() => loadInputRef.current?.click()}
               data-testid="open-diagram"
               aria-label="打开"

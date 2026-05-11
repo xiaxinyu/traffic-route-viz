@@ -44,10 +44,12 @@ pnpm run build
 
 ## 代码分层（不要混）
 
-- 解析：`web/src/k8sParser.ts`
-- 构图/布局：`web/src/buildGraph.ts`
-- 节点渲染：`web/src/FlowNodes.tsx`
-- 导入与页面：`web/src/App.tsx`
-- YAML 合并、多文件列表：`web/src/mergeYamlBundles.ts`
-- 画布会话 / 手写边合并：`web/src/diagramPersist.ts`、`DiagramActions.tsx`、`diagramExportPng.ts`
+说明：`web/src/README.md`。
+
+- 解析：`web/src/domain/k8sParser.ts`
+- 构图/布局：`web/src/domain/buildGraph.ts`
+- 节点渲染：`web/src/features/diagram/FlowNodes.tsx`
+- 导入与页面：`web/src/app/AppInner.tsx`（入口 `web/src/App.tsx`）
+- YAML 合并、多文件列表：`web/src/domain/mergeYamlBundles.ts`
+- 画布会话 / 手写边合并：`web/src/domain/diagramPersist.ts`、`web/src/features/diagram/DiagramActions.tsx`、`web/src/domain/diagramExportPng.ts`
 

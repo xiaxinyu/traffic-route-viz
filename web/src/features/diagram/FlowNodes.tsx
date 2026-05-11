@@ -2,7 +2,7 @@ import { memo, type CSSProperties } from "react";
 import type { NodeProps } from "reactflow";
 import { Handle, NodeResizer, Position } from "reactflow";
 
-import type { IngressTlsEntry, IstioRouteDestination } from "./k8sParser";
+import type { IngressTlsEntry, IstioRouteDestination } from "../../domain/k8sParser";
 
 type EntryKind = "Ingress" | "VirtualService" | "HTTPProxy";
 

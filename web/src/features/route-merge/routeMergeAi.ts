@@ -1,29 +1,7 @@
 import type { RouteMergeAiPayload, RouteMergeAnalysis } from "./routeMergeTypes";
 import type { RouteMergeAiResolved } from "./routeMergeAiConfig";
 import type { IndexedRawDoc } from "./routeMergeRawDocs";
-
-const SYSTEM_PROMPT = `你是 Kubernetes 与 Istio 流量治理专家。用户会提供 Ingress、VirtualService、DestinationRule 的 YAML 片段，以及本工具「规则引擎」已给出的合并分级（Safe/Review/Blocked）。
-
-请按以下领域分别思考并输出 **严格 JSON**（不要 Markdown 围栏，不要前后说明文字）：
-1) Ingress：入口合并、TLS/class、路径冲突、与 Service 的耦合。
-2) VirtualService：hosts/gateways、http 匹配与路由顺序、subset 与权重。
-3) DestinationRule：与 VS 中 destination.subset 的一致性、熔断/负载策略对路由的影响。
-
-JSON schema（字段必须齐全，数组可为空，optimizedYaml 可为空字符串）：
-{
-  "summary": "string",
-  "ingressDomainNotes": ["string"],
-  "virtualServiceDomainNotes": ["string"],
-  "destinationRuleDomainNotes": ["string"],
-  "suggestions": [{ "title": "string", "detail": "string", "risk": "low|medium|high" }],
-  "optimizedYaml": "string",
-  "disclaimer": "string"
-}
-
-要求：
-- optimizedYaml 必须是有效多文档 YAML（用 --- 分隔）或空字符串；仅包含 networking.k8s.io Ingress、Istio VirtualService/DestinationRule 等用户已提供的种类；不要编造不存在的资源名。
-- 若无法保证与现网语义等价，将 optimizedYaml 置为空，并在 suggestions 中说明人工步骤。
-- 不要输出 JSON 以外的字符。`;
+import { ROUTE_MERGE_AI_SYSTEM_PROMPT_BUILTIN } from "./routeMergeAiPrompt";
 
 function clip(s: string, max: number): string {
   if (s.length <= max) return s;
@@ -43,12 +21,20 @@ function collectKindYaml(docs: IndexedRawDoc[], kind: string, budget: number): s
   return parts.join("\n---\n");
 }
 
+export type BuildRouteMergeAiUserContentOptions = {
+  maxTotalChars?: number;
+  /** Prepended so the model scopes answers (e.g. single imported file vs merged corpus). */
+  scopeHeading?: string;
+};
+
 export function buildRouteMergeAiUserContent(
   analysis: RouteMergeAnalysis,
   indexed: IndexedRawDoc[],
   mergedYamlSample: string,
-  maxTotalChars = 120_000,
+  options?: BuildRouteMergeAiUserContentOptions,
 ): string {
+  const maxTotalChars = options?.maxTotalChars ?? 120_000;
+  const scopeHeading = options?.scopeHeading?.trim();
   const perKindBudget = Math.floor(maxTotalChars / 4);
   const ing = collectKindYaml(indexed, "Ingress", perKindBudget);
   const vs = collectKindYaml(indexed, "VirtualService", perKindBudget);
@@ -62,10 +48,12 @@ export function buildRouteMergeAiUserContent(
 
   const mergedClip = clip(mergedYamlSample, Math.floor(perKindBudget));
 
-  return clip(
+  const core = clip(
     `## 规则引擎摘要\n${rules}\n\n## v1 提示\n${analysis.v1RulesReminder}\n\n## Ingress YAML 片段\n${ing || "(无)"}\n\n## VirtualService YAML 片段\n${vs || "(无)"}\n\n## DestinationRule YAML 片段\n${dr || "(无)"}\n\n## 合并后的全量 YAML（截断样本）\n${mergedClip}`,
     maxTotalChars,
   );
+  if (!scopeHeading) return core;
+  return clip(`## 分析范围\n${scopeHeading}\n\n${core}`, maxTotalChars);
 }
 
 function parseJsonPayload(raw: string): RouteMergeAiPayload {
@@ -101,11 +89,21 @@ function parseJsonPayload(raw: string): RouteMergeAiPayload {
   };
 }
 
+export type CallRouteMergeAiOptions = {
+  /** 覆盖默认 system 提示；须仍约束模型输出与 `parseJsonPayload` 兼容的 JSON。 */
+  systemPrompt?: string;
+};
+
 export async function callRouteMergeAi(
   cfg: RouteMergeAiResolved,
   userContent: string,
   signal?: AbortSignal,
+  opts?: CallRouteMergeAiOptions,
 ): Promise<RouteMergeAiPayload> {
+  const system =
+    typeof opts?.systemPrompt === "string" && opts.systemPrompt.trim().length > 0
+      ? opts.systemPrompt
+      : ROUTE_MERGE_AI_SYSTEM_PROMPT_BUILTIN;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
@@ -113,7 +111,7 @@ export async function callRouteMergeAi(
 
   const body: Record<string, unknown> = {
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: system },
       { role: "user", content: userContent },
     ],
     temperature: 0.2,

@@ -1,4 +1,4 @@
-import { getRuntimeConfig, type RuntimeConfig } from "./runtimeConfig";
+import { getRuntimeConfig, type RuntimeConfig } from "../../domain/runtimeConfig";
 
 export type RouteMergeAiResolved = {
   enabled: boolean;

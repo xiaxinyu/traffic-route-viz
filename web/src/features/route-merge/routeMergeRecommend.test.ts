@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseK8sYaml } from "./k8sParser";
+import { parseK8sYaml } from "../../domain/k8sParser";
 import { buildIndexedDocCorpus } from "./routeMergeRawDocs";
 import { analyzeRouteMerge } from "./routeMergeRecommend";
 

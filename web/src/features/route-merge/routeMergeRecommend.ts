@@ -1,6 +1,6 @@
 import { stringify } from "yaml";
 
-import type { ParseResult } from "./k8sParser";
+import type { ParseResult } from "../../domain/k8sParser";
 import type { IndexedRawDoc, RawK8sObject } from "./routeMergeRawDocs";
 import { shallowStableJsonRecord } from "./routeMergeJson";
 import type { RouteMergeAnalysis, RouteMergeRecommendation } from "./routeMergeTypes";

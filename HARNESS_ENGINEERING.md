@@ -55,14 +55,16 @@
 - 支持拖拽多个文件到导入区域（dropzone）
 - 支持**导入文件夹**（目录选择 + 拖拽文件夹），并在解析时保留每个文件的**相对路径**（用于 Example 分层布局与 Area “来源文件”绑定）
 - 支持**多文件夹导入**：可一次拖拽多个文件夹，或多次点击选择不同文件夹进行“追加导入”（按相对路径去重）
+- **顶栏导入（必须）**：在应用顶栏提供**选择文件**、**选择文件夹**与（存在已导入文件时）**清空**入口，与顶栏拖放区、隐藏 `input` 共用同一导入与解析链路。
 - 合并策略：多文件以 `---` 拼接为多文档 YAML 解析
 - 导入后行为：自动填入左侧文本区 + **自动触发解析刷新**
 - 状态展示：显示“已导入 N 个文件”与文件名列表（可折叠）
 - **导入行数统计（必须）**：
   - 每个已导入文件在文件列表中显示其 `text` 的**行数**（与 YAML 编辑区统计口径一致：换行统一为 `\n` 后按 `\n` 分段计数，**含空行**）。
-  - 在「输入与数据源」副标题中展示 **各文件行数合计** 与 **`mergeYamlFiles` 合并拼接后的行数**；二者可能因 `\n---\n` 分隔行与各文件首尾换行而不相等，以列表下方脚注说明。
-  - **未导入文件**且编辑区有内容时，副标题可提示当前 YAML 行数；完整「行 / 文档 / 字符」仍以 YAML 编辑区一级统计为准。
+  - 在顶栏 **「输入与数据源」** 区域（紧凑摘要行，以及区块 `title`/悬停提示）展示 **各文件行数合计** 与 **`mergeYamlFiles` 合并拼接后的行数**；二者可能因 `\n---\n` 分隔行与各文件首尾换行而不相等，以文件列表下方脚注说明。
+  - **未导入文件**且编辑区有内容时，该摘要可提示当前 YAML 行数；完整「行 / 文档 / 字符」仍以 YAML 编辑区一级统计为准。
 - **路由合并推荐（Sprint1 v1，必须遵守 dry-run）**：
+  - **呈现**：规则引擎的 v1 提示与各 Safe/Review/Blocked 条目、以及候选 YAML 的复制/下载入口，须通过「?」**浮层**完整可读地提供；**不得**占用侧栏固定大块纵向列表区；浮层入口与文件列表行内 **「AI」**并列，或与（仅编辑区 YAML、未多文件导入时）YAML 工具栏 **「AI 优化」**并列；展示内容须与当前合并解析视图一致。
   - 推荐入口只能做 **分析与候选导出**：不得自动覆盖 YAML 编辑区、不得修改导入文件、不得写回集群或 Git。
   - 推荐结果分为 **Safe / Review / Blocked**：
     - **Safe**：满足 v1 全部边界，允许生成候选 YAML。
@@ -72,7 +74,7 @@
   - **VirtualService v1 Safe 边界**：仅同 namespace、`hosts` 集合一致、`gateways` 集合一致；v1 只合并 `spec.http[]`；复杂字段（如 `tcp`/`tls`/`exportTo`/`delegate`/`mirror`/`corsPolicy`/`retries`/`fault`/`timeout` 等）若无法完整保留，必须降级为 Review。
   - 候选 YAML 生成必须基于 **原始 YAML document/AST** 保留字段；`ParseResult` 只作为候选发现和画布闭环验证依据。缺少原始 doc 或无法安全序列化时，不得生成候选 YAML。
   - 候选 YAML 必须可重新导入：`parseK8sYaml` 不崩溃，`buildFlowGraph` 可渲染入口/路由链路。冲突样例必须验证不会生成 `candidateYaml`。
-  - **AI 优化建议（可选）**：在 `config.json` / `VITE_*` 中启用并配置 Azure OpenAI（`baseUrl`、`deployment`、`api-version`、密钥）后，用户可将当前 Ingress / VirtualService / DestinationRule 片段与规则引擎摘要一并发送给模型，获取领域化建议与可选 `optimizedYaml`。**启用即表示 YAML 会离开浏览器到达配置的模型端点**；密钥写入 `config.json` 会在客户端可见，仅限可信环境；本地开发推荐使用 Vite 代理（`routeMergeAi.useDevProxy` + `web/.env` 中 `AZURE_OPENAI_API_KEY`）。AI 输出须经人工复核，本地面板会尝试对 `optimizedYaml` 做 `parseK8sYaml` + `buildFlowGraph` 校验并展示结果。
+  - **AI 优化建议（可选）**：在 `config.json` / `VITE_*` 中启用并配置 Azure OpenAI（`baseUrl`、`deployment`、`api-version`、密钥）后，用户可将当前 Ingress / VirtualService / DestinationRule 片段与规则引擎摘要一并发送给模型，获取领域化建议与可选 `optimizedYaml`。**入口**：多文件时在「文件」标题旁提供「全部 AI」、每行文件旁「AI」；未导入多文件时在 YAML 编辑区提供「AI 优化」。**结果**在弹窗中展示；规则引擎结构化结果由「?」浮层承载，不在侧栏固定嵌套展示。**系统提示模版**可在弹窗内编辑并保存到浏览器 `localStorage`；可选在 `config.json` 的 `routeMergeAi.systemPrompt` 配置默认全文；优先级为浏览器保存 &gt; `config.json` &gt; 内置。自定义模版仍须约束模型只输出与面板解析器兼容的 JSON。**多文件导入时**支持「全部文件（合并上下文）」与「单个导入文件」两种分析范围；仅粘贴编辑区时走「当前编辑区 YAML」上下文。**启用即表示 YAML 会离开浏览器到达配置的模型端点**；密钥写入 `config.json` 会在客户端可见，仅限可信环境；本地开发推荐使用 Vite 代理（`routeMergeAi.useDevProxy` + `web/.env` 中 `AZURE_OPENAI_API_KEY`）。AI 输出须经人工复核，弹窗内会尝试对 `optimizedYaml` 做 `parseK8sYaml` + `buildFlowGraph` 校验并展示结果。
 
 ### 文本输入（必须）
 
@@ -189,9 +191,9 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 | P3 | **路由是匹配语义的最小单元** | **P6** 中路径比对以 **Ingress 每条 path / VirtualService 每条 HTTP URI 规则** 为粒度；**不按 Host 分层聚合后再匹配**。Host 仍为拓扑展示挂点。 |
 | P4 | **Service 节点与清单对齐（展示用）** | Ingress backend 推断 namespace 与真实 `Service` 不一致时：若导入清单中 **同名仅出现一次**，归并到该 `ns/name` 以对齐 ClusterIP / Endpoints；**P6** 中「指向该网关 backend」的规则仍按归并后的 `serviceKey` 收集。 |
 | P5 | **多 Ingress × 多 Istio Gateway（M×N）** | 在满足 **P1 + P6** 的前提下，对 **每一个** Ingress 分区内指向该 `serviceKey` 的 **Service 节点实例**，与 **每一个** Istio Gateway 节点（其名与 backend 同名）所在 **VirtualService 分区** 逐个判定；**通过者全连线**，不因「已有代表节点」而省略。VirtualService 分区内下游业务 Service 不参与此自动边。 |
-| P6 | **URI 规则相交（充分·路径维）** | 对候选 **Ingress 分区** × **VS 分区**：取 Ingress 侧 **凡 backend 为该 `serviceKey` 的规则**（`spec.rules[].http.paths[].path` + `pathType`）；取 VS 侧 **该分区全部 HTTP URI 匹配**（`spec.http[].match[].uri.prefix|exact|regex` 映射为 **Prefix / Exact / Regex**）。若存在 **任意一对** Ingress 规则与 VS 规则，二者在路径上 **`Exact`/`Prefix`/`Regex` 语义下可能同时命中某一请求路径**，则判定相交并允许连线。**ImplementationSpecific**：Ingress 侧按 **Prefix 近似** 处理（与实现一致）。**URI 省略或 Istio `"*"`**：视为匹配任意路径（与单侧全线相交）。Regex 侧使用 `RegExp` 及对 Ingress Prefix 的 **采样路径** 做保守检测；无法解析的正则则不判相交。判定实现见 **`web/src/istioIngressPathMatch.ts`**，`buildGraph.ts` 负责分区与路由收集。 |
+| P6 | **URI 规则相交（充分·路径维）** | 对候选 **Ingress 分区** × **VS 分区**：取 Ingress 侧 **凡 backend 为该 `serviceKey` 的规则**（`spec.rules[].http.paths[].path` + `pathType`）；取 VS 侧 **该分区全部 HTTP URI 匹配**（`spec.http[].match[].uri.prefix|exact|regex` 映射为 **Prefix / Exact / Regex**）。若存在 **任意一对** Ingress 规则与 VS 规则，二者在路径上 **`Exact`/`Prefix`/`Regex` 语义下可能同时命中某一请求路径**，则判定相交并允许连线。**ImplementationSpecific**：Ingress 侧按 **Prefix 近似** 处理（与实现一致）。**URI 省略或 Istio `"*"`**：视为匹配任意路径（与单侧全线相交）。Regex 侧使用 `RegExp` 及对 Ingress Prefix 的 **采样路径** 做保守检测；无法解析的正则则不判相交。判定实现见 **`web/src/domain/istioIngressPathMatch.ts`**，`buildGraph.ts` 负责分区与路由收集。 |
 
-> **实现注意**：`Service → Istio Gateway` 在 `web/src/buildGraph.ts` 中仅在 **P1 ∧ P6**（及 **P5** 的 M×N 展开）成立时绘制；**P3** 仍约束「不写 Host 分桶匹配」。若需关联但自动规则未命中，用手写边补充。
+> **实现注意**：`Service → Istio Gateway` 在 `web/src/domain/buildGraph.ts` 中仅在 **P1 ∧ P6**（及 **P5** 的 M×N 展开）成立时绘制；**P3** 仍约束「不写 Host 分桶匹配」。若需关联但自动规则未命中，用手写边补充。
 
 ---
 
@@ -249,7 +251,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
   - **Istio Gateway（全局合并）**：凡 VirtualService 引用的 Gateway（过滤 `mesh`）在画布 **左侧独立列**按名称合并为全局节点；初始纵向位置按名称占位堆叠后，在 **全部 VS 分区定位完成** 后再做一次 **垂直居中**：使每个全局 Gateway 卡片的垂直中心与「所有与之相连的 VirtualService 分区（`ingressRegion`）」垂直中心的 **中位数**对齐（多块 Gateway 名称时各自独立计算）；**分区宽度预留**左侧 Gateway 列，避免与分区重叠；Host 带起始高度仍与 **Ingress/VirtualService 头条 + 估算底边**对齐（分区内不再叠放多块 Gateway 卡）。
   - **Gateway→VS 连线长度（必须）**：全局 Gateway 的 **x** 不固定死在 `baseX`。在所有 VS 分区定位完成后，Gateway 节点 **自动贴近其连接到的 VS 列左侧**：\(x = \max(baseX,\; \min(\text{connected VS region }x) - (\text{gwCardW} + gap))\)。这样当 VS 列更靠左/靠右时，连线会自动变短/变长，避免永远拉一根超长线。
   - **VirtualService 竖列**：当 bundle 内存在 **至少一条** VirtualService 引用非 `mesh` 的 Istio Gateway，或 **VirtualService 入口对象 ≥ 2** 时，各 VirtualService 分区在画布上置于 **`01/02/03` Example 三列右侧的第四列**（与 Ingress / HTTPProxy 分区列分离），按导入排序 **纵向堆叠**；非 tier 导入时同样使用该竖列（与 fallback 网格中的 Ingress 分区分离）。
-- **画布泳道（启发式）**：依据导入路径推断 **4 个泳道层级**（实现：`web/src/swimlaneInfer.ts`），并在布局中强制按固定顺序自上而下堆叠：
+- **画布泳道（启发式）**：依据导入路径推断 **4 个泳道层级**（实现：`web/src/domain/swimlaneInfer.ts`），并在布局中强制按固定顺序自上而下堆叠：
   - `Global`
   - `Active01`
   - `Active02`
@@ -257,7 +259,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
   
   同一列内若泳道切换，插入额外垂直间距（`SWIMLANE_BAND_GAP`）；分区页眉展示 **泳道文案**（`swimlaneLabel`），与现有 `Level 01–03`、文件夹 hint 并存；同泳道内的 Area 必须严格 **上下排列**（不做多列网格散排）。
   - **多 Service**：在按 Route `y` median 初值对齐后，须按 **预估 Service 卡高 + gap** 做纵向碰撞-resolve，并保持 **DestinationRule** 占位在对应 Service **估算高度之下的独立留白带**。
-  - **常量与节点 UI 同步**：估高常量定义于 `web/src/buildGraph.ts`（`LAYOUT_EST_*`）；若 **`FlowNodes.tsx`** 卡片内边距/字体/可选字段显著变高或变矮，须在 **同一 MR** 内调整估算并在此处更新本条说明意图（避免再次出现结构性重叠）。
+  - **常量与节点 UI 同步**：估高常量定义于 `web/src/domain/buildGraph.ts`（`LAYOUT_EST_*`）；若 **`features/diagram/FlowNodes.tsx`** 卡片内边距/字体/可选字段显著变高或变矮，须在 **同一 MR** 内调整估算并在此处更新本条说明意图（避免再次出现结构性重叠）。
   - **边线视觉**：初始布局以降低节点重叠为第一目标；多层边仍可共用出口点，但通过 **拉大列距与纵向间距** 减轻「糊成一束」的阅读问题。**并行边散开（必须）**：对汇入同一目标端点的 **≥ 2** 条自动连线（按 **`target/targetHandle/sourceHandle`** 分组；含多 `istioDestination` → 同一 `service` 的场景），`buildFlowGraph.ts` 在包装 `readableLabel` 前将它们转为 **`step` 路径**并按边 `id` 稳定排序对称分配 **`pathOptions.offset`**（相邻间距约 **14px**），使多条并排蓝线可区分；手写边不受影响。
 - **文件名绑定**：导入文件后，Area 页眉必须展示来源文件名（不可出现“未绑定”状态）。
 - **Example 分层布局（必须）**：当导入的文件路径中存在 `01-*/02-*/03-*` 这样的 tier 目录时，Area 必须按层级固定到三列泳道：
@@ -286,7 +288,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
   - **Istio 网关跨区连线（必须与 §5.1 一致）**：**同名（P1）** + **URI 规则相交（P6）**；**禁止**仅以 namespace / Host 分桶决定是否连线。**M×N（P5）** 只对通过 **P6** 的 **（Ingress Service 结点 × Istio Gateway 结点）** 对连线。
   - **路由粒度（语义）**：**P6** 的比对落在 **Ingress path + pathType** 与 **VS `uri.prefix|exact|regex`**；不按 Host 做匹配分桶。
   - **Ingress 分层转发（必须）**：在 Example 分层（`01/02/03`）中，若两个 Ingress 分区 Host+Path 有重叠，允许自动连 `Nginx 转发`；为避免噪声，分层场景仅绘制相邻层前向边（`01→02`、`02→03`）。
-- **节点语义配色（必须）**：`web/src/FlowNodes.tsx` 的 `NODE_COLOR_PALETTE` 为配色单一事实来源，要求 `ingress / host / service / virtualService / destinationRule / route / httpProxy` 使用**可区分且协调**的固定语义色，不因 `01/02/03` 层级改变语义色。
+- **节点语义配色（必须）**：`web/src/features/diagram/FlowNodes.tsx` 的 `NODE_COLOR_PALETTE` 为配色单一事实来源，要求 `ingress / host / service / virtualService / destinationRule / route / httpProxy` 使用**可区分且协调**的固定语义色，不因 `01/02/03` 层级改变语义色。
   - ingress：`#4f46e5`
   - host：`#c026d3`
   - service：`#2563eb`
@@ -425,7 +427,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 - `hostGap`: **220**
 - `routeGap`: **84**
 - `serviceGap`: **210**
-- `regionHeaderReserveY`: **162**（含分区页眉可选泳道一行；与 `web/src/buildGraph.ts` 一致）
+- `regionHeaderReserveY`: **162**（含分区页眉可选泳道一行；与 `web/src/domain/buildGraph.ts` 一致）
 - `SWIMLANE_BAND_GAP`: **100**（同一列内 swimlane（Global/Active01/Active02/Gateway）切换时的额外垂直间距）
 - `lanePitchX`: **round(col × 7.2) + areaGapX**（与代码一致；用于 Example tier 列距及 VS 竖列）
 - **VirtualService 竖列**：在 Example tier 画布上为第四列，分区锚点 **x = baseX + layoutOffsetX + 3 × lanePitchX**；与 **`layoutOffsetX`**（全局 Istio Gateway 预留列宽） additive
@@ -437,7 +439,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
   - Service：`leftPad + col * 3.42`
   - Endpoints：`leftPad + col * 4.22`
 - **VirtualService 且存在拆分 `istioDestination`（多条 destination）**：**不再**仅用 `col * 系数` 放置中间列 —— Route 卡 `maxWidth`≈**352** 会吃掉列距。**Destination / Service / Endpoints** 按下式锚定（与代码常量一致）：`istioDestination.x = routeX + 352 + 182`；`service.x = istioDestination.x + 308 + 156`；Endpoints 再相对 Service 右缘留白 **88px**。
-- **Istio 多 destination 堆叠**：`LAYOUT_EST_ISTIO_DEST_H` **124**（下限；**长 FQDN / subset** 会加价），纵向间隙 `LAYOUT_ISTIO_DEST_STACK_GAP` **42**；Route **行间**额外间隙 `LAYOUT_ROUTE_STACK_GAP` **58**（见 `web/src/buildGraph.ts`）
+- **Istio 多 destination 堆叠**：`LAYOUT_EST_ISTIO_DEST_H` **124**（下限；**长 FQDN / subset** 会加价），纵向间隙 `LAYOUT_ISTIO_DEST_STACK_GAP` **42**；Route **行间**额外间隙 `LAYOUT_ROUTE_STACK_GAP` **58**（见 `web/src/domain/buildGraph.ts`）
 - **可读性与缩放**：画布区（`.flow-stage`）与左侧栏共用 **`--ui-scale`**；顶栏 **A+/A−** 可同时放大/缩小 YAML 与拓扑节点文字（默认约 **108%**，上限 **150%**，`localStorage`：`trv.ui.scale`）。
 - **VirtualService Route 行距**：在 `LAYOUT_EST_ROUTE_CARD_H` 基线之上，按 **path 行数（窄卡折行假设）/ queryParams / headers / 内嵌 Destinations** **动态估高**，避免长 Regex、多 header 卡片与下一行 Route 重叠。
 - **分区留白**：`regionPadBottom` **72**、`regionPadRight` **64**；**不再**使用过高的固定高度地板（旧 `620`），代之以 `regionMinHeight` 与内容包围盒。

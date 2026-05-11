@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
-import { getRuntimeConfig } from "./runtimeConfig";
+import { getRuntimeConfig } from "../../domain/runtimeConfig";
 
 const STORAGE_KEY = "trv.auth.session";
 

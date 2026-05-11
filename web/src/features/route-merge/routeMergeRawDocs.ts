@@ -1,7 +1,7 @@
 import { parseAllDocuments, stringify } from "yaml";
 
-import type { ImportedYamlFile } from "./mergeYamlBundles";
-import { mergeYamlFiles } from "./mergeYamlBundles";
+import type { ImportedYamlFile } from "../../domain/mergeYamlBundles";
+import { mergeYamlFiles } from "../../domain/mergeYamlBundles";
 
 export type RawK8sObject = Record<string, unknown>;
 

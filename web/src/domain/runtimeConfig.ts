@@ -18,6 +18,11 @@ export type RuntimeConfig = {
     apiVersion?: string;
     apiKey?: string;
     /**
+     * 可选：覆盖发给模型的 **system** 角色全文。须仍要求模型只输出可解析 JSON（与内置 schema 一致），
+     * 否则前端无法展示结构化结果。优先级低于浏览器内「AI 弹窗」保存的模版。
+     */
+    systemPrompt?: string;
+    /**
      * 开发模式：请求发往同源 `/trv-azure-openai`，由 Vite 代理转发并在服务端加 `api-key`
      *（见 web/.env 中 `AZURE_OPENAI_API_KEY`）。
      */
