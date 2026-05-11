@@ -51,14 +51,15 @@ describe("buildRouteMergeAiUserContent", () => {
     expect(content).toContain(mergedYaml);
   });
 
-  it("tells the model not to emit partial optimizedYaml when YAML is too large", () => {
-    const mergedYaml = "a".repeat(400);
+  it("keeps optimizedYaml mandatory and explains limits when YAML is too large", () => {
+    const mergedYaml = "a".repeat(1_000);
 
     const content = buildRouteMergeAiUserContent(analysis, docs, mergedYaml, {
-      maxTotalChars: 300,
+      maxTotalChars: 800,
     });
 
     expect(content).toContain("当前 YAML 过大");
-    expect(content).toContain("不要输出片段式 optimizedYaml");
+    expect(content).toContain("optimizedYaml 仍必须非空");
+    expect(content).toContain("按单文件或较小范围运行 AI");
   });
 });

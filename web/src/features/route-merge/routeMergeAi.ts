@@ -69,7 +69,7 @@ export function buildRouteMergeAiUserContent(
   const hasCompleteYaml = mergedYamlSample.length <= completeYamlBudget;
   const yamlSection = hasCompleteYaml
     ? `## 当前完整 YAML（必须基于它输出完整 optimizedYaml）\n${mergedYamlSample}`
-    : `## 当前 YAML 过大（未完整发送）\n当前 YAML 共 ${mergedYamlSample.length} 字符，超过本次请求预算 ${completeYamlBudget} 字符。不要输出片段式 optimizedYaml；若无法基于下方样本保证完整最终 YAML，请将 optimizedYaml 置为空。`;
+    : `## 当前 YAML 过大（未完整发送）\n当前 YAML 共 ${mergedYamlSample.length} 字符，超过本次请求预算 ${completeYamlBudget} 字符。optimizedYaml 仍必须非空：请基于下方辅助索引输出你能保证语义等价的最安全 YAML，并在 semanticEquivalence、suggestions、disclaimer 中明确说明完整性限制；若用户需要完整可替换结果，应建议按单文件或较小范围运行 AI。`;
 
   const remainingBudget = Math.max(12_000, maxTotalChars - yamlSection.length);
   const perKindBudget = Math.floor(remainingBudget / 3);
@@ -84,7 +84,7 @@ export function buildRouteMergeAiUserContent(
     .join("\n");
 
   const core = clip(
-    `## 规则引擎摘要\n${rules}\n\n## v1 提示\n${analysis.v1RulesReminder}\n\n${yamlSection}\n\n## Ingress YAML 辅助索引\n${ing || "(无)"}\n\n## VirtualService YAML 辅助索引\n${vs || "(无)"}\n\n## DestinationRule YAML 辅助索引\n${dr || "(无)"}`,
+    `## 优化目标\n压缩 VirtualService、DestinationRule、Ingress YAML，保持路由功能一致，输出完整 optimizedYaml，并给出简洁清晰的优化建议。\n\n## 规则引擎摘要\n${rules || "(无规则引擎条目)"}\n\n## v1 提示\n${analysis.v1RulesReminder}\n\n${yamlSection}\n\n## Ingress YAML 辅助索引\n${ing || "(无)"}\n\n## VirtualService YAML 辅助索引\n${vs || "(无)"}\n\n## DestinationRule YAML 辅助索引\n${dr || "(无)"}`,
     maxTotalChars,
   );
   if (!scopeHeading) return core;
@@ -100,17 +100,20 @@ function parseJsonPayload(raw: string): RouteMergeAiPayload {
   }
   const parsed = JSON.parse(trimmed.slice(start, end + 1)) as Record<string, unknown>;
   const suggestionsRaw = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+  const stringArray = (v: unknown): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
   return {
     summary: typeof parsed.summary === "string" ? parsed.summary : "",
-    ingressDomainNotes: Array.isArray(parsed.ingressDomainNotes)
-      ? parsed.ingressDomainNotes.filter((x): x is string => typeof x === "string")
-      : [],
-    virtualServiceDomainNotes: Array.isArray(parsed.virtualServiceDomainNotes)
-      ? parsed.virtualServiceDomainNotes.filter((x): x is string => typeof x === "string")
-      : [],
-    destinationRuleDomainNotes: Array.isArray(parsed.destinationRuleDomainNotes)
-      ? parsed.destinationRuleDomainNotes.filter((x): x is string => typeof x === "string")
-      : [],
+    compressionEstimate:
+      typeof parsed.compressionEstimate === "string" ? parsed.compressionEstimate : "",
+    semanticEquivalence:
+      typeof parsed.semanticEquivalence === "string" ? parsed.semanticEquivalence : "",
+    optimizationPlan: stringArray(parsed.optimizationPlan),
+    changeSummary: stringArray(parsed.changeSummary),
+    validationChecklist: stringArray(parsed.validationChecklist),
+    ingressDomainNotes: stringArray(parsed.ingressDomainNotes),
+    virtualServiceDomainNotes: stringArray(parsed.virtualServiceDomainNotes),
+    destinationRuleDomainNotes: stringArray(parsed.destinationRuleDomainNotes),
     suggestions: suggestionsRaw.map((s) => {
       const o = s as Record<string, unknown>;
       return {

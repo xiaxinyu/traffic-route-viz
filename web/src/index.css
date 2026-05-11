@@ -1977,6 +1977,86 @@ body {
   margin: 6px 0;
 }
 
+.route-merge-ai-summary-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f8fafc, #eef6ff);
+}
+
+.route-merge-ai-summary-card .route-merge-ai-summary {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #0f172a;
+}
+
+.route-merge-ai-kicker {
+  font-size: 10px;
+  font-weight: 900;
+  color: #0369a1;
+}
+
+.route-merge-ai-summary-pill {
+  flex-shrink: 0;
+  max-width: 220px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #ecfeff;
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 900;
+  text-align: right;
+}
+
+.route-merge-ai-equivalence {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.route-merge-ai-equivalence strong {
+  flex-shrink: 0;
+}
+
+.route-merge-ai-review-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.route-merge-ai-review-block {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #fff;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.route-merge-ai-review-block strong {
+  color: #0f172a;
+}
+
+.route-merge-ai-review-block ul,
+.route-merge-ai-review-block ol {
+  margin: 6px 0 0 18px;
+  padding: 0;
+}
+
 .route-merge-ai-block {
   font-size: 11px;
   margin-top: 6px;
@@ -1988,13 +2068,49 @@ body {
 }
 
 .route-merge-ai-suggestions {
-  margin: 6px 0 0 16px;
+  margin: 6px 0 0;
   padding: 0;
+  list-style: none;
   font-size: 11px;
 }
 
+.route-merge-ai-suggestion-panel {
+  margin-top: 8px;
+  padding: 9px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: #fafafa;
+}
+
+.route-merge-ai-suggestion-panel > strong {
+  font-size: 11px;
+  color: #0f172a;
+}
+
+.route-merge-ai-suggestions li {
+  padding: 7px 0;
+  border-top: 1px solid #e2e8f0;
+  line-height: 1.45;
+}
+
+.route-merge-ai-suggestions li:first-child {
+  border-top: 0;
+}
+
+.route-merge-ai-suggestion-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
 .route-merge-risk {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #fff7ed;
   color: #b45309;
+  font-size: 10px;
   font-weight: 700;
 }
 
@@ -2208,6 +2324,10 @@ body {
 }
 
 @media (max-width: 900px) {
+  .route-merge-ai-review-grid {
+    grid-template-columns: 1fr;
+  }
+
   .route-merge-ai-diff {
     grid-template-columns: minmax(520px, 1fr);
   }

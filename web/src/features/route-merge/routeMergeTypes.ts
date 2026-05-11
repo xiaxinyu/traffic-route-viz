@@ -35,6 +35,11 @@ export type RouteMergeAiSuggestion = {
 /** Parsed JSON from LLM (best-effort). */
 export type RouteMergeAiPayload = {
   summary: string;
+  compressionEstimate: string;
+  semanticEquivalence: string;
+  optimizationPlan: string[];
+  changeSummary: string[];
+  validationChecklist: string[];
   ingressDomainNotes: string[];
   virtualServiceDomainNotes: string[];
   destinationRuleDomainNotes: string[];
