@@ -117,22 +117,28 @@ export async function callRouteMergeAi(
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (cfg.authHeader) headers[cfg.authHeader.name] = cfg.authHeader.value;
 
-  const body: Record<string, unknown> = {
-    messages: [
-      { role: "system", content: system },
-      { role: "user", content: userContent },
-    ],
-    temperature: 0.2,
-    max_completion_tokens: 8192,
-  };
+  const body: Record<string, unknown> =
+    cfg.apiStyle === "azure-responses"
+      ? {
+          model: cfg.modelId,
+          input: [
+            { role: "system", content: system },
+            { role: "user", content: userContent },
+          ],
+          temperature: 0.2,
+          max_output_tokens: 16384,
+        }
+      : {
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: userContent },
+          ],
+          temperature: 0.2,
+          max_completion_tokens: 8192,
+        };
   if (cfg.apiStyle === "openai-v1") {
     body.model = cfg.modelId;
     body.reasoning_effort = "medium";
-  }
-  if (cfg.apiStyle === "azure-responses") {
-    // Azure OpenAI Responses API (2025-04-01-preview+): `model` + Bearer auth
-    body.model = cfg.modelId;
-    body.max_completion_tokens = 16384;
   }
 
   devLog("request", {
@@ -172,9 +178,7 @@ export async function callRouteMergeAi(
       });
     }
     if (!res.ok) {
-      throw new Error(
-        `Azure OpenAI HTTP ${res.status} (${cfg.requestUrl}): ${t.slice(0, 800)}`,
-      );
+      throw new Error(`Azure OpenAI HTTP ${res.status} (${cfg.requestUrl}): ${t.slice(0, 800)}`);
     }
   }
 
@@ -189,7 +193,12 @@ export async function callRouteMergeAi(
       : // responses api common shape
         typeof (json as any).output_text === "string"
         ? ((json as any).output_text as string)
-        : null;
+        : Array.isArray((json as any).output)
+          ? ((json as any).output as any[])
+              .flatMap((item) => (Array.isArray(item?.content) ? item.content : []))
+              .map((part) => (typeof part?.text === "string" ? part.text : ""))
+              .join("")
+          : null;
   if (typeof content !== "string" || !content.trim()) {
     throw new Error("模型返回空内容");
   }

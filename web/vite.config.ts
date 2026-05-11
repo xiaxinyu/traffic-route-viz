@@ -7,14 +7,26 @@ import { defineConfig, loadEnv } from "vite";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-function readRuntimeAzureBaseUrl(): string | null {
+type RuntimeAzureConfig = {
+  baseUrl?: string;
+  apiKey?: string;
+  bearerToken?: string;
+};
+
+function readRuntimeAzureConfig(): RuntimeAzureConfig | null {
   try {
     const p = path.join(__dirname, "public", "config.json");
     if (!fs.existsSync(p)) return null;
     const raw = fs.readFileSync(p, "utf-8");
-    const json = JSON.parse(raw) as { routeMergeAi?: { baseUrl?: unknown } };
-    const baseUrl = json.routeMergeAi?.baseUrl;
-    return typeof baseUrl === "string" ? baseUrl : null;
+    const json = JSON.parse(raw) as {
+      routeMergeAi?: { baseUrl?: unknown; apiKey?: unknown; bearerToken?: unknown };
+    };
+    const cfg = json.routeMergeAi;
+    return {
+      baseUrl: typeof cfg?.baseUrl === "string" ? cfg.baseUrl : undefined,
+      apiKey: typeof cfg?.apiKey === "string" ? cfg.apiKey : undefined,
+      bearerToken: typeof cfg?.bearerToken === "string" ? cfg.bearerToken : undefined,
+    };
   } catch {
     return null;
   }
@@ -22,21 +34,34 @@ function readRuntimeAzureBaseUrl(): string | null {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname, "");
-  const azureBase = env.VITE_AZURE_OPENAI_BASE_URL || readRuntimeAzureBaseUrl() || "";
+  const runtimeAzure = readRuntimeAzureConfig();
+  const azureBase = env.VITE_AZURE_OPENAI_BASE_URL || runtimeAzure?.baseUrl || "";
+  const azureProxyTarget = (() => {
+    if (!azureBase) return "";
+    try {
+      return new URL(azureBase).origin;
+    } catch {
+      return azureBase.replace(/\/+$/, "");
+    }
+  })();
 
   return {
     plugins: [react()],
-    server: azureBase
+    server: azureProxyTarget
       ? {
           proxy: {
             "/trv-azure-openai": {
-              target: azureBase.replace(/\/+$/, ""),
+              target: azureProxyTarget,
               changeOrigin: true,
-              rewrite: (p) => p.replace(/^\/trv-azure-openai/, ""),
+              rewrite: (p) => p.replace(/^\/trv-azure-openai/, "") || "/",
               configure: (proxy) => {
                 proxy.on("proxyReq", (proxyReq) => {
-                  const bearer = env.AZURE_API_KEY ?? env.VITE_AZURE_API_KEY;
-                  const key = env.AZURE_OPENAI_API_KEY ?? env.VITE_AZURE_OPENAI_API_KEY;
+                  const bearer =
+                    env.AZURE_API_KEY ?? env.VITE_AZURE_API_KEY ?? runtimeAzure?.bearerToken;
+                  const key =
+                    env.AZURE_OPENAI_API_KEY ??
+                    env.VITE_AZURE_OPENAI_API_KEY ??
+                    runtimeAzure?.apiKey;
                   if (bearer) {
                     proxyReq.setHeader("Authorization", `Bearer ${bearer}`);
                   } else if (key) {

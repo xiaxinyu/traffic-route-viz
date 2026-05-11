@@ -14,9 +14,13 @@ export type RuntimeConfig = {
     enabled?: boolean;
     /** 例如 `https://<resource>.cognitiveservices.azure.com/openai` */
     baseUrl?: string;
+    /** `azure-deployments` 使用 deployment；`openai-v1` / `azure-responses` 使用 model。 */
+    apiStyle?: "azure-deployments" | "openai-v1" | "azure-responses";
     deployment?: string;
+    model?: string;
     apiVersion?: string;
     apiKey?: string;
+    bearerToken?: string;
     /**
      * 可选：覆盖发给模型的 **system** 角色全文。须仍要求模型只输出可解析 JSON（与内置 schema 一致），
      * 否则前端无法展示结构化结果。优先级低于浏览器内「AI 弹窗」保存的模版。

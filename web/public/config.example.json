@@ -8,7 +8,9 @@
   "routeMergeAi": {
     "enabled": false,
     "baseUrl": "https://YOUR_RESOURCE_NAME.cognitiveservices.azure.com/openai",
+    "apiStyle": "azure-deployments",
     "deployment": "gpt-4o",
+    "model": "gpt-4o",
     "apiVersion": "2025-04-01-preview",
     "useDevProxy": true,
     "apiKey": ""

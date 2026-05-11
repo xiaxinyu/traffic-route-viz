@@ -21,6 +21,43 @@ function trimSlash(s: string): string {
   return s.replace(/\/+$/, "");
 }
 
+function stripQueryAndHash(s: string): string {
+  const query = s.indexOf("?");
+  const hash = s.indexOf("#");
+  const cut = [query, hash].filter((i) => i >= 0).sort((a, b) => a - b)[0];
+  return cut === undefined ? s : s.slice(0, cut);
+}
+
+function normalizeApiStyle(value: unknown): RouteMergeAiResolved["apiStyle"] | undefined {
+  return value === "azure-deployments" || value === "openai-v1" || value === "azure-responses"
+    ? value
+    : undefined;
+}
+
+function configuredBasePath(
+  configuredBaseUrl: string,
+  apiStyle: RouteMergeAiResolved["apiStyle"],
+): string {
+  const fallbackPath = apiStyle === "openai-v1" ? "" : "/openai";
+  try {
+    const u = new URL(configuredBaseUrl);
+    const path = trimSlash(u.pathname);
+    return path || fallbackPath;
+  } catch {
+    const path = trimSlash(stripQueryAndHash(configuredBaseUrl));
+    return path.startsWith("/") ? path : fallbackPath;
+  }
+}
+
+export function buildDevProxyBaseUrl(
+  browserOrigin: string,
+  configuredBaseUrl: string,
+  apiStyle: RouteMergeAiResolved["apiStyle"],
+): string {
+  const basePath = configuredBasePath(configuredBaseUrl, apiStyle);
+  return `${trimSlash(browserOrigin)}/trv-azure-openai${basePath}`;
+}
+
 /**
  * Build Azure OpenAI–style chat completions URL.
  * `baseUrl` is typically `https://<resource>.cognitiveservices.azure.com/openai`.
@@ -30,7 +67,7 @@ export function buildAzureOpenAiChatCompletionsUrl(
   deployment: string,
   apiVersion: string,
 ): string {
-  const base = trimSlash(baseUrl);
+  const base = trimSlash(stripQueryAndHash(baseUrl));
   const q = new URLSearchParams({ "api-version": apiVersion });
   return `${base}/deployments/${encodeURIComponent(deployment)}/chat/completions?${q.toString()}`;
 }
@@ -40,7 +77,7 @@ export function buildAzureOpenAiChatCompletionsUrl(
  * `baseUrl` is typically `https://<host>/openai/v1`.
  */
 export function buildOpenAiV1ChatCompletionsUrl(baseUrl: string): string {
-  return `${trimSlash(baseUrl)}/chat/completions`;
+  return `${trimSlash(stripQueryAndHash(baseUrl))}/chat/completions`;
 }
 
 /**
@@ -48,15 +85,13 @@ export function buildOpenAiV1ChatCompletionsUrl(baseUrl: string): string {
  * `baseUrl` is typically `https://<resource>.cognitiveservices.azure.com/openai`.
  */
 export function buildAzureOpenAiResponsesUrl(baseUrl: string, apiVersion: string): string {
-  const base = trimSlash(baseUrl);
+  const base = trimSlash(stripQueryAndHash(baseUrl));
   const root = base.endsWith("/responses") ? base.slice(0, -"/responses".length) : base;
   const q = new URLSearchParams({ "api-version": apiVersion });
   return `${root}/responses?${q.toString()}`;
 }
 
-function coalesceRouteMergeAi(
-  rc: RuntimeConfig["routeMergeAi"],
-): {
+function coalesceRouteMergeAi(rc: RuntimeConfig["routeMergeAi"]): {
   enabled: boolean;
   baseUrl: string;
   deployment: string;
@@ -71,35 +106,26 @@ function coalesceRouteMergeAi(
     rc?.enabled === true ||
     (import.meta.env.VITE_ROUTE_MERGE_AI_ENABLED as string | undefined) === "true";
   const baseUrl =
-    rc?.baseUrl ??
-    (import.meta.env.VITE_AZURE_OPENAI_BASE_URL as string | undefined) ??
-    "";
+    rc?.baseUrl ?? (import.meta.env.VITE_AZURE_OPENAI_BASE_URL as string | undefined) ?? "";
   const deployment =
     rc?.deployment ??
     (import.meta.env.VITE_AZURE_OPENAI_DEPLOYMENT as string | undefined) ??
     "gpt-4o";
   const model =
-    // @ts-expect-error runtime config may contain `model`
-    (typeof rc?.model === "string" ? (rc.model as string) : undefined) ??
+    (typeof rc?.model === "string" ? rc.model : undefined) ??
     (import.meta.env.VITE_AZURE_OPENAI_MODEL as string | undefined) ??
     deployment;
   const apiVersion =
     rc?.apiVersion ??
     (import.meta.env.VITE_AZURE_OPENAI_API_VERSION as string | undefined) ??
     "2025-04-01-preview";
-  const apiKey =
-    rc?.apiKey ?? (import.meta.env.VITE_AZURE_OPENAI_API_KEY as string | undefined);
+  const apiKey = rc?.apiKey ?? (import.meta.env.VITE_AZURE_OPENAI_API_KEY as string | undefined);
   const bearerToken =
-    // @ts-expect-error runtime config may contain `bearerToken`
-    (typeof rc?.bearerToken === "string" ? (rc.bearerToken as string) : undefined) ??
+    (typeof rc?.bearerToken === "string" ? rc.bearerToken : undefined) ??
     (import.meta.env.VITE_AZURE_API_KEY as string | undefined);
   const apiStyle =
-    // @ts-expect-error runtime config may contain `apiStyle`
-    (typeof rc?.apiStyle === "string" ? (rc.apiStyle as string) : undefined) as
-      | "azure-deployments"
-      | "openai-v1"
-      | "azure-responses"
-      | undefined;
+    normalizeApiStyle(rc?.apiStyle) ??
+    normalizeApiStyle(import.meta.env.VITE_AZURE_OPENAI_API_STYLE);
   const useDevProxy =
     rc?.useDevProxy === true ||
     (import.meta.env.VITE_AZURE_OPENAI_USE_DEV_PROXY as string | undefined) === "true";
@@ -138,16 +164,16 @@ export function resolveRouteMergeAiConfig(): RouteMergeAiResolved | null {
   if (!m.enabled) return null;
 
   const useProxy = import.meta.env.DEV && m.useDevProxy;
+  if (!m.baseUrl) return null;
+
+  const apiStyle = inferApiStyle(m.baseUrl, m.apiStyle);
   const baseForUrl = useProxy
-    ? `${trimSlash(window.location.origin)}/trv-azure-openai`
+    ? buildDevProxyBaseUrl(window.location.origin, m.baseUrl, apiStyle)
     : trimSlash(m.baseUrl);
-
-  if (!useProxy && !m.baseUrl) return null;
-
-  const apiStyle = inferApiStyle(baseForUrl, m.apiStyle);
   const requestUrl = (() => {
     if (apiStyle === "openai-v1") return buildOpenAiV1ChatCompletionsUrl(baseForUrl);
-    if (apiStyle === "azure-responses") return buildAzureOpenAiResponsesUrl(baseForUrl, m.apiVersion);
+    if (apiStyle === "azure-responses")
+      return buildAzureOpenAiResponsesUrl(baseForUrl, m.apiVersion);
     return buildAzureOpenAiChatCompletionsUrl(baseForUrl, m.deployment, m.apiVersion);
   })();
 
@@ -156,7 +182,9 @@ export function resolveRouteMergeAiConfig(): RouteMergeAiResolved | null {
     : apiStyle === "openai-v1" || apiStyle === "azure-responses"
       ? m.bearerToken
         ? { name: "Authorization", value: `Bearer ${m.bearerToken}` }
-        : null
+        : m.apiKey
+          ? { name: "api-key", value: m.apiKey }
+          : null
       : m.apiKey
         ? { name: "api-key", value: m.apiKey }
         : null;
@@ -176,13 +204,19 @@ export function resolveRouteMergeAiConfig(): RouteMergeAiResolved | null {
 export function routeMergeAiDisabledReason(): string {
   const rc = getRuntimeConfig();
   const m = coalesceRouteMergeAi(rc.routeMergeAi);
-  if (!m.enabled) return "未启用：在 config.json 设置 routeMergeAi.enabled=true 或 VITE_ROUTE_MERGE_AI_ENABLED=true。";
+  if (!m.enabled)
+    return "未启用：在 config.json 设置 routeMergeAi.enabled=true 或 VITE_ROUTE_MERGE_AI_ENABLED=true。";
   const useProxy = import.meta.env.DEV && m.useDevProxy;
-  if (!useProxy && !m.baseUrl)
+  if (!m.baseUrl)
     return "缺少 baseUrl：config.json.routeMergeAi.baseUrl 或 VITE_AZURE_OPENAI_BASE_URL。";
   const apiStyle = inferApiStyle(m.baseUrl, m.apiStyle);
-  if (!useProxy && (apiStyle === "openai-v1" || apiStyle === "azure-responses") && !m.bearerToken)
-    return "缺少 Bearer Token：config.routeMergeAi.bearerToken 或 VITE_AZURE_API_KEY（仅可信环境）。";
+  if (
+    !useProxy &&
+    (apiStyle === "openai-v1" || apiStyle === "azure-responses") &&
+    !m.bearerToken &&
+    !m.apiKey
+  )
+    return "缺少 Bearer Token 或 API Key：config.routeMergeAi.bearerToken / apiKey 或 VITE_AZURE_API_KEY / VITE_AZURE_OPENAI_API_KEY（仅可信环境）。";
   if (!useProxy && apiStyle === "azure-deployments" && !m.apiKey)
     return "缺少 API Key：config.routeMergeAi.apiKey 或 VITE_AZURE_OPENAI_API_KEY（仅可信环境）。";
   if (m.useDevProxy && !import.meta.env.DEV)
