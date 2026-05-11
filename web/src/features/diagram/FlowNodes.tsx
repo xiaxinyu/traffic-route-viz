@@ -470,7 +470,17 @@ export const IstioGatewayNode = memo(function IstioGatewayNode(props: NodeProps)
   };
   const accent = NODE_COLOR_PALETTE.istioGateway;
   return (
-    <div style={{ ...cardStyle, borderLeft: `5px solid ${accent}`, background: "#f0f9ff" }}>
+    <div
+      style={{
+        ...cardStyle,
+        minWidth: 220,
+        maxWidth: 360,
+        padding: "13px 16px",
+        fontSize: 14.5,
+        borderLeft: `6px solid ${accent}`,
+        background: "#f0f9ff",
+      }}
+    >
       <Handle type="target" position={Position.Left} id="t-left" style={handle(accent, "left")} />
       <Handle
         type="target"
@@ -488,27 +498,29 @@ export const IstioGatewayNode = memo(function IstioGatewayNode(props: NodeProps)
           </span>
         ) : null}
       </div>
-      <div style={{ marginTop: 6, fontWeight: 900, color: "#0f172a" }}>{label ?? "—"}</div>
-      {subtitle ? <div style={meta()}>{subtitle}</div> : null}
+      <div style={{ marginTop: 8, fontWeight: 900, color: "#0f172a", fontSize: 15.5 }}>
+        {label ?? "—"}
+      </div>
+      {subtitle ? <div style={meta({ marginTop: 3, fontSize: 12.5 })}>{subtitle}</div> : null}
       {servers?.length ? (
-        <div style={{ ...meta({ marginTop: 6 }), color: "#0f172a" }}>
-          <div style={{ fontWeight: 800, color: "#0369a1" }}>Servers</div>
+        <div style={{ ...meta({ marginTop: 8, fontSize: 12.5 }), color: "#0f172a" }}>
+          <div style={{ fontWeight: 900, color: "#0369a1" }}>Servers</div>
           <div style={{ marginTop: 2 }}>
             {servers.slice(0, 3).map((s, i) => (
-              <div key={i} style={meta({ marginTop: 2 })}>
+              <div key={i} style={meta({ marginTop: 3, fontSize: 12.5 })}>
                 {s.protocol ?? "?"} {s.port ?? "?"} {s.name ? `(${s.name})` : ""} ·{" "}
                 {(s.hosts ?? []).slice(0, 2).join(", ")}
                 {(s.hosts?.length ?? 0) > 2 ? ` (+${(s.hosts?.length ?? 0) - 2})` : ""}
               </div>
             ))}
             {servers.length > 3 ? (
-              <div style={meta({ marginTop: 2 })}>…(+{servers.length - 3})</div>
+              <div style={meta({ marginTop: 3, fontSize: 12.5 })}>…(+{servers.length - 3})</div>
             ) : null}
           </div>
         </div>
       ) : null}
       {selector && Object.keys(selector).length ? (
-        <div style={{ ...meta({ marginTop: 6 }), color: "#334155" }}>
+        <div style={{ ...meta({ marginTop: 8, fontSize: 12.5 }), color: "#334155" }}>
           selector:{" "}
           {Object.entries(selector)
             .map(([k, v]) => `${k}=${v}`)

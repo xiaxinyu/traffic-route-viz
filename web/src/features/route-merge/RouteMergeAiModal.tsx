@@ -373,7 +373,11 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                   复制原始 YAML
                 </button>
               </div>
-              <div className="route-merge-ai-preview-editor" role="region" aria-label="原始 YAML 预览">
+              <div
+                className="route-merge-ai-preview-editor"
+                role="region"
+                aria-label="原始 YAML 预览"
+              >
                 <div className="route-merge-ai-code-shell">
                   <div className="route-merge-ai-code-gutter" aria-hidden="true">
                     {previewLines.map((_, i) => (
@@ -390,103 +394,107 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
 
           {payload ? (
             <div className="route-merge-ai route-merge-ai-in-modal">
-              <div className="route-merge-ai-summary-card">
-                <div>
-                  <span className="route-merge-ai-kicker">优化结论</span>
-                  <p className="route-merge-ai-summary">
-                    {payload.summary || "已完成 VS/DR/Ingress 等价压缩分析。"}
-                  </p>
+              <div className="route-merge-ai-advice">
+                <div className="route-merge-ai-summary-card">
+                  <div>
+                    <span className="route-merge-ai-kicker">优化结论</span>
+                    <p className="route-merge-ai-summary">
+                      {payload.summary || "已完成 VS/DR/Ingress 等价压缩分析。"}
+                    </p>
+                  </div>
+                  {payload.compressionEstimate ? (
+                    <span className="route-merge-ai-summary-pill">
+                      {payload.compressionEstimate}
+                    </span>
+                  ) : null}
                 </div>
-                {payload.compressionEstimate ? (
-                  <span className="route-merge-ai-summary-pill">{payload.compressionEstimate}</span>
+                {payload.semanticEquivalence ? (
+                  <div className="route-merge-ai-equivalence">
+                    <strong>等价性判断</strong>
+                    <span>{payload.semanticEquivalence}</span>
+                  </div>
+                ) : null}
+                {optimizationPlan.length || changeSummary.length || validationChecklist.length ? (
+                  <div className="route-merge-ai-review-grid">
+                    {optimizationPlan.length ? (
+                      <section className="route-merge-ai-review-block">
+                        <strong>优化思路</strong>
+                        <ol>
+                          {optimizationPlan.map((x) => (
+                            <li key={x}>{x}</li>
+                          ))}
+                        </ol>
+                      </section>
+                    ) : null}
+                    {changeSummary.length ? (
+                      <section className="route-merge-ai-review-block">
+                        <strong>实际变更</strong>
+                        <ul>
+                          {changeSummary.map((x) => (
+                            <li key={x}>{x}</li>
+                          ))}
+                        </ul>
+                      </section>
+                    ) : null}
+                    {validationChecklist.length ? (
+                      <section className="route-merge-ai-review-block">
+                        <strong>复核清单</strong>
+                        <ul>
+                          {validationChecklist.map((x) => (
+                            <li key={x}>{x}</li>
+                          ))}
+                        </ul>
+                      </section>
+                    ) : null}
+                  </div>
+                ) : null}
+                {payload.ingressDomainNotes.length ? (
+                  <div className="route-merge-ai-block">
+                    <strong>Ingress</strong>
+                    <ul>
+                      {payload.ingressDomainNotes.map((x) => (
+                        <li key={x}>{x}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {payload.virtualServiceDomainNotes.length ? (
+                  <div className="route-merge-ai-block">
+                    <strong>VirtualService</strong>
+                    <ul>
+                      {payload.virtualServiceDomainNotes.map((x) => (
+                        <li key={x}>{x}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {payload.destinationRuleDomainNotes.length ? (
+                  <div className="route-merge-ai-block">
+                    <strong>DestinationRule</strong>
+                    <ul>
+                      {payload.destinationRuleDomainNotes.map((x) => (
+                        <li key={x}>{x}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {payload.suggestions.length ? (
+                  <div className="route-merge-ai-suggestion-panel">
+                    <strong>优化建议</strong>
+                    <ul className="route-merge-ai-suggestions">
+                      {payload.suggestions.map((s, i) => (
+                        <li key={`${s.title}-${i}`}>
+                          <div className="route-merge-ai-suggestion-title">
+                            <strong>{s.title}</strong>
+                            {s.risk ? <span className="route-merge-risk">{s.risk}</span> : null}
+                          </div>
+                          <div>{s.detail}</div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ) : null}
               </div>
-              {payload.semanticEquivalence ? (
-                <div className="route-merge-ai-equivalence">
-                  <strong>等价性判断</strong>
-                  <span>{payload.semanticEquivalence}</span>
-                </div>
-              ) : null}
-              {optimizationPlan.length || changeSummary.length || validationChecklist.length ? (
-                <div className="route-merge-ai-review-grid">
-                  {optimizationPlan.length ? (
-                    <section className="route-merge-ai-review-block">
-                      <strong>优化思路</strong>
-                      <ol>
-                        {optimizationPlan.map((x) => (
-                          <li key={x}>{x}</li>
-                        ))}
-                      </ol>
-                    </section>
-                  ) : null}
-                  {changeSummary.length ? (
-                    <section className="route-merge-ai-review-block">
-                      <strong>实际变更</strong>
-                      <ul>
-                        {changeSummary.map((x) => (
-                          <li key={x}>{x}</li>
-                        ))}
-                      </ul>
-                    </section>
-                  ) : null}
-                  {validationChecklist.length ? (
-                    <section className="route-merge-ai-review-block">
-                      <strong>复核清单</strong>
-                      <ul>
-                        {validationChecklist.map((x) => (
-                          <li key={x}>{x}</li>
-                        ))}
-                      </ul>
-                    </section>
-                  ) : null}
-                </div>
-              ) : null}
-              {payload.ingressDomainNotes.length ? (
-                <div className="route-merge-ai-block">
-                  <strong>Ingress</strong>
-                  <ul>
-                    {payload.ingressDomainNotes.map((x) => (
-                      <li key={x}>{x}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {payload.virtualServiceDomainNotes.length ? (
-                <div className="route-merge-ai-block">
-                  <strong>VirtualService</strong>
-                  <ul>
-                    {payload.virtualServiceDomainNotes.map((x) => (
-                      <li key={x}>{x}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {payload.destinationRuleDomainNotes.length ? (
-                <div className="route-merge-ai-block">
-                  <strong>DestinationRule</strong>
-                  <ul>
-                    {payload.destinationRuleDomainNotes.map((x) => (
-                      <li key={x}>{x}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              {payload.suggestions.length ? (
-                <div className="route-merge-ai-suggestion-panel">
-                  <strong>优化建议</strong>
-                  <ul className="route-merge-ai-suggestions">
-                    {payload.suggestions.map((s, i) => (
-                      <li key={`${s.title}-${i}`}>
-                        <div className="route-merge-ai-suggestion-title">
-                          <strong>{s.title}</strong>
-                          {s.risk ? <span className="route-merge-risk">{s.risk}</span> : null}
-                        </div>
-                        <div>{s.detail}</div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
               <div
                 className="route-merge-ai-yaml-area"
                 role="region"
