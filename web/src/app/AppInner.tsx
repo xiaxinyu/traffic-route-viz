@@ -527,7 +527,10 @@ export function AppInner() {
           window.location.reload();
         }}
         statusStrip={
-          <div className="header-status-strip header-status-strip-compact" data-testid="top-status-strip">
+          <div
+            className="header-status-strip header-status-strip-compact"
+            data-testid="top-status-strip"
+          >
             <span className="status-pill">节点 {graphMetrics.nodeCount}</span>
             <span className="status-pill">边 {graphMetrics.edgeCount}</span>
             <span className="status-pill">自动 {graphMetrics.autoEdgeCount}</span>
@@ -603,7 +606,7 @@ export function AppInner() {
                       className="trv-icon trv-icon--sm"
                     />
                   </span>
-                  {leftMode === "files" ? "文件" : "YAML"}
+                  {leftMode === "files" ? "数据源" : "YAML 编辑器"}
                 </span>
                 {leftMode === "files" && importedFiles && importedFiles.length > 1 ? (
                   <button
@@ -645,7 +648,11 @@ export function AppInner() {
                     const lineCount = importedLinesSummary?.perFile[idx]?.lineCount ?? 0;
                     const showPerFileAi = importedFiles.length >= 1;
                     return (
-                      <div key={p + idx} title={p} className={active ? "file-item active" : "file-item"}>
+                      <div
+                        key={p + idx}
+                        title={p}
+                        className={active ? "file-item active" : "file-item"}
+                      >
                         <div className="file-item-inner">
                           <div
                             role="button"
@@ -674,7 +681,9 @@ export function AppInner() {
                               </span>
                               <div className="file-item-main">
                                 <div className="file-item-title">{f.name}</div>
-                                {folderHint ? <div className="file-item-hint">{folderHint}</div> : null}
+                                {folderHint ? (
+                                  <div className="file-item-hint">{folderHint}</div>
+                                ) : null}
                               </div>
                             </div>
                           </div>
@@ -714,15 +723,18 @@ export function AppInner() {
                       data-testid="import-line-stats-note"
                       title="合并文本由 mergeYamlFiles 以换行 + --- + 换行连接；与各文件行数之和可能因分隔行与首尾换行而不相等。"
                     >
-                      行数口径：各文件行数相加 vs 合并拼接（<code className="import-line-stats-code">---</code>
-                      ）后行数可能不同；与左侧 YAML 编辑区行数统计一致（<code className="import-line-stats-code">\n</code>
+                      行数口径：各文件行数相加 vs 合并拼接（
+                      <code className="import-line-stats-code">---</code>
+                      ）后行数可能不同；与左侧 YAML 编辑区行数统计一致（
+                      <code className="import-line-stats-code">\n</code>
                       分段，含空行）。
                     </div>
                   ) : null}
                 </div>
               ) : (
                 <div className="empty-box">
-                  尚未导入。请在顶部「输入与数据源」区域拖入、点击虚线框，或使用「文件 / 文件夹」。
+                  尚未导入。请在顶部「输入与数据源」上传文件、上传文件夹，或直接拖拽 YAML
+                  到顶部导入区。
                 </div>
               )
             ) : (
@@ -749,7 +761,9 @@ export function AppInner() {
                         <button
                           type="button"
                           className={`btn-ai btn-with-icon${routeMergeAi.busy ? " btn-ai--busy" : ""}`}
-                          disabled={!canRouteMergeAi || routeMergeAi.busy || !yamlTextStats.hasContent}
+                          disabled={
+                            !canRouteMergeAi || routeMergeAi.busy || !yamlTextStats.hasContent
+                          }
                           title={
                             routeMergeAiHint ??
                             "将当前编辑区 YAML 与规则引擎摘要发给模型（未使用多文件导入时）"
@@ -764,16 +778,17 @@ export function AppInner() {
                     ) : null}
                     <button
                       type="button"
-                      className="btn-secondary"
+                      className="btn-secondary btn-with-icon"
                       onClick={() => updateYamlText("")}
                       data-testid="yaml-clear"
                       disabled={!yamlTextStats.hasContent}
                     >
+                      <Icon d={TRV_ICONS.trash} className="trv-icon trv-icon--sm" />
                       清空
                     </button>
                     <button
                       type="button"
-                      className="btn-secondary"
+                      className="btn-secondary btn-with-icon"
                       onClick={() => {
                         setImportedFiles(null);
                         setActiveFileIndex(null);
@@ -784,15 +799,17 @@ export function AppInner() {
                       }}
                       data-testid="yaml-restore-sample"
                     >
+                      <Icon d={TRV_ICONS.docFile} className="trv-icon trv-icon--sm" />
                       示例
                     </button>
                     <button
                       type="button"
-                      className="btn-secondary"
+                      className="btn-secondary btn-with-icon"
                       onClick={() => setYamlPopoutOpen(true)}
                       data-testid="yaml-popout-open"
                       title="放大查看 YAML（Esc 关闭）"
                     >
+                      <Icon d={TRV_ICONS.fit} className="trv-icon trv-icon--sm" />
                       放大
                     </button>
                   </div>
@@ -811,6 +828,7 @@ export function AppInner() {
                     data-testid="yaml-textarea"
                     onChange={(e) => updateYamlText(e.target.value)}
                     spellCheck={false}
+                    wrap="off"
                     className="yaml-editor"
                   />
                 </div>
@@ -913,6 +931,7 @@ export function AppInner() {
               value={yamlText}
               onChange={(e) => updateYamlText(e.target.value)}
               spellCheck={false}
+              wrap="off"
               className="yaml-editor yaml-editor-popout"
             />
           </div>
@@ -926,8 +945,8 @@ export function AppInner() {
         payload={routeMergeAi.payload}
         error={routeMergeAi.error}
         scopeLabel={routeMergeAi.scopeLabel}
+        sourceYaml={routeMergeAi.sourceYaml}
       />
     </div>
   );
 }
-

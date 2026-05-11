@@ -1,4 +1,4 @@
-import type { KeyboardEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import type { ImportedYamlFile } from "../domain/mergeYamlBundles";
 
@@ -96,22 +96,16 @@ export function AppHeader(props: {
       {importedLinesSummary ? (
         <>
           {" "}
-          · 合计 {importedLinesSummary.sumOfFileLines} 行 · 合并 {importedLinesSummary.mergedLineCount} 行
+          · 合计 {importedLinesSummary.sumOfFileLines} 行 · 合并{" "}
+          {importedLinesSummary.mergedLineCount} 行
         </>
       ) : null}
     </>
   ) : yamlTextStats.hasContent ? (
     <>未导入文件 · 当前 {yamlTextStats.lineCount} 行</>
   ) : (
-    <>拖入或点选导入</>
+    <>可拖拽或上传</>
   );
-
-  const onDropzoneKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      onClickImportFiles();
-    }
-  };
 
   return (
     <header className="app-header">
@@ -121,38 +115,46 @@ export function AppHeader(props: {
             <h1 title="专业化流量拓扑工作台：导入、解析、筛选、定位、导出一体化">
               Traffic Route Viz
             </h1>
-            <p className="header-tagline">专业化流量拓扑工作台：导入、解析、筛选、定位、导出一体化</p>
+            <p className="header-tagline">
+              专业化流量拓扑工作台：导入、解析、筛选、定位、导出一体化
+            </p>
           </div>
         </div>
 
-        <section className="header-seg header-seg--import" aria-label="输入与数据源" title={importTitle}>
-          <span className="header-import-meta">{meta}</span>
+        <section
+          className="header-seg header-seg--import"
+          aria-label="输入与数据源"
+          title={importTitle}
+          onDragOver={(ev) => ev.preventDefault()}
+          onDrop={(ev) => {
+            ev.preventDefault();
+            void onDropImport(ev.dataTransfer);
+          }}
+        >
+          <div className="header-import-copy">
+            <span className="header-import-label">输入与数据源</span>
+            <span className="header-import-meta">{meta}</span>
+            <span className="header-import-hint">
+              拖拽 YAML 文件或文件夹到此区域，自动追加、去重并刷新
+            </span>
+          </div>
           <div
             data-testid="import-dropzone"
-            className="import-dropzone import-dropzone--header import-dropzone--inline"
-            onDragOver={(ev) => ev.preventDefault()}
-            onDrop={(ev) => {
-              ev.preventDefault();
-              void onDropImport(ev.dataTransfer);
-            }}
-            onClick={onClickImportFiles}
-            onKeyDown={onDropzoneKeyDown}
-            role="button"
-            tabIndex={0}
+            className="header-import-drop-indicator"
+            aria-hidden="true"
           >
-            <span className="dropzone-title">拖入 / 点击</span>
-            <span className="dropzone-desc">追加 · 去重 · 刷新</span>
+            拖拽导入
           </div>
           <div className="header-import-tools" role="group" aria-label="导入 YAML">
             <button
               type="button"
-              className="btn-secondary btn-with-icon header-import-btn"
+              className="btn-primary btn-with-icon header-import-btn"
               onClick={onClickImportFiles}
               title="导入一个或多个 YAML 文件"
               aria-label="导入文件"
             >
               <Icon d={icons.docFile} className="trv-icon trv-icon--sm" />
-              文件
+              上传文件
             </button>
             <button
               type="button"
@@ -162,7 +164,7 @@ export function AppHeader(props: {
               aria-label="导入文件夹"
             >
               <Icon d={icons.folder} className="trv-icon trv-icon--sm" />
-              文件夹
+              上传文件夹
             </button>
             {importedFiles?.length ? (
               <button
@@ -238,22 +240,45 @@ export function AppHeader(props: {
               </button>
 
               <div className="search-nav" role="group" aria-label="全局缩放控制">
-                <button type="button" onClick={onZoomOut} title="缩小侧栏与拓扑（含文字）" aria-label="缩小">
+                <button
+                  type="button"
+                  onClick={onZoomOut}
+                  title="缩小侧栏与拓扑（含文字）"
+                  aria-label="缩小"
+                >
                   <Icon d={icons.minus} />
                 </button>
-                <button type="button" onClick={onZoomReset} title="将侧栏与拓扑缩放设为 100%" aria-label="重置缩放">
+                <button
+                  type="button"
+                  onClick={onZoomReset}
+                  title="将侧栏与拓扑缩放设为 100%"
+                  aria-label="重置缩放"
+                >
                   <span className="trv-icon-btn-text">{uiScalePct}%</span>
                 </button>
-                <button type="button" onClick={onZoomIn} title="放大侧栏与拓扑（含文字）" aria-label="放大">
+                <button
+                  type="button"
+                  onClick={onZoomIn}
+                  title="放大侧栏与拓扑（含文字）"
+                  aria-label="放大"
+                >
                   <Icon d={icons.plus} />
                 </button>
               </div>
             </div>
 
-            <div className="header-tool-cluster header-tool-cluster--status" role="group" aria-label="指标与账号">
+            <div
+              className="header-tool-cluster header-tool-cluster--status"
+              role="group"
+              aria-label="指标与账号"
+            >
               <button
                 type="button"
-                className={statusOpen ? "btn-secondary btn-icon metric btn-pill-active" : "btn-secondary btn-icon metric"}
+                className={
+                  statusOpen
+                    ? "btn-secondary btn-icon metric btn-pill-active"
+                    : "btn-secondary btn-icon metric"
+                }
                 onClick={toggleStatusOpen}
                 title={statusOpen ? "收起指标" : "展开指标"}
                 aria-label="指标"
@@ -262,7 +287,13 @@ export function AppHeader(props: {
               </button>
 
               {canLogout ? (
-                <button type="button" className="btn-secondary btn-icon" onClick={onLogout} title="退出登录" aria-label="退出">
+                <button
+                  type="button"
+                  className="btn-secondary btn-icon"
+                  onClick={onLogout}
+                  title="退出登录"
+                  aria-label="退出"
+                >
                   <Icon d={icons.logout} />
                 </button>
               ) : null}
@@ -275,4 +306,3 @@ export function AppHeader(props: {
     </header>
   );
 }
-

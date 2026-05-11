@@ -43,9 +43,16 @@ export function buildRouteMergeAiUserContent(
   mergedYamlSample: string,
   options?: BuildRouteMergeAiUserContentOptions,
 ): string {
-  const maxTotalChars = options?.maxTotalChars ?? 120_000;
+  const maxTotalChars = options?.maxTotalChars ?? 180_000;
   const scopeHeading = options?.scopeHeading?.trim();
-  const perKindBudget = Math.floor(maxTotalChars / 4);
+  const completeYamlBudget = Math.floor(maxTotalChars * 0.72);
+  const hasCompleteYaml = mergedYamlSample.length <= completeYamlBudget;
+  const yamlSection = hasCompleteYaml
+    ? `## 当前完整 YAML（必须基于它输出完整 optimizedYaml）\n${mergedYamlSample}`
+    : `## 当前 YAML 过大（未完整发送）\n当前 YAML 共 ${mergedYamlSample.length} 字符，超过本次请求预算 ${completeYamlBudget} 字符。不要输出片段式 optimizedYaml；若无法基于下方样本保证完整最终 YAML，请将 optimizedYaml 置为空。`;
+
+  const remainingBudget = Math.max(12_000, maxTotalChars - yamlSection.length);
+  const perKindBudget = Math.floor(remainingBudget / 3);
   const ing = collectKindYaml(indexed, "Ingress", perKindBudget);
   const vs = collectKindYaml(indexed, "VirtualService", perKindBudget);
   const dr = collectKindYaml(indexed, "DestinationRule", perKindBudget);
@@ -56,10 +63,8 @@ export function buildRouteMergeAiUserContent(
     )
     .join("\n");
 
-  const mergedClip = clip(mergedYamlSample, Math.floor(perKindBudget));
-
   const core = clip(
-    `## 规则引擎摘要\n${rules}\n\n## v1 提示\n${analysis.v1RulesReminder}\n\n## Ingress YAML 片段\n${ing || "(无)"}\n\n## VirtualService YAML 片段\n${vs || "(无)"}\n\n## DestinationRule YAML 片段\n${dr || "(无)"}\n\n## 合并后的全量 YAML（截断样本）\n${mergedClip}`,
+    `## 规则引擎摘要\n${rules}\n\n## v1 提示\n${analysis.v1RulesReminder}\n\n${yamlSection}\n\n## Ingress YAML 辅助索引\n${ing || "(无)"}\n\n## VirtualService YAML 辅助索引\n${vs || "(无)"}\n\n## DestinationRule YAML 辅助索引\n${dr || "(无)"}`,
     maxTotalChars,
   );
   if (!scopeHeading) return core;

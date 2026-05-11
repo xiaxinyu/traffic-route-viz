@@ -36,12 +36,14 @@ export function useRouteMergeAi(yamlText: string, importedFiles: ImportedYamlFil
   const [payload, setPayload] = useState<RouteMergeAiPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scopeLabel, setScopeLabel] = useState<string | null>(null);
+  const [sourceYaml, setSourceYaml] = useState("");
 
   const runAll = useCallback(async () => {
     const cfg = resolveRouteMergeAiConfig();
     setModalOpen(true);
     setPayload(null);
     setError(null);
+    setSourceYaml(mergedYaml);
     setScopeLabel(
       importedFiles?.length
         ? "全部已导入文件（合并视图）"
@@ -54,8 +56,8 @@ export function useRouteMergeAi(yamlText: string, importedFiles: ImportedYamlFil
     setBusy(true);
     try {
       const scopeHeading = importedFiles?.length
-        ? "当前为**合并视图**：规则引擎摘要与 YAML 片段覆盖所有已导入文件；「合并后的全量 YAML」样本为整库拼接。"
-        : "当前为**仅编辑器 YAML**（未使用多文件导入）。请仅基于下方片段与规则摘要分析；不要假设存在未出现在 YAML 样本中的其它清单文件。";
+        ? "当前为**合并视图**：规则引擎摘要覆盖所有已导入文件；「当前完整 YAML」为所有文件拼接后的最终输入。若输出 optimizedYaml，必须输出合并视图下建议后的完整新 YAML。"
+        : "当前为**仅编辑器 YAML**（未使用多文件导入）。若输出 optimizedYaml，必须输出当前编辑区建议后的完整新 YAML；不要假设存在未出现在 YAML 中的其它清单文件。";
       const user = buildRouteMergeAiUserContent(analysis, indexed, mergedYaml, { scopeHeading });
       const out = await callRouteMergeAi(cfg, user, undefined, {
         systemPrompt: resolveRouteMergeAiSystemPrompt(),
@@ -75,11 +77,13 @@ export function useRouteMergeAi(yamlText: string, importedFiles: ImportedYamlFil
       setPayload(null);
       setError(null);
       if (!importedFiles?.length) {
+        setSourceYaml("");
         setError("未导入文件，无法按单文件分析。");
         return;
       }
       const f = importedFiles[index];
       if (!f) {
+        setSourceYaml("");
         setError("文件索引无效。");
         return;
       }
@@ -93,9 +97,10 @@ export function useRouteMergeAi(yamlText: string, importedFiles: ImportedYamlFil
       const pr = mergeParseResults([parseK8sYaml(f.text, fileKey)]);
       const analysisSubset = analyzeRouteMerge(pr, indexedSubset);
       const mergedFile = f.text;
+      setSourceYaml(mergedFile);
       setBusy(true);
       try {
-        const scopeHeading = `仅分析导入文件 \`${fileKey}\`。请只基于该文件内的 Ingress / VirtualService / DestinationRule 给建议；不要臆测其它导入文件中存在但未出现在下方 YAML 样本里的资源。`;
+        const scopeHeading = `仅分析导入文件 \`${fileKey}\`。请只基于该文件内的 Ingress / VirtualService / DestinationRule 给建议；若输出 optimizedYaml，必须输出该文件建议后的完整新 YAML；不要臆测其它导入文件中存在但未出现在下方 YAML 里的资源。`;
         const user = buildRouteMergeAiUserContent(analysisSubset, indexedSubset, mergedFile, {
           scopeHeading,
         });
@@ -123,6 +128,7 @@ export function useRouteMergeAi(yamlText: string, importedFiles: ImportedYamlFil
     payload,
     error,
     scopeLabel,
+    sourceYaml,
     runAll,
     runForImportedFileIndex,
   };
