@@ -136,7 +136,7 @@ image: harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz@sha256:<digest
 
 1. **ConfigMap `config.json`**：`routeMergeAi.enabled=true`、`useSameOriginProxy=true`、`baseUrl`（以及 `deployment` / `model` / `apiVersion` / `apiStyle` 等，与前端解析一致）。**不要**写 `apiKey` / `bearerToken`。
 2. **Secret**：只存 **`AZURE_OPENAI_API_KEY`**（经典 Azure OpenAI `api-key` 头）。若使用 OpenAI v1 / Responses 的 Bearer，可改为注入 **`AZURE_API_KEY`**（与镜像内脚本约定一致）。
-3. **容器启动脚本**：读取挂载的 **`/usr/share/nginx/html/config.json`**，当 `enabled` 且 `useSameOriginProxy` 时启用 `/trv-azure-openai` 反向代理，并从 **`baseUrl` 推导 upstream 主机**，无需 `TRV_*` 环境变量。
+3. **容器启动脚本**：读取挂载的 **`/usr/share/nginx/html/config.json`**，当 `enabled` 且 `useSameOriginProxy` 时启用 `/trv-azure-openai` 反向代理，并从 **`baseUrl` 推导 upstream 主机**，无需 `TRV_*` 环境变量。脚本生成的 nginx 片段将 **`proxy_*_timeout` / `send_timeout` 设为 900s**（与示例 Ingress 注解一致），避免 Pod 内 nginx 先于 Ingress 返回 **504**（错误页常为 `nginx/1.27.x`）。
 4. **挂载**：将 ConfigMap 的 `config.json` 挂到容器内 `/usr/share/nginx/html/config.json`（`subPath`）。
 
 完整示例见 **`k8s/traffic-route-viz.yaml`**。应用前请替换镜像、Ingress、`REPLACE_ME` 与 Azure 占位符。

@@ -83,9 +83,13 @@ location ^~ /trv-azure-openai/ {
   proxy_set_header Host ${UPSTREAM_HOST};
   proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
   proxy_set_header X-Forwarded-Proto \$scheme;
-  proxy_connect_timeout 30s;
-  proxy_send_timeout 300s;
-  proxy_read_timeout 300s;
+  # 与 k8s Ingress 注解 proxy-*-timeout=900 对齐；避免 Pod 内 nginx 先 504（错误页常为 nginx/1.27.x）。
+  client_max_body_size 32m;
+  client_body_timeout 120s;
+  proxy_connect_timeout 60s;
+  proxy_send_timeout 900s;
+  proxy_read_timeout 900s;
+  send_timeout 900s;
   include ${AUTH_FILE};
 }
 EOF

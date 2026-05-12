@@ -53,6 +53,9 @@ export default defineConfig(({ mode }) => {
             "/trv-azure-openai": {
               target: azureProxyTarget,
               changeOrigin: true,
+              // 与生产镜像内 nginx 代理超时同量级（ms），避免本地长推理被 http-proxy 默认超时掐断。
+              timeout: 900_000,
+              proxyTimeout: 900_000,
               rewrite: (p) => p.replace(/^\/trv-azure-openai/, "") || "/",
               configure: (proxy) => {
                 proxy.on("proxyReq", (proxyReq) => {
