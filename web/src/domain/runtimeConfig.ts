@@ -7,8 +7,10 @@ export type RuntimeConfig = {
     ttlHours?: number;
   };
   /**
-   * 可选：路由合并「AI 助手」调用 Azure OpenAI（浏览器直连或 dev 代理）。
-   * apiKey 出现在浏览器可见配置中，仅限可信内网；生产更推荐网关或 Vite 代理注入。
+   * 可选：路由合并「AI 助手」调用 Azure OpenAI。
+   * - **生产 / K8s 推荐**：`useSameOriginProxy=true`，密钥只放在 Pod Secret → 容器环境变量，
+   *   由镜像内 nginx 将 `/trv-azure-openai` 转发到 `baseUrl` 所在资源并注入 `api-key` / `Authorization`（见 `DEPLOYMENT.md`）。
+   * - `apiKey` / `bearerToken` 出现在浏览器可见配置中时仅限可信内网；不要提交到 Git。
    */
   routeMergeAi?: {
     enabled?: boolean;
@@ -27,10 +29,16 @@ export type RuntimeConfig = {
      */
     systemPrompt?: string;
     /**
-     * 开发模式：请求发往同源 `/trv-azure-openai`，由 Vite 代理转发并在服务端加 `api-key`
-     *（见 web/.env 中 `AZURE_OPENAI_API_KEY`）。
+     * 仅 **开发模式 (vite dev)**：请求发往同源 `/trv-azure-openai`，由 Vite 代理转发并注入鉴权头
+     *（见 `web/.env` / `AZURE_OPENAI_API_KEY` 等）。
      */
     useDevProxy?: boolean;
+    /**
+     * **开发与生产**：请求发往同源 `/trv-azure-openai/...`，由 Vite（开发）或 **容器内 nginx**（生产镜像）
+     * 转发到 `baseUrl` 对应资源并注入鉴权；浏览器不持有 API Key。
+     * 生产需设置环境变量 `TRV_ENABLE_ROUTE_MERGE_AI_PROXY=true` 等（见 `DEPLOYMENT.md`）。
+     */
+    useSameOriginProxy?: boolean;
   };
 };
 

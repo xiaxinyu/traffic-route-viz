@@ -315,7 +315,7 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: modal backdrop (click-outside to close), same pattern as YAML popout
     <div
-      className="trv-modal-overlay"
+      className="trv-modal-overlay route-merge-ai-modal-overlay"
       role="presentation"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -495,6 +495,9 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                     </ul>
                   </div>
                 ) : null}
+                {payload.disclaimer ? (
+                  <div className="route-merge-disclaimer">{payload.disclaimer}</div>
+                ) : null}
               </div>
               <div
                 className="route-merge-ai-yaml-area"
@@ -508,7 +511,9 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                   <div className="route-merge-ai-yaml-tabs" role="tablist" aria-label="YAML 视图">
                     <button
                       type="button"
-                      className={activeYamlTab === "yaml" ? "btn-secondary btn-pill-active" : "btn-secondary"}
+                      className={
+                        activeYamlTab === "yaml" ? "btn-secondary btn-pill-active" : "btn-secondary"
+                      }
                       onClick={() => setActiveYamlTab("yaml")}
                       role="tab"
                       aria-selected={activeYamlTab === "yaml"}
@@ -517,12 +522,16 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                     </button>
                     <button
                       type="button"
-                      className={activeYamlTab === "diff" ? "btn-secondary btn-pill-active" : "btn-secondary"}
+                      className={
+                        activeYamlTab === "diff" ? "btn-secondary btn-pill-active" : "btn-secondary"
+                      }
                       onClick={() => setActiveYamlTab("diff")}
                       role="tab"
                       aria-selected={activeYamlTab === "diff"}
                       disabled={!hasOptimizedYaml}
-                      title={!hasOptimizedYaml ? "需要 AI 返回 optimizedYaml 才能对比" : "Diff 对比"}
+                      title={
+                        !hasOptimizedYaml ? "需要 AI 返回 optimizedYaml 才能对比" : "Diff 对比"
+                      }
                     >
                       Diff
                     </button>
@@ -590,10 +599,14 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                         <div className="route-merge-ai-code-shell">
                           <div className="route-merge-ai-code-gutter" aria-hidden="true">
                             {sourceLines.map((_, i) => (
-                              <span key={`old-${i}`}>{String(i + 1).padStart(lineDigits, " ")}</span>
+                              <span key={`old-${i}`}>
+                                {String(i + 1).padStart(lineDigits, " ")}
+                              </span>
                             ))}
                           </div>
-                          <pre className="route-merge-ai-code-pre">{sourceLines.join("\n") || " "}</pre>
+                          <pre className="route-merge-ai-code-pre">
+                            {sourceLines.join("\n") || " "}
+                          </pre>
                         </div>
                       </div>
 
@@ -605,15 +618,23 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                         <div className="route-merge-ai-code-shell">
                           <div className="route-merge-ai-code-gutter" aria-hidden="true">
                             {optimizedLines.map((_, i) => (
-                              <span key={`new-${i}`}>{String(i + 1).padStart(lineDigits, " ")}</span>
+                              <span key={`new-${i}`}>
+                                {String(i + 1).padStart(lineDigits, " ")}
+                              </span>
                             ))}
                           </div>
-                          <pre className="route-merge-ai-code-pre">{optimizedLines.join("\n") || " "}</pre>
+                          <pre className="route-merge-ai-code-pre">
+                            {optimizedLines.join("\n") || " "}
+                          </pre>
                         </div>
                       </div>
                     </div>
                   ) : hasOptimizedYaml ? (
-                    <div className="route-merge-ai-diff" role="region" aria-label="原始 YAML 与 AI 生成 YAML 差异对比">
+                    <div
+                      className="route-merge-ai-diff"
+                      role="region"
+                      aria-label="原始 YAML 与 AI 生成 YAML 差异对比"
+                    >
                       <div className="route-merge-ai-diff-head route-merge-ai-diff-head--old">
                         <span>Diff（原始）</span>
                         <span>{sourceLineCount} 行</span>
@@ -640,11 +661,15 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                             key={`${row.kind}-${row.oldLineNo ?? "x"}-${row.newLineNo ?? "x"}-${index}`}
                           >
                             <div className="route-merge-ai-diff-cell route-merge-ai-diff-cell--old">
-                              <span className="route-merge-ai-diff-line-no">{row.oldLineNo ?? ""}</span>
+                              <span className="route-merge-ai-diff-line-no">
+                                {row.oldLineNo ?? ""}
+                              </span>
                               <code>{row.oldText || " "}</code>
                             </div>
                             <div className="route-merge-ai-diff-cell route-merge-ai-diff-cell--new">
-                              <span className="route-merge-ai-diff-line-no">{row.newLineNo ?? ""}</span>
+                              <span className="route-merge-ai-diff-line-no">
+                                {row.newLineNo ?? ""}
+                              </span>
                               <code>{row.newText || " "}</code>
                             </div>
                           </div>
@@ -654,9 +679,6 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                   ) : null}
                 </div>
               </div>
-              {payload.disclaimer ? (
-                <div className="route-merge-disclaimer">{payload.disclaimer}</div>
-              ) : null}
             </div>
           ) : null}
         </div>

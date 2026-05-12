@@ -13,6 +13,6 @@
     "model": "gpt-4o",
     "apiVersion": "2025-04-01-preview",
     "useDevProxy": true,
-    "apiKey": ""
+    "useSameOriginProxy": false
   }
 }

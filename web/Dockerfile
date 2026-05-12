@@ -14,7 +14,10 @@ RUN pnpm run build
 FROM --platform=$TARGETPLATFORM nginx:1.27-alpine
 
 COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY docker-entrypoint.d/40-trv-route-merge-ai-proxy.sh /docker-entrypoint.d/40-trv-route-merge-ai-proxy.sh
+RUN chmod +x /docker-entrypoint.d/40-trv-route-merge-ai-proxy.sh \
+  && mkdir -p /etc/nginx/snippets
 
 EXPOSE 80
 

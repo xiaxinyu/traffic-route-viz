@@ -128,9 +128,54 @@ image: harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz@sha256:<digest
 - **Ingress host**：`Ingress.spec.rules[].host`
 - **登录配置**（可选）：
   - 用 `ConfigMap` 挂载到站点根目录 `/config.json`
-  - Nginx 已配置对 `/config.json` 禁用缓存（见 `web/nginx.conf`）
+  - Nginx 已配置对 `/config.json` 禁用缓存（见 `web/nginx/default.conf`）
 
-### 5.2 应用资源
+### 5.2 路由合并 AI（推荐：Kubernetes Secret + 同源代理）
+
+目标：**API Key / Endpoint 不进前端构建产物、不写进浏览器可下载的 `config.json`**，由运行中的 **Pod 环境变量**（通常来自 `Secret`）交给容器内 **nginx** 注入到发往 Azure 的请求头。
+
+1. **运行时 `config.json`（ConfigMap）**：开启 AI，并设置 `routeMergeAi.useSameOriginProxy=true`（不要配置 `apiKey` / `bearerToken`）。示例见 `web/k8s/route-merge-ai-secret-and-config.example.yaml` 中的 `ConfigMap`。
+2. **Pod 环境变量**（`Secret` + 明文或 `ConfigMap`）：
+   - `TRV_ENABLE_ROUTE_MERGE_AI_PROXY=true`：启用镜像内 `/trv-azure-openai` 反向代理。
+   - `TRV_AZURE_OPENAI_ORIGIN`：Azure 资源的 **scheme + host**（可写完整 `https://host/openai/...`，脚本会取 host 部分），须与 `baseUrl` 同源一致。
+   - 鉴权二选一：`AZURE_OPENAI_API_KEY`（`api-key` 头）或 `AZURE_API_KEY`（`Authorization: Bearer`）。
+3. **挂载 `config.json`**：将 `ConfigMap` 的 `config.json` 挂到容器内 `/usr/share/nginx/html/config.json`（`subPath`）。
+
+Deployment 片段示例：
+
+```yaml
+env:
+  - name: TRV_ENABLE_ROUTE_MERGE_AI_PROXY
+    value: "true"
+  - name: TRV_AZURE_OPENAI_ORIGIN
+    value: "https://YOUR_RESOURCE_NAME.cognitiveservices.azure.com"
+  - name: AZURE_OPENAI_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: traffic-route-viz-azure-openai
+        key: AZURE_OPENAI_API_KEY
+volumeMounts:
+  - name: trv-config
+    mountPath: /usr/share/nginx/html/config.json
+    subPath: config.json
+volumes:
+  - name: trv-config
+    configMap:
+      name: traffic-route-viz-config
+```
+
+本地验证镜像（模拟 K8s 注入；在**仓库根目录**执行）：
+
+```bash
+docker run --rm -p 8080:80 \
+  -e TRV_ENABLE_ROUTE_MERGE_AI_PROXY=true \
+  -e TRV_AZURE_OPENAI_ORIGIN=https://YOUR_RESOURCE_NAME.cognitiveservices.azure.com \
+  -e AZURE_OPENAI_API_KEY="$AZURE_OPENAI_API_KEY" \
+  -v "$PWD/web/k8s/config.route-merge-ai.example.json:/usr/share/nginx/html/config.json:ro" \
+  traffic-route-viz:local
+```
+
+### 5.3 应用资源
 
 ```bash
 kubectl apply -f k8s/traffic-route-viz.yaml

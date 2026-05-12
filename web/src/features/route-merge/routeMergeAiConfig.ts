@@ -101,6 +101,7 @@ function coalesceRouteMergeAi(rc: RuntimeConfig["routeMergeAi"]): {
   bearerToken?: string;
   apiStyle?: "azure-deployments" | "openai-v1" | "azure-responses";
   useDevProxy: boolean;
+  useSameOriginProxy: boolean;
 } {
   const enabled =
     rc?.enabled === true ||
@@ -129,6 +130,9 @@ function coalesceRouteMergeAi(rc: RuntimeConfig["routeMergeAi"]): {
   const useDevProxy =
     rc?.useDevProxy === true ||
     (import.meta.env.VITE_AZURE_OPENAI_USE_DEV_PROXY as string | undefined) === "true";
+  const useSameOriginProxy =
+    rc?.useSameOriginProxy === true ||
+    (import.meta.env.VITE_ROUTE_MERGE_AI_USE_SAME_ORIGIN_PROXY as string | undefined) === "true";
   return {
     enabled,
     baseUrl,
@@ -139,6 +143,7 @@ function coalesceRouteMergeAi(rc: RuntimeConfig["routeMergeAi"]): {
     bearerToken,
     apiStyle,
     useDevProxy,
+    useSameOriginProxy,
   };
 }
 
@@ -163,7 +168,7 @@ export function resolveRouteMergeAiConfig(): RouteMergeAiResolved | null {
   const m = coalesceRouteMergeAi(rc.routeMergeAi);
   if (!m.enabled) return null;
 
-  const useProxy = import.meta.env.DEV && m.useDevProxy;
+  const useProxy = m.useSameOriginProxy || (import.meta.env.DEV && m.useDevProxy);
   if (!m.baseUrl) return null;
 
   const apiStyle = inferApiStyle(m.baseUrl, m.apiStyle);
@@ -206,7 +211,7 @@ export function routeMergeAiDisabledReason(): string {
   const m = coalesceRouteMergeAi(rc.routeMergeAi);
   if (!m.enabled)
     return "未启用：在 config.json 设置 routeMergeAi.enabled=true 或 VITE_ROUTE_MERGE_AI_ENABLED=true。";
-  const useProxy = import.meta.env.DEV && m.useDevProxy;
+  const useProxy = m.useSameOriginProxy || (import.meta.env.DEV && m.useDevProxy);
   if (!m.baseUrl)
     return "缺少 baseUrl：config.json.routeMergeAi.baseUrl 或 VITE_AZURE_OPENAI_BASE_URL。";
   const apiStyle = inferApiStyle(m.baseUrl, m.apiStyle);
@@ -219,7 +224,7 @@ export function routeMergeAiDisabledReason(): string {
     return "缺少 Bearer Token 或 API Key：config.routeMergeAi.bearerToken / apiKey 或 VITE_AZURE_API_KEY / VITE_AZURE_OPENAI_API_KEY（仅可信环境）。";
   if (!useProxy && apiStyle === "azure-deployments" && !m.apiKey)
     return "缺少 API Key：config.routeMergeAi.apiKey 或 VITE_AZURE_OPENAI_API_KEY（仅可信环境）。";
-  if (m.useDevProxy && !import.meta.env.DEV)
-    return "已配置 useDevProxy，但当前非开发模式；生产环境请在网关侧代理 OpenAI 并放开 CORS，或改用内网直连 baseUrl + apiKey。";
+  if (m.useDevProxy && !import.meta.env.DEV && !m.useSameOriginProxy)
+    return "已配置 useDevProxy（仅 Vite 开发），但当前非开发模式；生产请改用 routeMergeAi.useSameOriginProxy=true，并在 Kubernetes Secret 注入 AZURE_OPENAI_API_KEY / AZURE_API_KEY，且设置 TRV_ENABLE_ROUTE_MERGE_AI_PROXY=true（见 DEPLOYMENT.md）。";
   return "配置不完整。";
 }
