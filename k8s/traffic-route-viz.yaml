@@ -24,6 +24,7 @@
 #   - **ConfigMap `config.json`**：`routeMergeAi.baseUrl`（endpoint）、`deployment`、`model`、`apiVersion`、
 #     `enabled`、`useSameOriginProxy`（镜像启动脚本据此启用 `/trv-azure-openai` 并推导 upstream，无需重复环境变量）。
 #   - **Secret**：仅注入 `AZURE_OPENAI_API_KEY`（容器内 nginx 写 `api-key` 头；Bearer 见 DEPLOYMENT.md）。
+#   - 改 ConfigMap 后须 rollout restart Pod，启动脚本才会重写 nginx snippet（见 docker-entrypoint.d/40-trv-route-merge-ai-proxy.sh）。
 #
 # 使用前请替换：镜像地址、ConfigMap 内 Azure 占位符、Secret 中的 REPLACE_ME；Ingress host 已示例为 ms5 域名，若不同请改。
 #

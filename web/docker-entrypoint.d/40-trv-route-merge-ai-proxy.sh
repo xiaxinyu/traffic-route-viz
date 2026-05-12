@@ -4,10 +4,17 @@ set -eu
 # 同源 `/trv-azure-openai` 反向代理：启用条件与 upstream 均来自运行时 config.json（见 routeMergeAi），
 # 不在此重复配置 endpoint。鉴权来自环境变量（K8s 中由 Secret 注入 AZURE_OPENAI_API_KEY 或 AZURE_API_KEY）。
 # 可选：TRV_RUNTIME_CONFIG_PATH 覆盖 config.json 路径（默认与静态站点一致）。
+#
+# 说明（与「端口错了」无关）：
+# - 只从 baseUrl 解析出 https?://主机名；到 Azure 为 **HTTPS 默认 443**，由 nginx proxy_ssl 处理，无单独「开放端口」环境变量。
+# - deployment / model / apiVersion 由**浏览器**读 /config.json 拼请求路径；本脚本不写这些字段进 nginx。
+# - 改 ConfigMap 后须 **重启 Pod**，本脚本才会重跑并更新 trv-route-merge-ai.conf（热更新挂载文件不会触发）。
 
 CONFIG="${TRV_RUNTIME_CONFIG_PATH:-/usr/share/nginx/html/config.json}"
 SNIPPET="/etc/nginx/snippets/trv-route-merge-ai.conf"
 mkdir -p /etc/nginx/snippets
+
+echo "traffic-route-viz: route-merge bootstrap reading ${CONFIG}" >&2
 
 escape_nginx_dquoted() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
@@ -72,7 +79,13 @@ else
 fi
 chmod 600 "$AUTH_FILE" 2>/dev/null || true
 
-echo "traffic-route-viz: /trv-azure-openai proxy ENABLED → upstream host ${UPSTREAM_HOST}" >&2
+API_STYLE=$(jq -r '.routeMergeAi.apiStyle // ""' "$CONFIG")
+DEPLOYMENT=$(jq -r '.routeMergeAi.deployment // ""' "$CONFIG")
+MODEL=$(jq -r '.routeMergeAi.model // ""' "$CONFIG")
+API_VER=$(jq -r '.routeMergeAi.apiVersion // ""' "$CONFIG")
+echo "traffic-route-viz: /trv-azure-openai proxy ENABLED" >&2
+echo "traffic-route-viz:   nginx upstream ${UPSTREAM_ORIGIN} (TLS → port 443); Host: ${UPSTREAM_HOST}" >&2
+echo "traffic-route-viz:   from ${CONFIG} (for humans: apiStyle=${API_STYLE} deployment=${DEPLOYMENT} model=${MODEL} apiVersion=${API_VER} — used by browser URL; not reread until pod restart)" >&2
 
 cat >"$SNIPPET" <<EOF
 location ^~ /trv-azure-openai/ {

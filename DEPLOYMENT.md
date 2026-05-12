@@ -134,10 +134,14 @@ image: harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz@sha256:<digest
 
 目标：**API Key 不进 `config.json`、不进前端构建**；**endpoint / deployment / model** 只在 **ConfigMap 的 `config.json`**；密钥仅通过 **Secret → 环境变量**（如 `AZURE_OPENAI_API_KEY`）交给容器内 nginx 注入请求头。
 
+> **与本地 `web/.env` 的区别**：`AZURE_OPENAI_*` / `VITE_*` 等 **只用于 `pnpm run dev`（Vite）**；**生产 Pod 不读 `.env`**。线上浏览器里的 `api-version`、`/openai/deployments/...` 来自 **`/config.json`**（通常即 ConfigMap 挂载）；Pod 内 nginx 同源代理只读同一文件里的 **`routeMergeAi.baseUrl`**（解析出主机，**HTTPS 默认 443**）+ 环境变量里的 Key。改 ConfigMap 后请 **`kubectl rollout restart deployment/traffic-route-viz`**（或删 Pod），否则 **`docker-entrypoint.d/40-trv-route-merge-ai-proxy.sh` 不会重跑**，nginx 片段仍可能是旧 upstream。
+
 1. **ConfigMap `config.json`**：`routeMergeAi.enabled=true`、`useSameOriginProxy=true`、`baseUrl`（以及 `deployment` / `model` / `apiVersion` / `apiStyle` 等，与前端解析一致）。**不要**写 `apiKey` / `bearerToken`。
 2. **Secret**：只存 **`AZURE_OPENAI_API_KEY`**（经典 Azure OpenAI `api-key` 头）。若使用 OpenAI v1 / Responses 的 Bearer，可改为注入 **`AZURE_API_KEY`**（与镜像内脚本约定一致）。
 3. **容器启动脚本**：读取挂载的 **`/usr/share/nginx/html/config.json`**，当 `enabled` 且 `useSameOriginProxy` 时启用 `/trv-azure-openai` 反向代理，并从 **`baseUrl` 推导 upstream 主机**，无需 `TRV_*` 环境变量。脚本生成的 nginx 片段将 **`proxy_*_timeout` / `send_timeout` 设为 900s**（与示例 Ingress 注解一致），避免 Pod 内 nginx 先于 Ingress 返回 **504**（错误页常为 `nginx/1.27.x`）。
 4. **挂载**：将 ConfigMap 的 `config.json` 挂到容器内 `/usr/share/nginx/html/config.json`（`subPath`）。
+
+5. **容器内 nginx 日志**：镜像将 **`access_log` → stdout、`error_log` → stderr**（见 `web/nginx/nginx.conf`），与 **Kubernetes 日志驱动**一致；请用 **`kubectl logs <pod>`** 查看请求与 upstream 超时（**不要**再依赖 `/var/log/nginx/access.log`）。
 
 完整示例见 **`k8s/traffic-route-viz.yaml`**。应用前请替换镜像、Ingress、`REPLACE_ME` 与 Azure 占位符。
 

@@ -13,12 +13,10 @@ RUN pnpm run build
 
 FROM --platform=$TARGETPLATFORM nginx:1.27-alpine
 
-# 避免 worker_processes auto 在超大节点上产生过多 worker（默认与 CPU 核数一致）
-RUN sed -i.bak 's/^worker_processes.*/worker_processes 5;/' /etc/nginx/nginx.conf && rm -f /etc/nginx/nginx.conf.bak
-
 RUN apk add --no-cache jq
 
 COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx/nginx.conf /etc/nginx/nginx.conf
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY docker-entrypoint.d/40-trv-route-merge-ai-proxy.sh /docker-entrypoint.d/40-trv-route-merge-ai-proxy.sh
 RUN chmod +x /docker-entrypoint.d/40-trv-route-merge-ai-proxy.sh \
