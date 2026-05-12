@@ -178,3 +178,20 @@ docker run --rm -p 8080:80 \
 kubectl apply -f k8s/traffic-route-viz.yaml
 ```
 
+### 5.4 NodePort / 外网访问与 AI 代理排障
+
+1. **NodePort 要打在「节点」上，不要打在 Pod IP 上**  
+   `31290` 会出现在**某台工作节点的 IP** 上（`kubectl get nodes -o wide`），与 **Pod IP** 不是一回事。若误用 Pod IP 会连不上。本机可用：`kubectl port-forward -n traffic-route-viz svc/traffic-route-viz 8080:80`。
+
+2. **NetworkPolicy**  
+   示例清单中的 `traffic-route-viz-netpol` 已改为**仅限制入站端口 80、不限制来源**（便于 Ingress / NodePort / 集群内访问）。若你集群里仍沿用旧版「仅放行 ingress-nginx」策略，请 `kubectl apply -f k8s/traffic-route-viz.yaml` 更新，或自行删除该 NetworkPolicy。
+
+3. **`/trv-azure-openai` 返回 503 JSON**  
+   表示同源 AI 代理未启用（配置或密钥不满足）。请看 Pod 日志中 **`traffic-route-viz: /trv-azure-openai proxy DISABLED — …`** 一行，按提示检查：`config.json` 里 `routeMergeAi.enabled`、`useSameOriginProxy`、`baseUrl`，以及环境变量 **`AZURE_OPENAI_API_KEY`**（或 `AZURE_API_KEY`）。镜像已改为：即使密钥缺失也会**启动 nginx**（主站可访问），仅 AI 路径 503。
+
+4. **Nginx worker 数量**  
+   镜像内已将 **`worker_processes` 固定为 5**（避免 `auto` 在大核节点上产生大量 worker 进程）。
+
+5. **其它**  
+   - `kubectl get endpoints -n traffic-route-viz traffic-route-viz`：无 Endpoints 说明 Pod 未就绪或 selector 不对。  
+   - 云厂商安全组 / 防火墙是否放行 NodePort 段 **30000–32767**。

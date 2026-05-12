@@ -14,6 +14,8 @@ escape_nginx_dquoted() {
 }
 
 write_disabled_snippet() {
+  reason="$1"
+  echo "traffic-route-viz: /trv-azure-openai proxy DISABLED — ${reason}. Main site still starts; fix config/secret then restart pod. See DEPLOYMENT.md." >&2
   cat >"$SNIPPET" <<'EOF'
 location ^~ /trv-azure-openai/ {
   default_type application/json;
@@ -28,7 +30,7 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 if [ ! -f "$CONFIG" ]; then
-  write_disabled_snippet
+  write_disabled_snippet "config file missing (${CONFIG})"
   exit 0
 fi
 
@@ -42,13 +44,13 @@ USING_PROXY=$(jq -r '(.routeMergeAi.useSameOriginProxy == true)' "$CONFIG")
 BASE_URL=$(jq -r '.routeMergeAi.baseUrl // ""' "$CONFIG")
 
 if [ "$ENABLED" != "true" ] || [ "$USING_PROXY" != "true" ]; then
-  write_disabled_snippet
+  write_disabled_snippet "routeMergeAi.enabled/useSameOriginProxy not both true (enabled=${ENABLED}, useSameOriginProxy=${USING_PROXY})"
   exit 0
 fi
 
 if [ -z "$BASE_URL" ]; then
-  echo "traffic-route-viz: routeMergeAi.useSameOriginProxy is true but baseUrl is empty in $CONFIG" >&2
-  exit 1
+  write_disabled_snippet "routeMergeAi.useSameOriginProxy is true but baseUrl is empty in ${CONFIG}"
+  exit 0
 fi
 
 # Accept https://host or https://host/openai/... — proxy only needs scheme+host[:port]
@@ -56,8 +58,8 @@ UPSTREAM_ORIGIN="$(printf '%s' "$BASE_URL" | sed -E 's#^(https?://[^/]+).*$#\1#'
 UPSTREAM_HOST="$(printf '%s' "$UPSTREAM_ORIGIN" | sed -E 's#^https?://##; s#/.*##')"
 
 if [ -z "${AZURE_API_KEY:-}" ] && [ -z "${AZURE_OPENAI_API_KEY:-}" ]; then
-  echo "traffic-route-viz: routeMerge AI proxy enabled but neither AZURE_API_KEY nor AZURE_OPENAI_API_KEY is set" >&2
-  exit 1
+  write_disabled_snippet "neither AZURE_API_KEY nor AZURE_OPENAI_API_KEY is set (Secret/env missing?)"
+  exit 0
 fi
 
 AUTH_FILE="/etc/nginx/snippets/trv-route-merge-ai-auth.conf"
@@ -69,6 +71,8 @@ else
   printf 'proxy_set_header api-key "%s";\n' "$KEY_ESC" >"$AUTH_FILE"
 fi
 chmod 600 "$AUTH_FILE" 2>/dev/null || true
+
+echo "traffic-route-viz: /trv-azure-openai proxy ENABLED → upstream host ${UPSTREAM_HOST}" >&2
 
 cat >"$SNIPPET" <<EOF
 location ^~ /trv-azure-openai/ {
