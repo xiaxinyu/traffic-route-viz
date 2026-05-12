@@ -1649,13 +1649,14 @@ body {
 }
 
 .route-merge-ai-modal-overlay {
-  padding: 8px;
+  padding: max(16px, 2.5vmin);
 }
 
 .route-merge-ai-modal.trv-modal {
-  width: min(1840px, calc(100vw - 16px));
-  height: calc(100vh - 16px);
-  border-radius: 10px;
+  width: min(1280px, calc(100vw - 32px));
+  height: min(85vh, 880px);
+  max-height: calc(100vh - 32px);
+  border-radius: 12px;
 }
 
 .route-merge-ai-modal .trv-modal-header {
