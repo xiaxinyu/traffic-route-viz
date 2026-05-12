@@ -124,13 +124,14 @@ docker run --rm -p 8080:80 traffic-route-viz:local
 docker login harbor.ms5-sit.aswatson.net:8080
 docker buildx build --platform linux/amd64 \
   -t harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz:<TAG> \
+  -t harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz:latest \
   -f web/Dockerfile web --push
 ```
 
 > 说明：`--load` 用于本地运行验证；`--push` 用于直接推送到 Harbor（无需先在本地保存镜像）。
 >
 > 推荐：
-> - `<TAG>` 使用可追溯的版本化命名（例如 `v1.4.2`、`2026.05.07-<gitsha>`），避免长期依赖 `:latest`
+> - `<TAG>` 使用可追溯的版本化命名（例如 `v1.4.2`、`2026.05.07-<gitsha>`），避免**只**推无 tag 的 digest；可与 `latest` **同一次 build 双 tag push**，减少 Harbor 里「无 tag 孤儿 digest」。
 > - 在 Kubernetes 清单中优先使用 `image: ...@sha256:<digest>` 锁定镜像（避免 tag 被覆盖导致回滚困难）
 
 #### 部署到 Kubernetes（示例清单）

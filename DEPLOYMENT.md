@@ -55,22 +55,25 @@ docker run --rm -p 8080:80 traffic-route-viz:local
 
 目标仓库示例：`harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz`。
 
-**推荐**：每次发布打**可追溯 tag**，并视需要更新 `latest`。
+**Tag 约定**：`YYYY.MM.DD-<git短sha>` 便于追溯；**同一 digest 上挂多个 tag**（例如同日多次构建）在 Harbor 里是正常现象，**不是** Kubernetes 报错的原因。
+
+**推荐**：一次 `buildx` **同时 push 可追溯 tag + `latest`**，避免 UI 里出现「无 tag 的孤儿 digest」、也方便环境拉 `latest`。
 
 ```bash
 docker login harbor.ms5-sit.aswatson.net:8080
 TAG="${TAG:-"$(date +%Y.%m.%d)-$(git rev-parse --short HEAD 2>/dev/null || echo nogit)"}"
+REG="harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz"
 echo "Using TAG=$TAG"
 
 docker buildx build --platform linux/amd64 \
-  -t harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz:"$TAG" \
+  -t "$REG:$TAG" -t "$REG:latest" \
   -f web/Dockerfile web --push
 ```
 
 **锁定 digest**（避免 `latest` 被覆盖后“同名不同物”）：
 
 ```bash
-docker buildx imagetools inspect harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz:latest
+docker buildx imagetools inspect harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz:"$TAG"
 # 部署：image: .../traffic-route-viz@sha256:<digest>
 ```
 
@@ -169,6 +172,7 @@ NS=hds-aswatson-prd bash k8s/check-traffic-route-viz.sh
 | **整站 504** | `Endpoints` 是否为空；Ingress `backend`；Pod 未 Ready |
 | **浏览器主文档长期 Pending** | Ingress **`host`** 是否与地址栏一致；**`ingressClassName`** 是否存在；`describe ingress` 的 Address/Backend；公网 DNS/LB/WAF；可先 **http** 试同一 host 排除 TLS |
 | **约 180s 才 504、Pod 内 localhost 正常** | 多发生在 **Ingress 前** LB/WAF；集群内分段验证：`NS=... bash k8s/diagnose-504.sh`（`kubectl exec` 业务 Pod + `wget`，无需 `kubectl run` curl 镜像） |
+| **`serviceaccount "traffic-route-viz" not found`** | **与镜像 tag 无关**。当前仓库 `Deployment` **不**声明 `serviceAccountName`；集群里若仍引用旧 SA，先确认：`kubectl get deploy -n <ns> traffic-route-viz -o jsonpath='{.spec.template.spec.serviceAccountName}{"\n"}'`。非空则 **`kubectl apply -f k8s/traffic-route-viz.yaml`** 覆盖，或删掉该字段：`kubectl patch deploy -n <ns> traffic-route-viz --type=json -p='[{"op":"remove","path":"/spec/template/spec/serviceAccountName"}]'`（若提示 path 不存在说明已对齐） |
 
 ```bash
 NS=hds-aswatson-prd bash k8s/diagnose-504.sh

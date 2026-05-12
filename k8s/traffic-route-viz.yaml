@@ -11,6 +11,10 @@
 #    外网表现常为长时间 Pending、404 或落到默认后端。
 #    若入口不是 ingress-nginx，请改 `ingressClassName` 并在对应网关配置超时（见 DEPLOYMENT.md §5.3）。
 # 4) Deployment 镜像：改成你可拉取的 tag/digest。
+# 5) 本清单**不**创建 ServiceAccount；Pod 使用命名空间 **default** ServiceAccount。
+#    若报错 `serviceaccount "traffic-route-viz" not found`，说明集群里 Deployment 仍为旧 YAML（含
+#    `serviceAccountName: traffic-route-viz`）。请 `kubectl apply -f` 本仓库当前文件，或
+#    `kubectl edit deployment` 删除 `spec.template.spec.serviceAccountName`（与 Harbor tag 无关）。
 #
 # =============================================================================
 # 状态码速查（保证「没问题」时应对照）
