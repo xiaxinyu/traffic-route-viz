@@ -36,5 +36,5 @@ kubectl describe ingress -n "$NS" 2>/dev/null | sed -n '/^Name:/,/^Events:/p' | 
 
 echo ""
 echo "完成。"
-echo "- 浏览器主文档一直「待处理」：多为 Ingress host / ingressClass / DNS-LB，见 DEPLOYMENT.md §5.7。"
+echo "- 浏览器主文档一直「待处理」：多为 Ingress host / ingressClass / DNS-LB，见 DEPLOYMENT.md §5.3。"
 echo "- 若 /trv-azure-openai 503：看 Pod 日志 proxy DISABLED；若 504：Ingress 超时或出站被拦。"

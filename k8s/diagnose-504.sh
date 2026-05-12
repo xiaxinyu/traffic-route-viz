@@ -147,4 +147,4 @@ hr
 echo "若 (2) FAIL        → 查 Endpoints、DNS、Pod Ready。"
 echo "若 (2) OK (3) FAIL → 查 Ingress host/class、Controller 日志、backend-protocol。"
 echo "若 (2)(3) OK 外网 504 → Ingress 前公网 LB/WAF 超时（常 ~180s）。"
-echo "详见 DEPLOYMENT.md §5.8"
+echo "详见 DEPLOYMENT.md §5.3"

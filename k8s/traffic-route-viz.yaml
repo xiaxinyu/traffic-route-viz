@@ -9,7 +9,7 @@
 # 3) Ingress `spec.rules[].host`：必须与浏览器地址栏主机名完全一致（大小写敏感）。
 #    若浏览器打开 traffic-route-viz.ms5-a1.aswatson.net 而 YAML 仍是 example.com，Ingress 不会把流量交给本 Service，
 #    外网表现常为长时间 Pending、404 或落到默认后端。
-#    若入口不是 ingress-nginx，请改 `ingressClassName` 并在对应网关配置超时（见 DEPLOYMENT.md §5.7）。
+#    若入口不是 ingress-nginx，请改 `ingressClassName` 并在对应网关配置超时（见 DEPLOYMENT.md §5.3）。
 # 4) Deployment 镜像：改成你可拉取的 tag/digest。
 #
 # =============================================================================

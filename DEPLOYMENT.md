@@ -1,20 +1,18 @@
-# Deployment / 发布指南 — traffic-route-viz
+# Deployment — traffic-route-viz
 
-本文件面向“把项目发布出去”的场景：本地验证 → 构建镜像 → 推送镜像 → 部署到 Kubernetes。
-
-> 画布/交互验收标准以 `HARNESS_ENGINEERING.md` 为准。
+把应用从本机验证到推镜像、再部署到 Kubernetes 的**操作顺序**说明。画布与交互验收以 **`HARNESS_ENGINEERING.md`** 为准。
 
 ---
 
-## 0. 你需要准备什么
+## 0. 前置
 
-- Node.js（建议 18+）
-- Docker（如需构建镜像）
-- Kubernetes + Ingress Controller（如需发布到集群）
+- Node.js 18+、`pnpm`
+- Docker（构建 / 本地跑镜像）
+- 若上集群：`kubectl`、Ingress Controller
 
 ---
 
-## 1. 本地验证（推荐先做）
+## 1. 本地构建
 
 ```bash
 cd web
@@ -25,64 +23,42 @@ pnpm run preview
 
 ---
 
-## 2. 开发环境登录配置（可选）
+## 2. 运行时 `/config.json`（可选：登录等）
 
-系统支持运行时通过 `GET /config.json` 控制是否需要登录。
-
-在 `web/` 下创建本地配置（该文件已被 `web/.gitignore` 忽略，不要提交仓库）：
+应用通过 **`GET /config.json`** 读登录等配置。本地可复制示例后改（**勿提交**）：
 
 ```bash
 cd web
 cp public/config.example.json public/config.json
-```
-
-然后启动开发服务器：
-
-```bash
-cd web
 pnpm run dev
 ```
 
 ---
 
-## 3. Docker 构建与本地运行
+## 3. Docker 镜像
 
-生产发布形态为：Vite build → Nginx 静态托管（`web/Dockerfile` 多阶段构建）。
+- **形态**：`pnpm run build` → 静态文件由容器内 **Nginx** 提供（`web/Dockerfile`）。
+- **架构**：集群多为 **linux/amd64**；Apple Silicon 上构建请加 `--platform linux/amd64`。
 
-### 3.1 macOS（尤其 Apple Silicon）注意事项
-
-集群通常运行在 **Linux amd64**。在 macOS/arm64 上构建时，建议显式指定平台为 `linux/amd64`，避免架构不匹配。
-
-### 3.2 构建并本地跑起来
-
-在仓库根目录执行（使用 `web/Dockerfile`，构建上下文为 `web/`）：
+仓库根目录：
 
 ```bash
 docker buildx build --platform linux/amd64 -t traffic-route-viz:local -f web/Dockerfile web --load
 docker run --rm -p 8080:80 traffic-route-viz:local
 ```
 
-打开 `http://localhost:8080`。
+浏览器打开 `http://localhost:8080`。
 
 ---
 
-## 4. 推送镜像到 Harbor（你的地址）
+## 4. 推 Harbor（示例 registry）
 
-你最终要推送到：
+目标仓库示例：`harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz`。
 
-- `harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz:latest`
-
-### 4.1 推荐做法：同时推“可追溯版本 tag”+ `latest`
-
-理由：`latest` 方便部署与对接，但不利于回滚/审计；因此建议每次发布都带一个**可追溯 tag**，并额外更新 `latest` 指向同一份镜像。
-
-在仓库根目录执行（使用 `web/Dockerfile`，构建上下文为 `web/`）：
+**推荐**：每次发布打**可追溯 tag**，并视需要更新 `latest`。
 
 ```bash
 docker login harbor.ms5-sit.aswatson.net:8080
-
-# 例：用日期 + git 短 sha 作为版本 tag（你也可以改成 v1.2.3）
-# 注意：TAG 不能为空；如果你没先设置 TAG，下面会给一个默认值。
 TAG="${TAG:-"$(date +%Y.%m.%d)-$(git rev-parse --short HEAD 2>/dev/null || echo nogit)"}"
 echo "Using TAG=$TAG"
 
@@ -91,62 +67,52 @@ docker buildx build --platform linux/amd64 \
   -f web/Dockerfile web --push
 ```
 
-### 4.2 只推 `latest`（不推荐，但可用）
-
-```bash
-docker login harbor.ms5-sit.aswatson.net:8080
-docker buildx build --platform linux/amd64 \
-  -t harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz:latest \
-  -f web/Dockerfile web --push
-```
-
-### 4.3 推送后获取 digest（推荐用于 K8s 锁定）
-
-> 目的：在 Kubernetes 中用 `@sha256:<digest>` 固定镜像，避免 `latest` 被覆盖导致“同名不同物”。
+**锁定 digest**（避免 `latest` 被覆盖后“同名不同物”）：
 
 ```bash
 docker buildx imagetools inspect harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz:latest
-```
-
-输出里会有 `Digest: sha256:...`。部署时可写成：
-
-```yaml
-image: harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz@sha256:<digest>
+# 部署：image: .../traffic-route-viz@sha256:<digest>
 ```
 
 ---
 
-## 5. 发布到 Kubernetes（示例清单）
+## 5. Kubernetes
 
-> 注意：根目录 `.gitignore` 默认忽略 `k8s/`。建议你在自己的环境里维护部署清单（或复制到单独的私有仓库/基础设施仓库）。
+> 根目录 **`.gitignore` 可能忽略 `k8s/`**；若你本地看不到清单，用仓库里的 **`k8s/traffic-route-viz.yaml`** 或复制到自己的 GitOps 仓库。
 
-`HARNESS_ENGINEERING.md` 中给出了推荐的清单结构；仓库内提供**可提交**的整合示例：`k8s/traffic-route-viz.yaml`（Deployment、Secret、ConfigMap、Service、Ingress）。
+**示例清单**：`Namespace`、`Secret`、`ConfigMap`、`Deployment`、`Service`、`Ingress`（见 `HARNESS_ENGINEERING.md` 部署小节）。
 
-### 5.1 需要改哪些地方
+### 5.1 上线前必改
 
-- **镜像地址**：`Deployment.spec.template.spec.containers[].image`
-- **Ingress host**：`Ingress.spec.rules[].host`
-- **登录配置**（可选）：
-  - 用 `ConfigMap` 挂载到站点根目录 `/config.json`
-  - Nginx 已配置对 `/config.json` 禁用缓存（见 `web/nginx/default.conf`）
+| 项 | 位置 |
+|----|------|
+| 镜像 | `Deployment` → `containers[].image` |
+| 域名 | `Ingress` → `spec.rules[].host`（须与浏览器地址栏**完全一致**） |
+| Azure Key | `Secret` → `AZURE_OPENAI_API_KEY`（勿留占位符） |
+| AI 与登录 | `ConfigMap` → `config.json`（`routeMergeAi`、`auth` 等） |
 
-### 5.2 路由合并 AI（推荐：Kubernetes Secret + ConfigMap + 同源代理）
+```bash
+kubectl apply -f k8s/traffic-route-viz.yaml
+```
 
-目标：**API Key 不进 `config.json`、不进前端构建**；**endpoint / deployment / model** 只在 **ConfigMap 的 `config.json`**；密钥仅通过 **Secret → 环境变量**（如 `AZURE_OPENAI_API_KEY`）交给容器内 nginx 注入请求头。
+---
 
-> **与本地 `web/.env` 的区别**：`AZURE_OPENAI_*` / `VITE_*` 等 **只用于 `pnpm run dev`（Vite）**；**生产 Pod 不读 `.env`**。线上浏览器里的 `api-version`、`/openai/deployments/...` 来自 **`/config.json`**（通常即 ConfigMap 挂载）；Pod 内 nginx 同源代理只读同一文件里的 **`routeMergeAi.baseUrl`**（解析出主机，**HTTPS 默认 443**）+ 环境变量里的 Key。改 ConfigMap 后请 **`kubectl rollout restart deployment/traffic-route-viz`**（或删 Pod），否则 **`docker-entrypoint.d/40-trv-route-merge-ai-proxy.sh` 不会重跑**，nginx 片段仍可能是旧 upstream。
+### 5.2 路由合并 AI（生产推荐路径）
 
-1. **ConfigMap `config.json`**：`routeMergeAi.enabled=true`、`useSameOriginProxy=true`、`baseUrl`（以及 `deployment` / `model` / `apiVersion` / `apiStyle` 等，与前端解析一致）。**不要**写 `apiKey` / `bearerToken`。
-2. **Secret**：只存 **`AZURE_OPENAI_API_KEY`**（经典 Azure OpenAI `api-key` 头）。若使用 OpenAI v1 / Responses 的 Bearer，可改为注入 **`AZURE_API_KEY`**（与镜像内脚本约定一致）。
-3. **容器启动脚本**：读取挂载的 **`/usr/share/nginx/html/config.json`**，当 `enabled` 且 `useSameOriginProxy` 时启用 `/trv-azure-openai` 反向代理，并从 **`baseUrl` 推导 upstream 主机**，无需 `TRV_*` 环境变量。脚本生成的 nginx 片段将 **`proxy_*_timeout` / `send_timeout` 设为 900s**（与示例 Ingress 注解一致），避免 Pod 内 nginx 先于 Ingress 返回 **504**（错误页常为 `nginx/1.27.x`）。
-4. **挂载**：将 ConfigMap 的 `config.json` 挂到容器内 `/usr/share/nginx/html/config.json`（`subPath`）。
+**一条链**：浏览器读 **`/config.json`**（通常来自 ConfigMap 挂载）拼请求路径；**密钥**只来自 **Secret → 环境变量**；Pod 内 **`docker-entrypoint.d/40-trv-route-merge-ai-proxy.sh`** 在**容器启动时**读同一 `config.json` 里的 **`routeMergeAi.baseUrl`**，生成 Nginx 片段，把 **`/trv-azure-openai`** 反代到 Azure（**HTTPS 443**，无单独“开放端口”变量）。
 
-5. **容器内 nginx 日志**：镜像将 **`access_log` → stdout、`error_log` → stderr**（见 `web/nginx/nginx.conf`），与 **Kubernetes 日志驱动**一致；请用 **`kubectl logs <pod>`** 查看请求与 upstream 超时（**不要**再依赖 `/var/log/nginx/access.log`）。
+| 来源 | 生产 Pod 是否使用 |
+|------|-------------------|
+| `web/.env`、`VITE_*`、`AZURE_OPENAI_*`（本地脚本除外） | **否**；仅 **`pnpm run dev`** 等开发场景 |
+| `config.json`（ConfigMap） | **是**（`baseUrl`、`deployment`、`model`、`apiVersion`…） |
+| `AZURE_OPENAI_API_KEY` / `AZURE_API_KEY`（Secret） | **是**（注入 `api-key` / `Authorization`） |
 
-完整示例见 **`k8s/traffic-route-viz.yaml`**。应用前请替换镜像、Ingress、`REPLACE_ME` 与 Azure 占位符。
+**必做**：改 ConfigMap 后 **`kubectl rollout restart deployment/traffic-route-viz -n <ns>`**（或删 Pod），否则启动脚本**不会重跑**，Nginx 反代片段可能仍是旧 `baseUrl`。
+
+**日志**：`access_log` / `error_log` 指向 **stdout/stderr**（`web/nginx/nginx.conf`），排障用 **`kubectl logs <pod>`**，不要依赖 `/var/log/nginx/*.log`。
 
 <details>
-<summary>仅 Deployment 片段（与仓库文件一致时可不单独复制）</summary>
+<summary>Deployment 片段：Secret + ConfigMap 挂载</summary>
 
 ```yaml
 env:
@@ -167,7 +133,7 @@ volumes:
 
 </details>
 
-本地验证镜像（在**仓库根目录**执行；endpoint 来自挂载的 `config.json`，仅需密钥环境变量）：
+本地用镜像测 AI（仓库根目录；`config.json` 用示例挂载，密钥走环境变量）：
 
 ```bash
 docker run --rm -p 8080:80 \
@@ -176,121 +142,48 @@ docker run --rm -p 8080:80 \
   traffic-route-viz:local
 ```
 
-### 5.3 应用资源
+---
+
+### 5.3 自检与排障（503 / 504 / Pending）
+
+**应用前**：
 
 ```bash
-kubectl apply -f k8s/traffic-route-viz.yaml
+kubectl apply --dry-run=client -f k8s/traffic-route-viz.yaml
 ```
 
-### 5.4 NodePort / 外网访问与 AI 代理排障
+**应用后**（`NS` 按实际命名空间）：
 
-1. **NodePort 要打在「节点」上，不要打在 Pod IP 上**  
-   `31290` 会出现在**某台工作节点的 IP** 上（`kubectl get nodes -o wide`），与 **Pod IP** 不是一回事。若误用 Pod IP 会连不上。本机可用：`kubectl port-forward -n hds-aswatson-prd svc/traffic-route-viz 8080:80`。
+```bash
+NS=hds-aswatson-prd bash k8s/check-traffic-route-viz.sh
+```
 
-2. **`/trv-azure-openai` 返回 503 JSON**  
-   表示同源 AI 代理未启用（配置或密钥不满足）。请看 Pod 日志中 **`traffic-route-viz: /trv-azure-openai proxy DISABLED — …`** 一行，按提示检查：`config.json` 里 `routeMergeAi.enabled`、`useSameOriginProxy`、`baseUrl`，以及环境变量 **`AZURE_OPENAI_API_KEY`**（或 `AZURE_API_KEY`）。镜像已改为：即使密钥缺失也会**启动 nginx**（主站可访问），仅 AI 路径 503。
+- Pod 内 **`/healthz`** 须 **200**。
+- 日志含 **`proxy ENABLED`** → AI 反代已启用；**`proxy DISABLED — …`** → 按该行修 `config.json` / Secret。
+- 调 **`/trv-azure-openai/...`**：**503 JSON** → 代理未启用；**401/405** 等 → 已到 Azure，再查 key / 路径 / `api-version`。
 
-3. **Nginx worker 数量**  
-   镜像内已将 **`worker_processes` 固定为 5**（避免 `auto` 在大核节点上产生大量 worker 进程）。
-
-4. **其它**  
-   - `kubectl get endpoints -n hds-aswatson-prd traffic-route-viz`：无 Endpoints 说明 Pod 未就绪或 selector 不对。  
-   - 云厂商安全组 / 防火墙是否放行 NodePort 段 **30000–32767**。
-
-### 5.5 Ingress 报 `504 Gateway Time-out`（页面显示 nginx）
-
-常见两类：
-
-1. **路由合并 AI / 大请求**  
-   Ingress Controller（nginx）默认 **`proxy-read-timeout` 约 60s**。浏览器经 Ingress → Pod → Azure 拉模型时，超过即 **504**。  
-   **处理**：在 Ingress 上拉长读写超时（示例清单已加 `nginx.ingress.kubernetes.io/proxy-read-timeout` / `proxy-send-timeout` 为 **900s**，并放宽 `proxy-body-size`）。若你自建 Ingress YAML，请合并同等 `metadata.annotations`。Kong / Traefik 需在其各自配置里调 upstream timeout。
-
-2. **连首页都 504**  
-   多为 **Service 无 Endpoints**（Pod 未 Ready / CrashLoop）、**Ingress `backend` 指错 Service/端口**，或 **集群出口/防火墙** 拦了到 Pod 网段。依次检查：  
-   `kubectl get pods,endpoints,svc -n hds-aswatson-prd`、Pod 事件与日志、`kubectl describe ingress -n hds-aswatson-prd`。
-
-### 5.6 如何保证配置「没有问题」（503 / 504 对照）
-
-1. **应用前**  
-   `kubectl apply --dry-run=client -f k8s/traffic-route-viz.yaml`  
-   并确认已替换：**Secret 真实 key**、**ConfigMap 内 baseUrl/deployment/model**、**Ingress host**、**镜像**。
-
-2. **应用后**（需 `kubectl` 连上集群）  
-   ```bash
-   NS=hds-aswatson-prd bash k8s/check-traffic-route-viz.sh
-   ```  
-   - `/healthz` 在 Pod 内必须 **200**。  
-   - Pod 日志中应有 **`proxy ENABLED`**（AI 可用）或 **`proxy DISABLED — …`**（按原因修 Secret/ConfigMap）。  
-   - 对 `/trv-azure-openai/...`：返回 **503 JSON** = 代理未启用；返回 **401/405** 等 = 代理已转发到 Azure（key/路径再细调）。
-
-3. **集群或企业网络限制 Pod 出站**（例如默认拒绝出站到公网 **443**、或必须走 HTTP 代理）时，AI 会长时间挂起 → Ingress **504**。需由集群/网络团队放行目标 endpoint 或配置代理；本仓库清单**不包含** NetworkPolicy / egress 样例。
-
-4. **入口不是 ingress-nginx**（如 Kong）时，仓库里的 `nginx.ingress.kubernetes.io/*` **不会生效**，必须在对应网关上为上游设置 **≥900s** 超时，否则 AI 仍 504。
-
-### 5.7 Pod 内能 curl Service，但浏览器里主文档一直「待处理」(Pending)
-
-说明 **ClusterIP / Endpoints / 容器内 nginx 正常**；问题在 **DNS → 负载均衡 → Ingress（或更外层网关）**，不是 `traffic-route-viz` Service 本身。
-
-按顺序核对：
-
-1. **Ingress 的 `host` 与浏览器是否一致**  
-   `kubectl get ingress -n hds-aswatson-prd traffic-route-viz -o jsonpath='{.spec.rules[*].host}{"\n"}'`  
-   必须与地址栏里的主机名**逐字相同**（例如 `traffic-route-viz.ms5-a1.aswatson.net`）。若仍是 `example.com` 等占位符，请改 YAML 后 `kubectl apply`，否则规则不匹配，行为依赖 Ingress 默认配置（常见为异常或长时间无响应）。
-
-2. **`ingressClassName` 是否与集群一致**  
-   `kubectl get ingressclass`  
-   若集群没有 `nginx` 这一类，Ingress 可能**长期无 ADDRESS**，外网会一直 Pending。需改成集群实际类名（如 `nginx-internal`），或在 Kong/其它入口上单独建路由。
-
-3. **Ingress 是否已绑定后端**  
-   `kubectl describe ingress -n hds-aswatson-prd traffic-route-viz`  
-   看 **Address**、**Backends** 是否为 `HEALTHY`（ingress-nginx 会显示）。若 `default backend` 或 backend 不健康，先修 Endpoints。
-
-4. **从集群内带 Host 头模拟浏览器**（替换为你的域名与 Ingress Controller Service）  
-   ```bash
-   kubectl -n ingress-nginx get svc
-   # 假设为 ingress-nginx-controller
-   kubectl run curlj --rm -it --restart=Never --image=curlimages/curl -- \
-     curl -sv --max-time 10 http://<INGRESS_CONTROLLER_CLUSTERIP> -H 'Host: traffic-route-viz.ms5-a1.aswatson.net' /
-   ```  
-   若此处很快返回 HTML，而外网 Pending，多半是 **公网 DNS / 负载均衡 / 防火墙** 未指到该 Ingress 或 443/80 被拦。
-
-5. **HTTPS**  
-   若浏览器用 **https://**，需在 Ingress 上配置 **tls**（证书）或由前置 LB 终止 TLS 再回源 HTTP；证书链错误时也可能长时间 Pending。可先用 **http://** 同一 host 对比排除 TLS。
-
-6. **仓库清单**  
-   `k8s/traffic-route-viz.yaml` 中 Ingress 的 `host` 已示例为 **`traffic-route-viz.ms5-a1.aswatson.net`**；若你使用其它域名，请改成与线上一致后再 apply。
-
-### 5.8 浏览器约 **3 分钟** 后 **504**，但 Pod 内 `curl localhost:80` 正常
-
-现象说明：**应用 Pod 与 ClusterIP Service 正常**；超时发生在 **Ingress Controller → Pod** 或 **公网负载均衡 → Ingress**。
-
-**先跑集群内脚本**（不依赖本机网络；**不再使用 `kubectl run` 拉 curl 镜像**，避免 Cloud Shell / 受限集群镜像拉取超时）。脚本顺序：**0 部署/Pod** → **1 Endpoints** → **2 Service DNS /healthz**（`kubectl exec` 进业务 Pod，用 `wget`）→ **2b Ingress 摘要** → **3 Ingress ClusterIP + Host** → **4 IngressClass** → **结论汇总**。（若集群内另有 NetworkPolicy，由平台侧维护，不在本仓库示例中。）
+| 现象 | 优先检查 |
+|------|----------|
+| **`/trv-azure-openai` 503 JSON** | `enabled` + `useSameOriginProxy` + `baseUrl`；环境变量是否有 Key；Pod 日志 `DISABLED` 原因 |
+| **仅 AI 或大包 504** | Ingress / 网关 **read timeout**（示例 Ingress 已 **900s**）；Pod 内反代超时与 Ingress 对齐（脚本生成片段）；**非 ingress-nginx** 时注解无效，须在对应网关配 **≥900s** |
+| **整站 504** | `Endpoints` 是否为空；Ingress `backend`；Pod 未 Ready |
+| **浏览器主文档长期 Pending** | Ingress **`host`** 是否与地址栏一致；**`ingressClassName`** 是否存在；`describe ingress` 的 Address/Backend；公网 DNS/LB/WAF；可先 **http** 试同一 host 排除 TLS |
+| **约 180s 才 504、Pod 内 localhost 正常** | 多发生在 **Ingress 前** LB/WAF；集群内分段验证：`NS=... bash k8s/diagnose-504.sh`（`kubectl exec` 业务 Pod + `wget`，无需 `kubectl run` curl 镜像） |
 
 ```bash
 NS=hds-aswatson-prd bash k8s/diagnose-504.sh
 ```
 
-若脚本提示找不到 Ingress ClusterIP，先查：`kubectl get svc -A | grep -iE 'ingress|traefik'`，再设 `INGRESS_CLUSTERIP` 或 `INGRESS_NS`+`INGRESS_SVC` 重跑（见脚本头部注释）。
+脚本找不到 Ingress ClusterIP 时：`kubectl get svc -A | grep -iE 'ingress|traefik'`，再设环境变量 **`INGRESS_CLUSTERIP`** 或 **`INGRESS_NS` + `INGRESS_SVC`**（见脚本注释）。
 
-- 若 **步骤 2（Service DNS）失败**：若 `localhost /healthz` 正常但 `Service DNS :80` 超时，优先查 **CoreDNS**、经 Service 的 **hairpin** 行为、以及**命名空间内其它 NetworkPolicy**（本仓库不再提供样例策略）。  
-- 若 **步骤 2 成功、步骤 3（经 Ingress VIP + Host）失败**：Ingress 规则、`ingressClassName`、或 **ingress-nginx 全局 ConfigMap**（如 `proxy-read-timeout`）与注解冲突；查 `kubectl describe ingress`、`kubectl logs -n ingress-nginx deploy/<controller>`。  
-- 若 **步骤 2、3 均成功，仅外网 504**：问题在 **Ingress 之前的 DNS/LB/WAF**（**约 180s** 常为外层网关默认超时，与 Pod 内 nginx 无关）。
+**其它**：NodePort 打在**节点 IP**，不是 Pod IP；需要时用 `kubectl port-forward -n <ns> svc/traffic-route-viz 8080:80`。清单含 **`nginx.ingress.kubernetes.io/backend-protocol: "HTTP"`**，避免误 **HTTPS 回源** 导致长时间无响应。
 
-**清单已增加** `nginx.ingress.kubernetes.io/backend-protocol: "HTTP"`，避免部分环境误用 **HTTPS 回源** 导致长时间无响应。请 **`kubectl apply -f k8s/traffic-route-viz.yaml`** 后重试。
+**集群出站被拦**（Pod 不能直连公网 443 等）时 AI 会挂起直至超时 → 须网络侧放行或代理；本仓库示例**不含** NetworkPolicy。
 
-针对你看到的典型输出：
+**浏览器 Network 面板**：`content_main.js` 等 **200** 常为扩展请求；以 **`document` / `favicon`** 为准。
 
-```text
-Pod 1/1 Running，Endpoints 有 10.x.x.x:80
-Pod 内 wget http://traffic-route-viz.<ns>.svc.cluster.local/healthz timed out
-Pod 内 wget http://<Ingress ClusterIP>/ -H Host:... timed out
-```
+---
 
-若同时 `kubectl exec ... wget http://127.0.0.1/healthz` 是 `ok`，应用本身和容器端口正常，再查 **集群 DNS、CNI/Service 路径、Ingress 规则**（若平台对命名空间挂了 NetworkPolicy，由平台文档处理）：
+## 6. 清单文件
 
-```bash
-kubectl apply -f k8s/traffic-route-viz.yaml
-NS=hds-aswatson-prd bash k8s/diagnose-504.sh
-```
-
-**说明**：Network 里 `content_main.js` / `style.css` 等 **200** 多为**浏览器扩展**请求，不代表你的站点资源已加载成功；以 **`document` / `favicon`** 为准。
+- **`k8s/traffic-route-viz.yaml`**：整合示例（替换镜像、host、密钥与 Azure 占位后再 apply）。
