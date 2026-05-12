@@ -120,7 +120,7 @@ image: harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz@sha256:<digest
 
 > 注意：根目录 `.gitignore` 默认忽略 `k8s/`。建议你在自己的环境里维护部署清单（或复制到单独的私有仓库/基础设施仓库）。
 
-`HARNESS_ENGINEERING.md` 中给出了推荐的清单结构；仓库内提供**可提交**的整合示例：`k8s/traffic-route-viz.yaml`（Deployment、Secret、ConfigMap、Service、Ingress、NetworkPolicy）。
+`HARNESS_ENGINEERING.md` 中给出了推荐的清单结构；仓库内提供**可提交**的整合示例：`k8s/traffic-route-viz.yaml`（Deployment、Secret、ConfigMap、Service、Ingress）。
 
 ### 5.1 需要改哪些地方
 
@@ -183,16 +183,13 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 1. **NodePort 要打在「节点」上，不要打在 Pod IP 上**  
    `31290` 会出现在**某台工作节点的 IP** 上（`kubectl get nodes -o wide`），与 **Pod IP** 不是一回事。若误用 Pod IP 会连不上。本机可用：`kubectl port-forward -n hds-aswatson-prd svc/traffic-route-viz 8080:80`。
 
-2. **NetworkPolicy**  
-   示例清单中的 `traffic-route-viz-netpol` 已改为**仅限制入站端口 80、不限制来源**（便于 Ingress / NodePort / 集群内访问）。若你集群里仍沿用旧版「仅放行 ingress-nginx」策略，请 `kubectl apply -f k8s/traffic-route-viz.yaml` 更新，或自行删除该 NetworkPolicy。
-
-3. **`/trv-azure-openai` 返回 503 JSON**  
+2. **`/trv-azure-openai` 返回 503 JSON**  
    表示同源 AI 代理未启用（配置或密钥不满足）。请看 Pod 日志中 **`traffic-route-viz: /trv-azure-openai proxy DISABLED — …`** 一行，按提示检查：`config.json` 里 `routeMergeAi.enabled`、`useSameOriginProxy`、`baseUrl`，以及环境变量 **`AZURE_OPENAI_API_KEY`**（或 `AZURE_API_KEY`）。镜像已改为：即使密钥缺失也会**启动 nginx**（主站可访问），仅 AI 路径 503。
 
-4. **Nginx worker 数量**  
+3. **Nginx worker 数量**  
    镜像内已将 **`worker_processes` 固定为 5**（避免 `auto` 在大核节点上产生大量 worker 进程）。
 
-5. **其它**  
+4. **其它**  
    - `kubectl get endpoints -n hds-aswatson-prd traffic-route-viz`：无 Endpoints 说明 Pod 未就绪或 selector 不对。  
    - 云厂商安全组 / 防火墙是否放行 NodePort 段 **30000–32767**。
 
@@ -222,8 +219,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
    - Pod 日志中应有 **`proxy ENABLED`**（AI 可用）或 **`proxy DISABLED — …`**（按原因修 Secret/ConfigMap）。  
    - 对 `/trv-azure-openai/...`：返回 **503 JSON** = 代理未启用；返回 **401/405** 等 = 代理已转发到 Azure（key/路径再细调）。
 
-3. **集群默认拒绝 Pod 出站** 时，AI 会长时间挂起 → Ingress **504**。可尝试：  
-   `kubectl apply -f k8s/traffic-route-viz-egress-netpol.yaml`（仅放行 **443 + DNS**；若企业要求走 HTTP 代理则需另配）。
+3. **集群或企业网络限制 Pod 出站**（例如默认拒绝出站到公网 **443**、或必须走 HTTP 代理）时，AI 会长时间挂起 → Ingress **504**。需由集群/网络团队放行目标 endpoint 或配置代理；本仓库清单**不包含** NetworkPolicy / egress 样例。
 
 4. **入口不是 ingress-nginx**（如 Kong）时，仓库里的 `nginx.ingress.kubernetes.io/*` **不会生效**，必须在对应网关上为上游设置 **≥900s** 超时，否则 AI 仍 504。
 
@@ -259,3 +255,38 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 
 6. **仓库清单**  
    `k8s/traffic-route-viz.yaml` 中 Ingress 的 `host` 已示例为 **`traffic-route-viz.ms5-a1.aswatson.net`**；若你使用其它域名，请改成与线上一致后再 apply。
+
+### 5.8 浏览器约 **3 分钟** 后 **504**，但 Pod 内 `curl localhost:80` 正常
+
+现象说明：**应用 Pod 与 ClusterIP Service 正常**；超时发生在 **Ingress Controller → Pod** 或 **公网负载均衡 → Ingress**。
+
+**先跑集群内脚本**（不依赖本机网络；**不再使用 `kubectl run` 拉 curl 镜像**，避免 Cloud Shell / 受限集群镜像拉取超时）。脚本顺序：**0 部署/Pod** → **1 Endpoints** → **2 Service DNS /healthz**（`kubectl exec` 进业务 Pod，用 `wget`）→ **2b Ingress 摘要** → **3 Ingress ClusterIP + Host** → **4 IngressClass** → **结论汇总**。（若集群内另有 NetworkPolicy，由平台侧维护，不在本仓库示例中。）
+
+```bash
+NS=hds-aswatson-prd bash k8s/diagnose-504.sh
+```
+
+若脚本提示找不到 Ingress ClusterIP，先查：`kubectl get svc -A | grep -iE 'ingress|traefik'`，再设 `INGRESS_CLUSTERIP` 或 `INGRESS_NS`+`INGRESS_SVC` 重跑（见脚本头部注释）。
+
+- 若 **步骤 2（Service DNS）失败**：若 `localhost /healthz` 正常但 `Service DNS :80` 超时，优先查 **CoreDNS**、经 Service 的 **hairpin** 行为、以及**命名空间内其它 NetworkPolicy**（本仓库不再提供样例策略）。  
+- 若 **步骤 2 成功、步骤 3（经 Ingress VIP + Host）失败**：Ingress 规则、`ingressClassName`、或 **ingress-nginx 全局 ConfigMap**（如 `proxy-read-timeout`）与注解冲突；查 `kubectl describe ingress`、`kubectl logs -n ingress-nginx deploy/<controller>`。  
+- 若 **步骤 2、3 均成功，仅外网 504**：问题在 **Ingress 之前的 DNS/LB/WAF**（**约 180s** 常为外层网关默认超时，与 Pod 内 nginx 无关）。
+
+**清单已增加** `nginx.ingress.kubernetes.io/backend-protocol: "HTTP"`，避免部分环境误用 **HTTPS 回源** 导致长时间无响应。请 **`kubectl apply -f k8s/traffic-route-viz.yaml`** 后重试。
+
+针对你看到的典型输出：
+
+```text
+Pod 1/1 Running，Endpoints 有 10.x.x.x:80
+Pod 内 wget http://traffic-route-viz.<ns>.svc.cluster.local/healthz timed out
+Pod 内 wget http://<Ingress ClusterIP>/ -H Host:... timed out
+```
+
+若同时 `kubectl exec ... wget http://127.0.0.1/healthz` 是 `ok`，应用本身和容器端口正常，再查 **集群 DNS、CNI/Service 路径、Ingress 规则**（若平台对命名空间挂了 NetworkPolicy，由平台文档处理）：
+
+```bash
+kubectl apply -f k8s/traffic-route-viz.yaml
+NS=hds-aswatson-prd bash k8s/diagnose-504.sh
+```
+
+**说明**：Network 里 `content_main.js` / `style.css` 等 **200** 多为**浏览器扩展**请求，不代表你的站点资源已加载成功；以 **`document` / `favicon`** 为准。

@@ -39,16 +39,6 @@ metadata:
 
 ---
 apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: traffic-route-viz
-  namespace: hds-aswatson-prd
-  labels:
-    app.kubernetes.io/name: traffic-route-viz
-automountServiceAccountToken: false
-
----
-apiVersion: v1
 kind: Secret
 metadata:
   name: traffic-route-viz-azure-openai
@@ -106,8 +96,6 @@ spec:
       labels:
         app.kubernetes.io/name: traffic-route-viz
     spec:
-      serviceAccountName: traffic-route-viz
-      automountServiceAccountToken: false
       securityContext:
         seccompProfile:
           type: RuntimeDefault
@@ -180,27 +168,6 @@ spec:
       protocol: TCP
 
 ---
-# 仅限制入站 TCP/80；不限制来源，便于 Ingress、NodePort、集群内 curl 均可访问。
-# 生产若需零信任，可改为仅放行 ingress 控制器命名空间或指定 ipBlock。
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: traffic-route-viz-netpol
-  namespace: hds-aswatson-prd
-  labels:
-    app.kubernetes.io/name: traffic-route-viz
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/name: traffic-route-viz
-  policyTypes:
-    - Ingress
-  ingress:
-    - ports:
-        - protocol: TCP
-          port: 80
-
----
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -209,6 +176,8 @@ metadata:
   labels:
     app.kubernetes.io/name: traffic-route-viz
   annotations:
+    # 回源到本应用为纯 HTTP:80；显式声明可避免部分 Ingress 误用 HTTPS 回源导致长时间无响应 → 504。
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
     # 默认 60s 时，路由合并 AI（/trv-azure-openai → Azure）易 504；静态页一般几毫秒内响应。
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "900"

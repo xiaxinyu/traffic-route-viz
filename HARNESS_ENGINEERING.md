@@ -137,7 +137,7 @@ docker buildx build --platform linux/amd64 \
 
 - 清单文件：`k8s/traffic-route-viz.yaml`
 - 清单内包含：
-  - `ConfigMap/traffic-route-viz-config`（挂载为站点根目录 `/config.json`，用于强制登录配置）
+  - `Secret`（如 Azure OpenAI API Key）、`ConfigMap/traffic-route-viz-config`（挂载为站点根目录 `/config.json`，用于登录与路由合并 AI 等）
   - `Deployment/Service/Ingress`
 
 应用：
