@@ -181,7 +181,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 ### 5.4 NodePort / 外网访问与 AI 代理排障
 
 1. **NodePort 要打在「节点」上，不要打在 Pod IP 上**  
-   `31290` 会出现在**某台工作节点的 IP** 上（`kubectl get nodes -o wide`），与 **Pod IP** 不是一回事。若误用 Pod IP 会连不上。本机可用：`kubectl port-forward -n traffic-route-viz svc/traffic-route-viz 8080:80`。
+   `31290` 会出现在**某台工作节点的 IP** 上（`kubectl get nodes -o wide`），与 **Pod IP** 不是一回事。若误用 Pod IP 会连不上。本机可用：`kubectl port-forward -n hds-aswatson-prd svc/traffic-route-viz 8080:80`。
 
 2. **NetworkPolicy**  
    示例清单中的 `traffic-route-viz-netpol` 已改为**仅限制入站端口 80、不限制来源**（便于 Ingress / NodePort / 集群内访问）。若你集群里仍沿用旧版「仅放行 ingress-nginx」策略，请 `kubectl apply -f k8s/traffic-route-viz.yaml` 更新，或自行删除该 NetworkPolicy。
@@ -193,7 +193,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
    镜像内已将 **`worker_processes` 固定为 5**（避免 `auto` 在大核节点上产生大量 worker 进程）。
 
 5. **其它**  
-   - `kubectl get endpoints -n traffic-route-viz traffic-route-viz`：无 Endpoints 说明 Pod 未就绪或 selector 不对。  
+   - `kubectl get endpoints -n hds-aswatson-prd traffic-route-viz`：无 Endpoints 说明 Pod 未就绪或 selector 不对。  
    - 云厂商安全组 / 防火墙是否放行 NodePort 段 **30000–32767**。
 
 ### 5.5 Ingress 报 `504 Gateway Time-out`（页面显示 nginx）
@@ -206,7 +206,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 
 2. **连首页都 504**  
    多为 **Service 无 Endpoints**（Pod 未 Ready / CrashLoop）、**Ingress `backend` 指错 Service/端口**，或 **集群出口/防火墙** 拦了到 Pod 网段。依次检查：  
-   `kubectl get pods,endpoints,svc -n traffic-route-viz`、Pod 事件与日志、`kubectl describe ingress -n traffic-route-viz`。
+   `kubectl get pods,endpoints,svc -n hds-aswatson-prd`、Pod 事件与日志、`kubectl describe ingress -n hds-aswatson-prd`。
 
 ### 5.6 如何保证配置「没有问题」（503 / 504 对照）
 
@@ -216,7 +216,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 
 2. **应用后**（需 `kubectl` 连上集群）  
    ```bash
-   NS=traffic-route-viz bash k8s/check-traffic-route-viz.sh
+   NS=hds-aswatson-prd bash k8s/check-traffic-route-viz.sh
    ```  
    - `/healthz` 在 Pod 内必须 **200**。  
    - Pod 日志中应有 **`proxy ENABLED`**（AI 可用）或 **`proxy DISABLED — …`**（按原因修 Secret/ConfigMap）。  
@@ -226,3 +226,36 @@ kubectl apply -f k8s/traffic-route-viz.yaml
    `kubectl apply -f k8s/traffic-route-viz-egress-netpol.yaml`（仅放行 **443 + DNS**；若企业要求走 HTTP 代理则需另配）。
 
 4. **入口不是 ingress-nginx**（如 Kong）时，仓库里的 `nginx.ingress.kubernetes.io/*` **不会生效**，必须在对应网关上为上游设置 **≥900s** 超时，否则 AI 仍 504。
+
+### 5.7 Pod 内能 curl Service，但浏览器里主文档一直「待处理」(Pending)
+
+说明 **ClusterIP / Endpoints / 容器内 nginx 正常**；问题在 **DNS → 负载均衡 → Ingress（或更外层网关）**，不是 `traffic-route-viz` Service 本身。
+
+按顺序核对：
+
+1. **Ingress 的 `host` 与浏览器是否一致**  
+   `kubectl get ingress -n hds-aswatson-prd traffic-route-viz -o jsonpath='{.spec.rules[*].host}{"\n"}'`  
+   必须与地址栏里的主机名**逐字相同**（例如 `traffic-route-viz.ms5-a1.aswatson.net`）。若仍是 `example.com` 等占位符，请改 YAML 后 `kubectl apply`，否则规则不匹配，行为依赖 Ingress 默认配置（常见为异常或长时间无响应）。
+
+2. **`ingressClassName` 是否与集群一致**  
+   `kubectl get ingressclass`  
+   若集群没有 `nginx` 这一类，Ingress 可能**长期无 ADDRESS**，外网会一直 Pending。需改成集群实际类名（如 `nginx-internal`），或在 Kong/其它入口上单独建路由。
+
+3. **Ingress 是否已绑定后端**  
+   `kubectl describe ingress -n hds-aswatson-prd traffic-route-viz`  
+   看 **Address**、**Backends** 是否为 `HEALTHY`（ingress-nginx 会显示）。若 `default backend` 或 backend 不健康，先修 Endpoints。
+
+4. **从集群内带 Host 头模拟浏览器**（替换为你的域名与 Ingress Controller Service）  
+   ```bash
+   kubectl -n ingress-nginx get svc
+   # 假设为 ingress-nginx-controller
+   kubectl run curlj --rm -it --restart=Never --image=curlimages/curl -- \
+     curl -sv --max-time 10 http://<INGRESS_CONTROLLER_CLUSTERIP> -H 'Host: traffic-route-viz.ms5-a1.aswatson.net' /
+   ```  
+   若此处很快返回 HTML，而外网 Pending，多半是 **公网 DNS / 负载均衡 / 防火墙** 未指到该 Ingress 或 443/80 被拦。
+
+5. **HTTPS**  
+   若浏览器用 **https://**，需在 Ingress 上配置 **tls**（证书）或由前置 LB 终止 TLS 再回源 HTTP；证书链错误时也可能长时间 Pending。可先用 **http://** 同一 host 对比排除 TLS。
+
+6. **仓库清单**  
+   `k8s/traffic-route-viz.yaml` 中 Ingress 的 `host` 已示例为 **`traffic-route-viz.ms5-a1.aswatson.net`**；若你使用其它域名，请改成与线上一致后再 apply。

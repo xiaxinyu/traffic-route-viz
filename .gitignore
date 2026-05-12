@@ -1,11 +1,7 @@
 # 本地/敏感示例数据：不纳入版本库（含子目录）
 traffic/
 
-# 部署清单：不上传到 GitHub（含子目录）
-k8s/
-!k8s/traffic-route-viz.yaml
-!k8s/check-traffic-route-viz.sh
-!k8s/traffic-route-viz-egress-netpol.yaml
+
 
 # 常见系统文件
 .DS_Store

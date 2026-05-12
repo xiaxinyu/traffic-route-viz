@@ -1,0 +1,231 @@
+# traffic-route-viz — 单文件示例清单（Deployment + Secret + ConfigMap + Service + Ingress）
+#
+# =============================================================================
+# 部署前必改（否则易 503/504 或无法访问）
+# =============================================================================
+# 1) Secret `traffic-route-viz-azure-openai`：把 AZURE_OPENAI_API_KEY 换成真实 key（勿留 REPLACE_ME）。
+# 2) ConfigMap `config.json`：YOUR_RESOURCE_NAME、YOUR_AZURE_DEPLOYMENT_NAME、model/apiVersion 与 Azure 控制台一致；
+#    且 routeMergeAi.enabled=true、useSameOriginProxy=true、baseUrl 与 Secret 对应资源同主机。
+# 3) Ingress `spec.rules[].host`：必须与浏览器地址栏主机名完全一致（大小写敏感）。
+#    若浏览器打开 traffic-route-viz.ms5-a1.aswatson.net 而 YAML 仍是 example.com，Ingress 不会把流量交给本 Service，
+#    外网表现常为长时间 Pending、404 或落到默认后端。
+#    若入口不是 ingress-nginx，请改 `ingressClassName` 并在对应网关配置超时（见 DEPLOYMENT.md §5.7）。
+# 4) Deployment 镜像：改成你可拉取的 tag/digest。
+#
+# =============================================================================
+# 状态码速查（保证「没问题」时应对照）
+# =============================================================================
+# - 首页 / 与 /healthz：在 Pod 内应 200。浏览器经 Ingress 亦应 200；若 504 → 看 Ingress 日志/超时/无 Endpoints。
+# - /trv-azure-openai/...：503 JSON → Pod 日志里 proxy DISABLED（配置或密钥）；504 → Ingress 超时或 Pod 出网 443 被拦。
+#
+# 自检脚本（集群可访问时）：bash k8s/check-traffic-route-viz.sh
+#
+# 路由合并 AI（同源代理）：
+#   - **ConfigMap `config.json`**：`routeMergeAi.baseUrl`（endpoint）、`deployment`、`model`、`apiVersion`、
+#     `enabled`、`useSameOriginProxy`（镜像启动脚本据此启用 `/trv-azure-openai` 并推导 upstream，无需重复环境变量）。
+#   - **Secret**：仅注入 `AZURE_OPENAI_API_KEY`（容器内 nginx 写 `api-key` 头；Bearer 见 DEPLOYMENT.md）。
+#
+# 使用前请替换：镜像地址、ConfigMap 内 Azure 占位符、Secret 中的 REPLACE_ME；Ingress host 已示例为 ms5 域名，若不同请改。
+#
+# 说明：官方 nginx 镜像默认监听 80 且主进程为 root；若集群启用 Restricted PSA，需改用非特权端口镜像或自定义镜像。
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hds-aswatson-prd
+  labels:
+    app.kubernetes.io/name: traffic-route-viz
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: traffic-route-viz
+  namespace: hds-aswatson-prd
+  labels:
+    app.kubernetes.io/name: traffic-route-viz
+automountServiceAccountToken: false
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: traffic-route-viz-azure-openai
+  namespace: hds-aswatson-prd
+  labels:
+    app.kubernetes.io/name: traffic-route-viz
+type: Opaque
+stringData:
+  AZURE_OPENAI_API_KEY: "REPLACE_ME"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: traffic-route-viz-config
+  namespace: hds-aswatson-prd
+  labels:
+    app.kubernetes.io/name: traffic-route-viz
+data:
+  config.json: |
+    {
+      "auth": {
+        "enabled": true,
+        "username": "admin",
+        "password": "CHANGE_ME_OR_USE_SECRET_LATER",
+        "ttlHours": 8
+      },
+      "routeMergeAi": {
+        "enabled": true,
+        "baseUrl": "https://YOUR_RESOURCE_NAME.cognitiveservices.azure.com/openai",
+        "apiStyle": "azure-deployments",
+        "deployment": "YOUR_AZURE_DEPLOYMENT_NAME",
+        "model": "YOUR_MODEL_NAME_OR_SAME_AS_DEPLOYMENT",
+        "apiVersion": "2025-04-01-preview",
+        "useDevProxy": false,
+        "useSameOriginProxy": true
+      }
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traffic-route-viz
+  namespace: hds-aswatson-prd
+  labels:
+    app.kubernetes.io/name: traffic-route-viz
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: traffic-route-viz
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: traffic-route-viz
+    spec:
+      serviceAccountName: traffic-route-viz
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: traffic-route-viz
+          image: harbor.example.com/hds-asw/traffic-route-viz:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          env:
+            - name: AZURE_OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: traffic-route-viz-azure-openai
+                  key: AZURE_OPENAI_API_KEY
+          volumeMounts:
+            - name: trv-config
+              mountPath: /usr/share/nginx/html/config.json
+              subPath: config.json
+              readOnly: true
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+      volumes:
+        - name: trv-config
+          configMap:
+            name: traffic-route-viz-config
+            items:
+              - key: config.json
+                path: config.json
+            defaultMode: 0444
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: traffic-route-viz
+  namespace: hds-aswatson-prd
+  labels:
+    app.kubernetes.io/name: traffic-route-viz
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: traffic-route-viz
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+
+---
+# 仅限制入站 TCP/80；不限制来源，便于 Ingress、NodePort、集群内 curl 均可访问。
+# 生产若需零信任，可改为仅放行 ingress 控制器命名空间或指定 ipBlock。
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: traffic-route-viz-netpol
+  namespace: hds-aswatson-prd
+  labels:
+    app.kubernetes.io/name: traffic-route-viz
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: traffic-route-viz
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: traffic-route-viz
+  namespace: hds-aswatson-prd
+  labels:
+    app.kubernetes.io/name: traffic-route-viz
+  annotations:
+    # 默认 60s 时，路由合并 AI（/trv-azure-openai → Azure）易 504；静态页一般几毫秒内响应。
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "900"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "900"
+    nginx.ingress.kubernetes.io/proxy-body-size: "32m"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+spec:
+  ingressClassName: nginx
+  rules:
+    # 必须与浏览器里输入的 host 完全一致；勿保留 example.com 即上线。
+    - host: traffic-route-viz.ms5-a1.aswatson.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: traffic-route-viz
+                port:
+                  number: 80
