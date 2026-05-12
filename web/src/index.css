@@ -1649,8 +1649,8 @@ body {
 }
 
 .route-merge-ai-modal.trv-modal {
-  width: min(1560px, 99vw);
-  height: min(96vh, 1120px);
+  width: min(1680px, 99vw);
+  height: min(97vh, 1180px);
   border-radius: 12px;
 }
 
@@ -1684,7 +1684,7 @@ body {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
   grid-template-rows: 1fr;
   gap: 10px;
   overflow: hidden;
@@ -1701,42 +1701,6 @@ body {
   }
 }
 
-.route-merge-ai-in-modal .route-merge-ai-advice {
-  max-height: none;
-  min-height: 0;
-  overflow: auto;
-  padding-right: 6px;
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.96));
-  box-shadow: var(--shadow-xs);
-  padding: 10px 10px 12px;
-}
-
-.route-merge-ai-in-modal .route-merge-ai-yaml-area {
-  border-top: none;
-  padding-top: 0;
-  min-height: 0;
-  overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, 0.28);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: var(--shadow-xs);
-  padding: 10px 10px 12px;
-}
-
-.route-merge-ai-in-modal .route-merge-ai-yaml-actions {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
-  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
-  padding: 8px 8px;
-  margin: -10px -10px 10px;
-  border-top-left-radius: 12px;
-  border-top-right-radius: 12px;
-}
-
 .route-merge-ai-yaml-tabs {
   display: inline-flex;
   gap: 6px;
@@ -1749,19 +1713,7 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-}
-
-.route-merge-ai-in-modal .route-merge-ai-yaml-grid,
-.route-merge-ai-in-modal .route-merge-ai-diff {
-  flex: 1;
-  min-height: 0;
-}
-
-.route-merge-ai-in-modal .route-merge-ai-diff {
-  margin-top: 0;
-  max-height: none;
-  overflow: auto;
-  flex: 1 1 auto;
+  height: 100%;
 }
 
 .route-merge-ai-template-details {
@@ -2043,6 +1995,15 @@ body {
   overflow: auto;
 }
 
+.route-merge-ai.route-merge-ai-in-modal {
+  height: 100%;
+  max-height: none;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+  overflow: hidden;
+}
+
 .route-merge-ai-advice {
   flex: 0 0 auto;
   max-height: min(30vh, 280px);
@@ -2074,7 +2035,7 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
-  padding: 8px 10px;
+  padding: 7px 8px;
   border: 1px solid rgba(14, 165, 233, 0.2);
   border-radius: 10px;
   background: linear-gradient(180deg, #f8fafc, #eef6ff);
@@ -2082,7 +2043,7 @@ body {
 
 .route-merge-ai-summary-card .route-merge-ai-summary {
   margin: 3px 0 0;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.45;
   color: #0f172a;
 }
@@ -2095,8 +2056,8 @@ body {
 
 .route-merge-ai-summary-pill {
   flex-shrink: 0;
-  max-width: 220px;
-  padding: 5px 9px;
+  max-width: 180px;
+  padding: 4px 7px;
   border-radius: 999px;
   background: #ecfeff;
   color: #0f766e;
@@ -2124,7 +2085,7 @@ body {
 
 .route-merge-ai-review-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 6px;
   margin-top: 6px;
 }
@@ -2210,7 +2171,7 @@ body {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   margin-top: 0;
   margin-bottom: 6px;
 }
@@ -2437,6 +2398,53 @@ body {
   .route-merge-ai-diff-cell--old {
     border-right: 0;
   }
+}
+
+.route-merge-ai-in-modal .route-merge-ai-advice {
+  max-height: none;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 8px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.96));
+  box-shadow: var(--shadow-xs);
+}
+
+.route-merge-ai-in-modal .route-merge-ai-yaml-area {
+  min-height: 0;
+  overflow: hidden;
+  padding: 8px 8px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow-xs);
+}
+
+.route-merge-ai-in-modal .route-merge-ai-yaml-actions {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 7px 8px;
+  margin: -8px -8px 8px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+}
+
+.route-merge-ai-in-modal .route-merge-ai-yaml-grid,
+.route-merge-ai-in-modal .route-merge-ai-diff {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
+}
+
+.route-merge-ai-in-modal .route-merge-ai-diff {
+  flex: 1 1 auto;
+  max-height: none;
+  margin-top: 0;
+  overflow: auto;
 }
 
 .route-merge-error {
