@@ -195,3 +195,34 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 5. **其它**  
    - `kubectl get endpoints -n traffic-route-viz traffic-route-viz`：无 Endpoints 说明 Pod 未就绪或 selector 不对。  
    - 云厂商安全组 / 防火墙是否放行 NodePort 段 **30000–32767**。
+
+### 5.5 Ingress 报 `504 Gateway Time-out`（页面显示 nginx）
+
+常见两类：
+
+1. **路由合并 AI / 大请求**  
+   Ingress Controller（nginx）默认 **`proxy-read-timeout` 约 60s**。浏览器经 Ingress → Pod → Azure 拉模型时，超过即 **504**。  
+   **处理**：在 Ingress 上拉长读写超时（示例清单已加 `nginx.ingress.kubernetes.io/proxy-read-timeout` / `proxy-send-timeout` 为 **900s**，并放宽 `proxy-body-size`）。若你自建 Ingress YAML，请合并同等 `metadata.annotations`。Kong / Traefik 需在其各自配置里调 upstream timeout。
+
+2. **连首页都 504**  
+   多为 **Service 无 Endpoints**（Pod 未 Ready / CrashLoop）、**Ingress `backend` 指错 Service/端口**，或 **集群出口/防火墙** 拦了到 Pod 网段。依次检查：  
+   `kubectl get pods,endpoints,svc -n traffic-route-viz`、Pod 事件与日志、`kubectl describe ingress -n traffic-route-viz`。
+
+### 5.6 如何保证配置「没有问题」（503 / 504 对照）
+
+1. **应用前**  
+   `kubectl apply --dry-run=client -f k8s/traffic-route-viz.yaml`  
+   并确认已替换：**Secret 真实 key**、**ConfigMap 内 baseUrl/deployment/model**、**Ingress host**、**镜像**。
+
+2. **应用后**（需 `kubectl` 连上集群）  
+   ```bash
+   NS=traffic-route-viz bash k8s/check-traffic-route-viz.sh
+   ```  
+   - `/healthz` 在 Pod 内必须 **200**。  
+   - Pod 日志中应有 **`proxy ENABLED`**（AI 可用）或 **`proxy DISABLED — …`**（按原因修 Secret/ConfigMap）。  
+   - 对 `/trv-azure-openai/...`：返回 **503 JSON** = 代理未启用；返回 **401/405** 等 = 代理已转发到 Azure（key/路径再细调）。
+
+3. **集群默认拒绝 Pod 出站** 时，AI 会长时间挂起 → Ingress **504**。可尝试：  
+   `kubectl apply -f k8s/traffic-route-viz-egress-netpol.yaml`（仅放行 **443 + DNS**；若企业要求走 HTTP 代理则需另配）。
+
+4. **入口不是 ingress-nginx**（如 Kong）时，仓库里的 `nginx.ingress.kubernetes.io/*` **不会生效**，必须在对应网关上为上游设置 **≥900s** 超时，否则 AI 仍 504。
