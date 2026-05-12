@@ -225,6 +225,6 @@ export function routeMergeAiDisabledReason(): string {
   if (!useProxy && apiStyle === "azure-deployments" && !m.apiKey)
     return "缺少 API Key：config.routeMergeAi.apiKey 或 VITE_AZURE_OPENAI_API_KEY（仅可信环境）。";
   if (m.useDevProxy && !import.meta.env.DEV && !m.useSameOriginProxy)
-    return "已配置 useDevProxy（仅 Vite 开发），但当前非开发模式；生产请改用 routeMergeAi.useSameOriginProxy=true，并在 Kubernetes Secret 注入 AZURE_OPENAI_API_KEY / AZURE_API_KEY，且设置 TRV_ENABLE_ROUTE_MERGE_AI_PROXY=true（见 DEPLOYMENT.md）。";
+    return "已配置 useDevProxy（仅 Vite 开发），但当前非开发模式；生产请改用 routeMergeAi.useSameOriginProxy=true，并在 Kubernetes Secret 注入 AZURE_OPENAI_API_KEY（或 AZURE_API_KEY），且保证运行时 config.json 含 routeMergeAi.baseUrl（见 DEPLOYMENT.md）。";
   return "配置不完整。";
 }

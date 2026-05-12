@@ -120,7 +120,7 @@ image: harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz@sha256:<digest
 
 > 注意：根目录 `.gitignore` 默认忽略 `k8s/`。建议你在自己的环境里维护部署清单（或复制到单独的私有仓库/基础设施仓库）。
 
-`HARNESS_ENGINEERING.md` 中给出了推荐的清单结构；你也可以参考仓库内的示例 `k8s/traffic-route-viz.yaml`（若你本地有该文件）。
+`HARNESS_ENGINEERING.md` 中给出了推荐的清单结构；仓库内提供**可提交**的整合示例：`k8s/traffic-route-viz.yaml`（Deployment、Secret、ConfigMap、Service、Ingress、NetworkPolicy）。
 
 ### 5.1 需要改哪些地方
 
@@ -130,25 +130,22 @@ image: harbor.ms5-sit.aswatson.net:8080/hds-asw/traffic-route-viz@sha256:<digest
   - 用 `ConfigMap` 挂载到站点根目录 `/config.json`
   - Nginx 已配置对 `/config.json` 禁用缓存（见 `web/nginx/default.conf`）
 
-### 5.2 路由合并 AI（推荐：Kubernetes Secret + 同源代理）
+### 5.2 路由合并 AI（推荐：Kubernetes Secret + ConfigMap + 同源代理）
 
-目标：**API Key / Endpoint 不进前端构建产物、不写进浏览器可下载的 `config.json`**，由运行中的 **Pod 环境变量**（通常来自 `Secret`）交给容器内 **nginx** 注入到发往 Azure 的请求头。
+目标：**API Key 不进 `config.json`、不进前端构建**；**endpoint / deployment / model** 只在 **ConfigMap 的 `config.json`**；密钥仅通过 **Secret → 环境变量**（如 `AZURE_OPENAI_API_KEY`）交给容器内 nginx 注入请求头。
 
-1. **运行时 `config.json`（ConfigMap）**：开启 AI，并设置 `routeMergeAi.useSameOriginProxy=true`（不要配置 `apiKey` / `bearerToken`）。示例见 `web/k8s/route-merge-ai-secret-and-config.example.yaml` 中的 `ConfigMap`。
-2. **Pod 环境变量**（`Secret` + 明文或 `ConfigMap`）：
-   - `TRV_ENABLE_ROUTE_MERGE_AI_PROXY=true`：启用镜像内 `/trv-azure-openai` 反向代理。
-   - `TRV_AZURE_OPENAI_ORIGIN`：Azure 资源的 **scheme + host**（可写完整 `https://host/openai/...`，脚本会取 host 部分），须与 `baseUrl` 同源一致。
-   - 鉴权二选一：`AZURE_OPENAI_API_KEY`（`api-key` 头）或 `AZURE_API_KEY`（`Authorization: Bearer`）。
-3. **挂载 `config.json`**：将 `ConfigMap` 的 `config.json` 挂到容器内 `/usr/share/nginx/html/config.json`（`subPath`）。
+1. **ConfigMap `config.json`**：`routeMergeAi.enabled=true`、`useSameOriginProxy=true`、`baseUrl`（以及 `deployment` / `model` / `apiVersion` / `apiStyle` 等，与前端解析一致）。**不要**写 `apiKey` / `bearerToken`。
+2. **Secret**：只存 **`AZURE_OPENAI_API_KEY`**（经典 Azure OpenAI `api-key` 头）。若使用 OpenAI v1 / Responses 的 Bearer，可改为注入 **`AZURE_API_KEY`**（与镜像内脚本约定一致）。
+3. **容器启动脚本**：读取挂载的 **`/usr/share/nginx/html/config.json`**，当 `enabled` 且 `useSameOriginProxy` 时启用 `/trv-azure-openai` 反向代理，并从 **`baseUrl` 推导 upstream 主机**，无需 `TRV_*` 环境变量。
+4. **挂载**：将 ConfigMap 的 `config.json` 挂到容器内 `/usr/share/nginx/html/config.json`（`subPath`）。
 
-Deployment 片段示例：
+完整示例见 **`k8s/traffic-route-viz.yaml`**。应用前请替换镜像、Ingress、`REPLACE_ME` 与 Azure 占位符。
+
+<details>
+<summary>仅 Deployment 片段（与仓库文件一致时可不单独复制）</summary>
 
 ```yaml
 env:
-  - name: TRV_ENABLE_ROUTE_MERGE_AI_PROXY
-    value: "true"
-  - name: TRV_AZURE_OPENAI_ORIGIN
-    value: "https://YOUR_RESOURCE_NAME.cognitiveservices.azure.com"
   - name: AZURE_OPENAI_API_KEY
     valueFrom:
       secretKeyRef:
@@ -164,12 +161,12 @@ volumes:
       name: traffic-route-viz-config
 ```
 
-本地验证镜像（模拟 K8s 注入；在**仓库根目录**执行）：
+</details>
+
+本地验证镜像（在**仓库根目录**执行；endpoint 来自挂载的 `config.json`，仅需密钥环境变量）：
 
 ```bash
 docker run --rm -p 8080:80 \
-  -e TRV_ENABLE_ROUTE_MERGE_AI_PROXY=true \
-  -e TRV_AZURE_OPENAI_ORIGIN=https://YOUR_RESOURCE_NAME.cognitiveservices.azure.com \
   -e AZURE_OPENAI_API_KEY="$AZURE_OPENAI_API_KEY" \
   -v "$PWD/web/k8s/config.route-merge-ai.example.json:/usr/share/nginx/html/config.json:ro" \
   traffic-route-viz:local

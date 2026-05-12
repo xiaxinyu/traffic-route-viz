@@ -13,6 +13,8 @@ RUN pnpm run build
 
 FROM --platform=$TARGETPLATFORM nginx:1.27-alpine
 
+RUN apk add --no-cache jq
+
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY docker-entrypoint.d/40-trv-route-merge-ai-proxy.sh /docker-entrypoint.d/40-trv-route-merge-ai-proxy.sh

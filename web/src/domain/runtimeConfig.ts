@@ -35,8 +35,9 @@ export type RuntimeConfig = {
     useDevProxy?: boolean;
     /**
      * **开发与生产**：请求发往同源 `/trv-azure-openai/...`，由 Vite（开发）或 **容器内 nginx**（生产镜像）
-     * 转发到 `baseUrl` 对应资源并注入鉴权；浏览器不持有 API Key。
-     * 生产需设置环境变量 `TRV_ENABLE_ROUTE_MERGE_AI_PROXY=true` 等（见 `DEPLOYMENT.md`）。
+     * 转发到 `routeMergeAi.baseUrl` 对应资源并注入鉴权；浏览器不持有 API Key。
+     * 生产镜像启动时从挂载的 **`/config.json`** 读取 `enabled`、`useSameOriginProxy`、`baseUrl` 决定是否启用代理；
+     * `AZURE_OPENAI_API_KEY` / `AZURE_API_KEY` 仅通过环境变量（如 K8s Secret）注入（见 `DEPLOYMENT.md`）。
      */
     useSameOriginProxy?: boolean;
   };

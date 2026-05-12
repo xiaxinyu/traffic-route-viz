@@ -1,11 +1,15 @@
 #!/bin/sh
 set -eu
 
+# 同源 `/trv-azure-openai` 反向代理：启用条件与 upstream 均来自运行时 config.json（见 routeMergeAi），
+# 不在此重复配置 endpoint。鉴权来自环境变量（K8s 中由 Secret 注入 AZURE_OPENAI_API_KEY 或 AZURE_API_KEY）。
+# 可选：TRV_RUNTIME_CONFIG_PATH 覆盖 config.json 路径（默认与静态站点一致）。
+
+CONFIG="${TRV_RUNTIME_CONFIG_PATH:-/usr/share/nginx/html/config.json}"
 SNIPPET="/etc/nginx/snippets/trv-route-merge-ai.conf"
 mkdir -p /etc/nginx/snippets
 
 escape_nginx_dquoted() {
-  # Minimal escaping for proxy_set_header "...";
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
@@ -13,28 +17,46 @@ write_disabled_snippet() {
   cat >"$SNIPPET" <<'EOF'
 location ^~ /trv-azure-openai/ {
   default_type application/json;
-  return 503 '{"error":"trv-azure-openai-proxy-disabled","hint":"Set TRV_ENABLE_ROUTE_MERGE_AI_PROXY=true and TRV_AZURE_OPENAI_ORIGIN on the pod (see DEPLOYMENT.md)."}';
+  return 503 '{"error":"trv-azure-openai-proxy-disabled","hint":"Set routeMergeAi.enabled, useSameOriginProxy, baseUrl in config.json and AZURE_OPENAI_API_KEY or AZURE_API_KEY in the environment (see DEPLOYMENT.md)."}';
 }
 EOF
 }
 
-if [ "${TRV_ENABLE_ROUTE_MERGE_AI_PROXY:-}" != "true" ]; then
+if ! command -v jq >/dev/null 2>&1; then
+  echo "traffic-route-viz: jq is required for route-merge AI proxy bootstrap" >&2
+  exit 1
+fi
+
+if [ ! -f "$CONFIG" ]; then
   write_disabled_snippet
   exit 0
 fi
 
-ORIGIN_RAW="${TRV_AZURE_OPENAI_ORIGIN:-}"
-if [ -z "$ORIGIN_RAW" ]; then
-  echo "traffic-route-viz: TRV_ENABLE_ROUTE_MERGE_AI_PROXY=true but TRV_AZURE_OPENAI_ORIGIN is empty" >&2
+if ! jq empty "$CONFIG" 2>/dev/null; then
+  echo "traffic-route-viz: invalid JSON: $CONFIG" >&2
   exit 1
 fi
 
-# Accept either https://host or https://host/openai/... — proxy only needs scheme+host[:port]
-UPSTREAM_ORIGIN="$(printf '%s' "$ORIGIN_RAW" | sed -E 's#^(https?://[^/]+).*$#\1#')"
+ENABLED=$(jq -r '(.routeMergeAi.enabled == true)' "$CONFIG")
+USING_PROXY=$(jq -r '(.routeMergeAi.useSameOriginProxy == true)' "$CONFIG")
+BASE_URL=$(jq -r '.routeMergeAi.baseUrl // ""' "$CONFIG")
+
+if [ "$ENABLED" != "true" ] || [ "$USING_PROXY" != "true" ]; then
+  write_disabled_snippet
+  exit 0
+fi
+
+if [ -z "$BASE_URL" ]; then
+  echo "traffic-route-viz: routeMergeAi.useSameOriginProxy is true but baseUrl is empty in $CONFIG" >&2
+  exit 1
+fi
+
+# Accept https://host or https://host/openai/... — proxy only needs scheme+host[:port]
+UPSTREAM_ORIGIN="$(printf '%s' "$BASE_URL" | sed -E 's#^(https?://[^/]+).*$#\1#')"
 UPSTREAM_HOST="$(printf '%s' "$UPSTREAM_ORIGIN" | sed -E 's#^https?://##; s#/.*##')"
 
 if [ -z "${AZURE_API_KEY:-}" ] && [ -z "${AZURE_OPENAI_API_KEY:-}" ]; then
-  echo "traffic-route-viz: TRV_ENABLE_ROUTE_MERGE_AI_PROXY=true but neither AZURE_API_KEY nor AZURE_OPENAI_API_KEY is set" >&2
+  echo "traffic-route-viz: routeMerge AI proxy enabled but neither AZURE_API_KEY nor AZURE_OPENAI_API_KEY is set" >&2
   exit 1
 fi
 
