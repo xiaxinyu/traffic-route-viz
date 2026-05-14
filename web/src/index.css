@@ -3098,6 +3098,8 @@ a.btn-secondary.portal-tile .portal-tile-sub {
   justify-self: end;
   width: 100%;
   justify-content: flex-end;
+  display: flex;
+  align-items: center;
 }
 
 .rs-stats-header .local-folder__toolbar {
@@ -3111,15 +3113,25 @@ a.btn-secondary.portal-tile .portal-tile-sub {
 
 .rs-stats-header .header-app-row.rs-stats-header__row {
   display: grid;
-  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr) minmax(96px, 140px);
-  align-items: center;
+  grid-template-columns: minmax(200px, 300px) minmax(0, 1fr) minmax(96px, 140px);
+  align-items: stretch;
   width: 100%;
   column-gap: 0;
-  min-height: 64px;
+  min-height: 72px;
 }
 
 .rs-stats-header__brand {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 6px;
+}
+
+.rs-stats-header__brand-slot {
+  min-width: 0;
+  width: 100%;
 }
 
 .header-seg--metrics {
@@ -3131,6 +3143,9 @@ a.btn-secondary.portal-tile .portal-tile-sub {
 .rs-stats-header__center {
   min-width: 0;
   max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .rs-header-metrics {
@@ -3142,19 +3157,102 @@ a.btn-secondary.portal-tile .portal-tile-sub {
   width: 100%;
 }
 
-.rs-header-metrics--anchored {
-  min-height: 92px;
+.rs-header-file-cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rs-header-file-cluster__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.rs-header-meta-pill--path {
+  flex: 1 1 120px;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.rs-header-file-cluster__kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: stretch;
+}
+
+.rs-header-kpi--dense {
+  flex: 1 1 56px;
+  min-width: 52px;
+  max-width: 100px;
+  padding: 3px 5px 4px;
+}
+
+.rs-header-kpi--dense .rs-header-kpi__v {
+  font-size: 15px;
+}
+
+.rs-header-resource-cluster {
+  min-height: 62px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.rs-header-resource-cluster--loading {
+  align-items: flex-end;
+}
+
+.rs-header-resource-cluster__loading {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.rs-header-resource-cluster__limits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.rs-header-resource-cluster__err {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #b91c1c;
+}
+
+.rs-code-footer {
+  flex-shrink: 0;
+  padding: 8px 12px 9px;
+  border-top: 1px solid rgba(226, 232, 240, 0.95);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-sub);
+  line-height: 1.35;
+  word-break: break-all;
+  background: rgba(248, 250, 252, 0.55);
 }
 
 .rs-header-metrics--idle {
   align-items: center;
   justify-content: center;
-  min-height: 36px;
+  min-height: 44px;
 }
 
 .rs-header-metrics__hint {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-soft);
   text-align: center;
@@ -3221,11 +3319,11 @@ a.btn-secondary.portal-tile .portal-tile-sub {
 .rs-header-meta-pill {
   display: inline-flex;
   align-items: center;
-  min-height: 22px;
+  min-height: 26px;
   max-width: 100%;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   color: #334155;
   background: rgba(241, 245, 249, 0.92);
@@ -3373,7 +3471,7 @@ a.btn-secondary.portal-tile .portal-tile-sub {
 
 .rs-header-kpi__k {
   display: block;
-  font-size: 8px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -3384,7 +3482,7 @@ a.btn-secondary.portal-tile .portal-tile-sub {
 .rs-header-kpi__v {
   display: block;
   margin-top: 2px;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 800;
   color: #0f172a;
   line-height: 1;
@@ -3392,11 +3490,11 @@ a.btn-secondary.portal-tile .portal-tile-sub {
 }
 
 .rs-header-limit {
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 800;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   color: #334155;
-  padding: 2px 7px;
+  padding: 3px 9px;
   border-radius: 999px;
   background: rgba(226, 232, 240, 0.55);
   border: 1px solid rgba(203, 213, 225, 0.65);
@@ -3412,15 +3510,21 @@ a.btn-secondary.portal-tile .portal-tile-sub {
 .rs-stats-main {
   display: grid;
   grid-template-columns: minmax(232px, 276px) minmax(400px, 1fr) minmax(300px, 400px);
-  gap: 0;
+  gap: 12px;
+  padding: 10px 12px 14px;
   min-height: 0;
   flex: 1;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.55), #f1f5f9);
 }
 
 .rs-stats-main > .rs-stats-left.left-panel {
   width: 100%;
   max-width: 100%;
-  padding: 6px 5px 8px;
+  padding: 10px 10px 12px;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: var(--shadow-xs);
 }
 
 .rs-stats-left .local-folder-tree {
@@ -3434,9 +3538,9 @@ a.btn-secondary.portal-tile .portal-tile-sub {
 
 .rs-stats-left .local-folder-tree__toggle,
 .rs-stats-left .local-folder-tree__leaf {
-  padding: 3px 5px 3px 3px;
-  gap: 4px;
-  border-radius: 6px;
+  padding: 5px 6px 5px 4px;
+  gap: 5px;
+  border-radius: 8px;
 }
 
 .local-folder-tree__name mark {
@@ -3452,7 +3556,7 @@ a.btn-secondary.portal-tile .portal-tile-sub {
 }
 
 .rs-stats-left .local-folder-tree__name {
-  font-size: 11.5px;
+  font-size: 13.5px;
   font-weight: 600;
 }
 
@@ -3523,11 +3627,14 @@ a.btn-secondary.portal-tile .portal-tile-sub {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 8px;
+  padding: 10px;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 14px;
   background:
     radial-gradient(circle at 0% -8%, rgba(15, 118, 110, 0.08), transparent 42%),
     radial-gradient(circle at 100% 0%, rgba(14, 165, 233, 0.06), transparent 40%),
     linear-gradient(180deg, #f6fbfc, #ffffff);
+  box-shadow: var(--shadow-xs);
 }
 
 .rs-stats-left {
@@ -3576,9 +3683,9 @@ a.btn-secondary.portal-tile .portal-tile-sub {
 }
 
 .rs-mini-btn {
-  min-height: 24px;
-  padding: 4px 9px;
-  font-size: 11px;
+  min-height: 28px;
+  padding: 5px 11px;
+  font-size: 12.5px;
   font-weight: 700;
 }
 
@@ -3656,7 +3763,7 @@ a.btn-secondary.portal-tile .portal-tile-sub {
 
 .rs-product-stack-title {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
   color: var(--text-main);
   letter-spacing: -0.02em;
@@ -3664,7 +3771,7 @@ a.btn-secondary.portal-tile .portal-tile-sub {
 
 .rs-product-subhead {
   margin: 0 0 6px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -3685,16 +3792,24 @@ a.btn-secondary.portal-tile .portal-tile-sub {
 }
 
 .rs-right-panel {
-  border-left: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(4px);
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 8px;
+  padding: 12px;
   min-width: 0;
   min-height: 0;
   overflow: auto;
+  box-shadow: var(--shadow-xs);
+}
+
+.rs-right-panel .status-pill,
+.rs-tree-head-pills .status-pill {
+  padding: 6px 12px;
+  font-size: 12px;
 }
 
 .rs-right-block {
@@ -3720,6 +3835,20 @@ a.btn-secondary.portal-tile .portal-tile-sub {
 .rs-code-editor-shell {
   flex: 1;
   min-height: 0;
+}
+
+.rs-stats-center .yaml-editor-shell {
+  grid-template-columns: 48px minmax(0, 1fr);
+}
+
+.rs-stats-center .yaml-editor {
+  font-size: 14px;
+  line-height: 24px;
+  padding: 16px 16px;
+}
+
+.rs-stats-center .yaml-gutter {
+  font-size: 12px;
 }
 
 .rs-summary-strip {
@@ -3970,6 +4099,10 @@ a.btn-secondary.portal-tile .portal-tile-sub {
   flex-direction: column;
 }
 
+.rs-tree-section .block-title {
+  font-size: 14px;
+}
+
 .rs-tree-head {
   align-items: center;
 }
@@ -3995,13 +4128,13 @@ a.btn-secondary.portal-tile .portal-tile-sub {
 
 .rs-tree-search input {
   width: 100%;
-  min-height: 30px;
+  min-height: 32px;
   border-radius: 8px;
   border: 1px solid rgba(203, 213, 225, 0.9);
   background: #fff;
   color: var(--text-main);
-  padding: 6px 10px;
-  font-size: 12px;
+  padding: 7px 11px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -4454,7 +4587,7 @@ a.btn-secondary.portal-tile .portal-tile-sub {
 
 .rs-right-muted {
   margin: 10px 0 0;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-soft);
   line-height: 1.45;
 }
@@ -4499,8 +4632,7 @@ a.btn-secondary.portal-tile .portal-tile-sub {
 
   .rs-right-panel {
     grid-column: 1 / -1;
-    border-left: none;
-    border-top: 1px solid var(--line);
+    border: 1px solid var(--line);
     max-height: 44vh;
   }
 }

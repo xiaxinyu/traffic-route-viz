@@ -1,6 +1,12 @@
+import { useMemo } from "react";
+
+import { findFileAtRelativePath } from "../../domain/fileTreeQueries";
 import { ResourceStatsCodePanel } from "./components/ResourceStatsCodePanel";
 import { ResourceStatsHeader } from "./components/ResourceStatsHeader";
-import { ResourceStatsHeaderMetrics } from "./components/ResourceStatsHeaderMetrics";
+import {
+  ResourceStatsHeaderFileCluster,
+  ResourceStatsHeaderResourceCluster,
+} from "./components/ResourceStatsHeaderMetrics";
 import { ResourceStatsLeftPanel } from "./components/ResourceStatsLeftPanel";
 import { ResourceStatsRightPanel } from "./components/ResourceStatsRightPanel";
 import { useLocalFolderScan } from "./hooks/useLocalFolderScan";
@@ -28,16 +34,31 @@ export function ResourceStatsHome() {
     summaryLine,
   } = useLocalFolderScan();
 
+  const selectedFile = useMemo(() => {
+    if (scan.phase !== "ready" || !scan.root || !selectedPath) return null;
+    return findFileAtRelativePath(scan.root, selectedPath)?.file ?? null;
+  }, [scan.phase, scan.root, selectedPath]);
+
   return (
     <div className="app-shell" data-testid="resource-stats-home">
       <ResourceStatsHeader
+        fileCluster={
+          summaryLine ? (
+            <ResourceStatsHeaderFileCluster
+              valuesStatsState={valuesStatsState}
+              gitReposState={gitReposState}
+              selectedPath={selectedPath}
+            />
+          ) : undefined
+        }
         centerMetrics={
-          <ResourceStatsHeaderMetrics
-            summaryLine={summaryLine}
-            valuesStatsState={valuesStatsState}
-            gitReposState={gitReposState}
-            selectedPath={selectedPath}
-          />
+          summaryLine ? (
+            <ResourceStatsHeaderResourceCluster valuesStatsState={valuesStatsState} />
+          ) : (
+            <div className="rs-header-metrics rs-header-metrics--idle" data-testid="resource-stats-header-metrics">
+              <span className="rs-header-metrics__hint">在左侧选择文件夹后，此处显示汇总指标</span>
+            </div>
+          )
         }
       />
 
@@ -68,7 +89,7 @@ export function ResourceStatsHome() {
         </aside>
 
         <div className="flow-stage rs-stats-code-stage rs-stats-center">
-          <ResourceStatsCodePanel selectedPath={selectedPath} preview={preview} />
+          <ResourceStatsCodePanel selectedPath={selectedPath} selectedFile={selectedFile} preview={preview} />
         </div>
 
         <ResourceStatsRightPanel

@@ -19,18 +19,24 @@ export function LocalFolderTreeView({
   onSelectLeaf,
   highlightTerm,
 }: Props) {
+  const topLevel =
+    root.children && root.children.length > 0 ? root.children : [root];
+
   return (
     <div className="local-folder-tree">
       <ul className="local-folder-tree__root">
-        <LocalFolderTreeRow
-          node={root}
-          depth={0}
-          expanded={expanded}
-          onToggle={onToggle}
-          selectedPath={selectedPath}
-          onSelectLeaf={onSelectLeaf}
-          highlightTerm={highlightTerm}
-        />
+        {topLevel.map((node) => (
+          <LocalFolderTreeRow
+            key={node.relativePath}
+            node={node}
+            depth={0}
+            expanded={expanded}
+            onToggle={onToggle}
+            selectedPath={selectedPath}
+            onSelectLeaf={onSelectLeaf}
+            highlightTerm={highlightTerm}
+          />
+        ))}
       </ul>
     </div>
   );

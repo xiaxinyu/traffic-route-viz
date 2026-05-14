@@ -261,7 +261,7 @@ export function ResourceStatsRightPanel({
   const expandAll = () => setCollapsed(new Set());
 
   return (
-    <aside className="rs-right-panel" aria-label="Helm 与 Git 解析明细">
+    <aside className="rs-right-panel" aria-label="Git 与 Helm 详情">
       <section className="left-panel-block grow rs-right-block rs-right-unified">
         <div className="rs-right-topbar">
           <div className="rs-right-health" aria-label="解析健康度">
@@ -283,16 +283,16 @@ export function ResourceStatsRightPanel({
         </div>
 
         <div className="rs-right-global-status" data-testid="resource-stats-git-remote">
-          {gitReposState.kind === "loading" ? <p className="rs-right-muted">正在解析 Git 远程地址…</p> : null}
-          {gitReposState.kind === "none" ? <p className="rs-right-muted">未发现 .git/config（或未导入该文件）</p> : null}
-          {helmLoading ? <p className="rs-right-muted">正在扫描 values / Chart，并计算加权资源总量…</p> : null}
+          {gitReposState.kind === "loading" ? <p className="rs-right-muted">Git 信息加载中…</p> : null}
+          {gitReposState.kind === "none" ? <p className="rs-right-muted">未检出本地 Git 配置</p> : null}
+          {helmLoading ? <p className="rs-right-muted">扫描 values / Chart…</p> : null}
           {valsKind === "error" ? (
             <p className="rs-right-muted" role="alert">
               统计失败：{valuesStatsState.message}
             </p>
           ) : null}
           {valsKind === "ready" && noValuesAnywhere ? (
-            <p className="rs-right-muted">未发现 values*.yaml；导入 Helm 目录后将在对应组下展示。</p>
+            <p className="rs-right-muted">未发现 values*.yaml；导入含 Helm 的目录后在此展示。</p>
           ) : null}
         </div>
 
