@@ -1,6 +1,3 @@
-import { useMemo } from "react";
-
-import { findFileAtRelativePath } from "../../domain/fileTreeQueries";
 import { ResourceStatsCodePanel } from "./components/ResourceStatsCodePanel";
 import { ResourceStatsHeader } from "./components/ResourceStatsHeader";
 import { ResourceStatsHeaderSummaryCluster } from "./components/ResourceStatsHeaderMetrics";
@@ -13,8 +10,6 @@ export function ResourceStatsHome() {
     inputRef,
     scan,
     displayRoot,
-    showDotGit,
-    setShowDotGit,
     expanded,
     selectedPath,
     preview,
@@ -30,11 +25,6 @@ export function ResourceStatsHome() {
     selectLeaf,
     summaryLine,
   } = useLocalFolderScan();
-
-  const selectedFile = useMemo(() => {
-    if (scan.phase !== "ready" || !scan.root || !selectedPath) return null;
-    return findFileAtRelativePath(scan.root, selectedPath)?.file ?? null;
-  }, [scan.phase, scan.root, selectedPath]);
 
   return (
     <div className="app-shell" data-testid="resource-stats-home">
@@ -69,8 +59,6 @@ export function ResourceStatsHome() {
             onPickFolder={pickFolder}
             scan={scan}
             displayRoot={displayRoot}
-            showDotGit={showDotGit}
-            onShowDotGitChange={setShowDotGit}
             expanded={expanded}
             selectedPath={selectedPath}
             onToggle={togglePath}
@@ -81,7 +69,16 @@ export function ResourceStatsHome() {
         </aside>
 
         <div className="flow-stage rs-stats-code-stage rs-stats-center">
-          <ResourceStatsCodePanel selectedPath={selectedPath} selectedFile={selectedFile} preview={preview} />
+          <div className="rs-stage-section-head">
+            <div className="rs-stage-section-head__title-wrap">
+              <h2 className="rs-stage-section-head__title">文件预览</h2>
+              <p className="rs-stage-section-head__desc">从左侧目录树选择文件，定位资源定义与配置细节。</p>
+            </div>
+            <span className="rs-stage-section-head__tag" title={selectedPath ?? "未选择文件"}>
+              {selectedPath ?? "未选择文件"}
+            </span>
+          </div>
+          <ResourceStatsCodePanel selectedPath={selectedPath} preview={preview} />
         </div>
 
         <ResourceStatsRightPanel

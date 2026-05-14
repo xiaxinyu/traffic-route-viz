@@ -263,6 +263,12 @@ export function ResourceStatsRightPanel({
   return (
     <aside className="rs-right-panel" aria-label="Git 与 Helm 详情">
       <section className="left-panel-block grow rs-right-block rs-right-unified">
+        <div className="rs-right-section-head">
+          <div className="rs-right-section-head__title-wrap">
+            <h2 className="rs-right-section-head__title">资源明细</h2>
+            <p className="rs-right-section-head__desc">按仓库分组展示 Git、Chart 与 workload 资源画像。</p>
+          </div>
+        </div>
         <div className="rs-right-topbar">
           <div className="rs-right-health" aria-label="解析健康度">
             <span className="status-pill">组 {stacks.filter((s) => s.repos.length > 0 || s.dirs.length > 0).length}</span>

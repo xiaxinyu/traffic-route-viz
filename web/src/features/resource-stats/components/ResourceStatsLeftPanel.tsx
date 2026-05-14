@@ -1,8 +1,8 @@
 import { useMemo, useState, type ChangeEvent, type RefObject } from "react";
 
+import { TRV_ICONS } from "../../../app/trvIcons";
 import type { FileTreeNode } from "../../../domain/fileTreeTypes";
 import type { LocalFolderScanModel } from "../hooks/useLocalFolderScan";
-import { LOCAL_FOLDER_COPY } from "../localFolderCopy";
 
 import { LocalFolderToolbar } from "./LocalFolderToolbar";
 import { LocalFolderTreeView } from "./LocalFolderTreeView";
@@ -13,8 +13,6 @@ type Props = {
   onPickFolder: () => void;
   scan: LocalFolderScanModel;
   displayRoot: FileTreeNode | null;
-  showDotGit: boolean;
-  onShowDotGitChange: (v: boolean) => void;
   expanded: Set<string>;
   selectedPath: string | null;
   onToggle: (relativePath: string) => void;
@@ -23,24 +21,16 @@ type Props = {
   onSelectLeaf: (node: FileTreeNode) => void;
 };
 
-type TreeCounters = { dirs: number; files: number };
+function Icon({ d }: { d: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="trv-icon trv-icon--sm">
+      <path d={d} fill="currentColor" />
+    </svg>
+  );
+}
 
 function norm(value: string): string {
   return value.trim().toLowerCase();
-}
-
-function countTree(node: FileTreeNode): TreeCounters {
-  if (!node.children?.length) {
-    return { dirs: 0, files: node.file ? 1 : 0 };
-  }
-  let dirs = 1;
-  let files = 0;
-  for (const child of node.children) {
-    const c = countTree(child);
-    dirs += c.dirs;
-    files += c.files;
-  }
-  return { dirs, files };
 }
 
 function filterTreeByQuery(root: FileTreeNode, query: string): FileTreeNode | null {
@@ -83,8 +73,6 @@ export function ResourceStatsLeftPanel({
   onPickFolder,
   scan,
   displayRoot,
-  showDotGit,
-  onShowDotGitChange,
   expanded,
   selectedPath,
   onToggle,
@@ -101,11 +89,6 @@ export function ResourceStatsLeftPanel({
     return filterTreeByQuery(displayRoot, query);
   }, [displayRoot, query]);
 
-  const counters = useMemo(() => {
-    if (!visibleRoot) return { dirs: 0, files: 0 };
-    return countTree(visibleRoot);
-  }, [visibleRoot]);
-
   const effectiveExpanded = useMemo(() => {
     if (!visibleRoot) return expanded;
     if (!query.trim()) return expanded;
@@ -117,9 +100,13 @@ export function ResourceStatsLeftPanel({
       <div className="rs-tree-section">
         <div className="block-title-row rs-tree-head">
           <div className="block-title">目录树</div>
-          <div className="rs-tree-head-pills" aria-label="目录树统计">
-            <span className="status-pill">{counters.dirs} 目录</span>
-            <span className="status-pill">{counters.files} 文件</span>
+          <div className="rs-tree-head-actions">
+            <LocalFolderToolbar
+              inputRef={inputRef}
+              onInputChange={onInputChange}
+              onPickFolder={onPickFolder}
+              compact
+            />
           </div>
         </div>
 
@@ -133,11 +120,23 @@ export function ResourceStatsLeftPanel({
             />
           </label>
           <div className="rs-tree-actions">
-            <button type="button" className="btn-secondary rs-mini-btn" onClick={onExpandAll}>
-              展开全部
+            <button
+              type="button"
+              className="btn-secondary rs-icon-btn"
+              onClick={onExpandAll}
+              title="展开全部"
+              aria-label="展开全部"
+            >
+              <Icon d={TRV_ICONS.plus} />
             </button>
-            <button type="button" className="btn-secondary rs-mini-btn" onClick={onCollapseToRoot}>
-              收起
+            <button
+              type="button"
+              className="btn-secondary rs-icon-btn"
+              onClick={onCollapseToRoot}
+              title="收起"
+              aria-label="收起"
+            >
+              <Icon d={TRV_ICONS.minus} />
             </button>
           </div>
         </div>
@@ -155,28 +154,12 @@ export function ResourceStatsLeftPanel({
           ) : hasTree && !visibleRoot ? (
             <div className="empty-box rs-tree-empty">未匹配到目录或文件，请调整搜索关键词。</div>
           ) : (
-            <div className="empty-box rs-tree-empty">
-              {LOCAL_FOLDER_COPY.emptyHintPrefix} <code className="local-folder__code">RTS-ROLLOUT</code>
-              {LOCAL_FOLDER_COPY.emptyHintSuffix} <code className="local-folder__code">master-data</code>
-              {LOCAL_FOLDER_COPY.emptyHintAnd}
-              <code className="local-folder__code">stock-physical</code>
-              {LOCAL_FOLDER_COPY.emptyHintEnd}
+            <div className="empty-box rs-tree-empty rs-tree-empty--minimal">
+              请选择文件夹后查看目录树
             </div>
           )}
         </div>
 
-        <div className="rs-tree-footer">
-          <LocalFolderToolbar inputRef={inputRef} onInputChange={onInputChange} onPickFolder={onPickFolder} />
-          <label className="rs-dotgit-toggle rs-dotgit-toggle--footer">
-            <input
-              type="checkbox"
-              checked={showDotGit}
-              onChange={(e) => onShowDotGitChange(e.target.checked)}
-              data-testid="resource-stats-show-dotgit"
-            />
-            <span>显示 .git 目录</span>
-          </label>
-        </div>
       </div>
     </section>
   );

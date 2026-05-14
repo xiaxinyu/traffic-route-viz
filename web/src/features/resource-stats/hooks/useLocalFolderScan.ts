@@ -84,7 +84,6 @@ export function useLocalFolderScan() {
     fileCount: 0,
     errorMessage: null,
   });
-  const [showDotGit, setShowDotGit] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [preview, setPreview] = useState<CodePreviewState>({ status: "idle" });
@@ -93,8 +92,8 @@ export function useLocalFolderScan() {
 
   const displayRoot = useMemo(() => {
     if (scan.phase !== "ready" || !scan.root) return null;
-    return filterDotGitFromTree(scan.root, showDotGit);
-  }, [scan.phase, scan.root, showDotGit]);
+    return filterDotGitFromTree(scan.root, false);
+  }, [scan.phase, scan.root]);
 
   const pickFolder = useCallback(() => {
     inputRef.current?.click();
@@ -109,13 +108,13 @@ export function useLocalFolderScan() {
       setGitReposState({ kind: "idle" });
       setValuesStatsState({ kind: "idle" });
       if (next.phase === "ready" && next.root) {
-        setExpanded(defaultExpandedPaths(filterDotGitFromTree(next.root, showDotGit)));
+        setExpanded(defaultExpandedPaths(filterDotGitFromTree(next.root, false)));
       } else {
         setExpanded(new Set());
       }
       ev.target.value = "";
     },
-    [showDotGit],
+    [],
   );
 
   useEffect(() => {
@@ -222,15 +221,15 @@ export function useLocalFolderScan() {
 
   const expandAllDirectories = useCallback(() => {
     if (scan.phase !== "ready" || !scan.root) return;
-    const dr = filterDotGitFromTree(scan.root, showDotGit);
+    const dr = filterDotGitFromTree(scan.root, false);
     setExpanded(new Set(collectDirectoryRelativePaths(dr)));
-  }, [scan.phase, scan.root, showDotGit]);
+  }, [scan.phase, scan.root]);
 
   const collapseToRootOnly = useCallback(() => {
     if (scan.phase !== "ready" || !scan.root) return;
-    const dr = filterDotGitFromTree(scan.root, showDotGit);
+    const dr = filterDotGitFromTree(scan.root, false);
     setExpanded(defaultExpandedPaths(dr));
-  }, [scan.phase, scan.root, showDotGit]);
+  }, [scan.phase, scan.root]);
 
   const selectLeaf = useCallback((node: FileTreeNode) => {
     if (!node.file) return;
@@ -270,8 +269,6 @@ export function useLocalFolderScan() {
     inputRef,
     scan,
     displayRoot,
-    showDotGit,
-    setShowDotGit,
     expanded,
     selectedPath,
     preview,
