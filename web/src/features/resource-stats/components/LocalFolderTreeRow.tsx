@@ -28,6 +28,19 @@ function IconFileSmall() {
   );
 }
 
+function highlightName(name: string, term: string): { before: string; match: string; after: string } | null {
+  const t = term.trim().toLowerCase();
+  if (!t) return null;
+  const lower = name.toLowerCase();
+  const idx = lower.indexOf(t);
+  if (idx < 0) return null;
+  return {
+    before: name.slice(0, idx),
+    match: name.slice(idx, idx + term.length),
+    after: name.slice(idx + term.length),
+  };
+}
+
 type Props = {
   node: FileTreeNode;
   depth: number;
@@ -35,6 +48,7 @@ type Props = {
   onToggle: (relativePath: string) => void;
   selectedPath: string | null;
   onSelectLeaf?: (node: FileTreeNode) => void;
+  highlightTerm?: string;
 };
 
 export function LocalFolderTreeRow({
@@ -44,11 +58,13 @@ export function LocalFolderTreeRow({
   onToggle,
   selectedPath,
   onSelectLeaf,
+  highlightTerm,
 }: Props) {
   const isDir = !!node.children?.length;
   const key = node.relativePath;
   const open = expanded.has(key);
   const isActive = !isDir && selectedPath === key;
+  const hit = highlightName(node.name, highlightTerm ?? "");
 
   return (
     <li className="local-folder-tree__item" style={{ "--depth": depth } as CSSProperties}>
@@ -56,7 +72,7 @@ export function LocalFolderTreeRow({
         {isDir ? (
           <button
             type="button"
-            className="local-folder-tree__toggle"
+            className={`local-folder-tree__toggle${hit ? " local-folder-tree__toggle--hit" : ""}`}
             aria-expanded={open}
             onClick={() => onToggle(key)}
             title={open ? "折叠" : "展开"}
@@ -65,18 +81,38 @@ export function LocalFolderTreeRow({
               {open ? "▾" : "▸"}
             </span>
             <IconFolderSmall />
-            <span className="local-folder-tree__name">{node.name}</span>
+            <span className="local-folder-tree__name">
+              {hit ? (
+                <>
+                  {hit.before}
+                  <mark>{hit.match}</mark>
+                  {hit.after}
+                </>
+              ) : (
+                node.name
+              )}
+            </span>
           </button>
         ) : (
           <button
             type="button"
-            className={`local-folder-tree__leaf${isActive ? " local-folder-tree__leaf--active" : ""}`}
+            className={`local-folder-tree__leaf${isActive ? " local-folder-tree__leaf--active" : ""}${hit ? " local-folder-tree__leaf--hit" : ""}`}
             onClick={() => onSelectLeaf?.(node)}
             title="在右侧预览文件内容"
           >
             <span className="local-folder-tree__spacer" aria-hidden="true" />
             <IconFileSmall />
-            <span className="local-folder-tree__name">{node.name}</span>
+            <span className="local-folder-tree__name">
+              {hit ? (
+                <>
+                  {hit.before}
+                  <mark>{hit.match}</mark>
+                  {hit.after}
+                </>
+              ) : (
+                node.name
+              )}
+            </span>
           </button>
         )}
       </div>
@@ -91,6 +127,7 @@ export function LocalFolderTreeRow({
               onToggle={onToggle}
               selectedPath={selectedPath}
               onSelectLeaf={onSelectLeaf}
+              highlightTerm={highlightTerm}
             />
           ))}
         </ul>

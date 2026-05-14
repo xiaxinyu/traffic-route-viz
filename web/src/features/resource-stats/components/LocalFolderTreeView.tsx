@@ -8,9 +8,17 @@ type Props = {
   onToggle: (relativePath: string) => void;
   selectedPath: string | null;
   onSelectLeaf: (node: FileTreeNode) => void;
+  highlightTerm?: string;
 };
 
-export function LocalFolderTreeView({ root, expanded, onToggle, selectedPath, onSelectLeaf }: Props) {
+export function LocalFolderTreeView({
+  root,
+  expanded,
+  onToggle,
+  selectedPath,
+  onSelectLeaf,
+  highlightTerm,
+}: Props) {
   return (
     <div className="local-folder-tree">
       <ul className="local-folder-tree__root">
@@ -21,6 +29,7 @@ export function LocalFolderTreeView({ root, expanded, onToggle, selectedPath, on
           onToggle={onToggle}
           selectedPath={selectedPath}
           onSelectLeaf={onSelectLeaf}
+          highlightTerm={highlightTerm}
         />
       </ul>
     </div>

@@ -22,6 +22,8 @@ export function ResourceStatsHome() {
     pickFolder,
     onInputChange,
     togglePath,
+    expandAllDirectories,
+    collapseToRootOnly,
     selectLeaf,
     summaryLine,
   } = useLocalFolderScan();
@@ -34,6 +36,7 @@ export function ResourceStatsHome() {
             summaryLine={summaryLine}
             valuesStatsState={valuesStatsState}
             gitReposState={gitReposState}
+            selectedPath={selectedPath}
           />
         }
       />
@@ -58,6 +61,8 @@ export function ResourceStatsHome() {
             expanded={expanded}
             selectedPath={selectedPath}
             onToggle={togglePath}
+            onExpandAll={expandAllDirectories}
+            onCollapseToRoot={collapseToRootOnly}
             onSelectLeaf={selectLeaf}
           />
         </aside>
@@ -71,6 +76,7 @@ export function ResourceStatsHome() {
           activeGitRepoRoot={activeGitRepoRoot}
           gitReposOrdered={gitReposOrdered}
           valuesStatsState={valuesStatsState}
+          selectedPath={selectedPath}
         />
       </div>
     </div>
