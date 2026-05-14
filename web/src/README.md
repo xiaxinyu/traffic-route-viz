@@ -5,7 +5,7 @@
 | 目录 | 职责 |
 |------|------|
 | **`app/`** | 应用入口与页面组合：`App.tsx`（`ReactFlowProvider` + `AuthGate`）、`AppInner.tsx`（主界面逻辑）、`nodeTypes`、`sampleYaml`、`trvIcons`、UI 偏好常量等。 |
-| **`features/`** | 按业务功能拆分，可继续新增子目录（如 `features/<feature>/`）。当前：`auth/`、`diagram/`（画布节点与工具条）、`route-merge/`（路由合并规则引擎 + AI）。 |
+| **`features/`** | 按业务功能拆分，可继续新增子目录（如 `features/<feature>/`）。当前：`auth/`、`diagram/`（画布节点与工具条）、`route-merge/`（路由合并规则引擎 + AI）、`resource-stats/`（资源统计：本地目录扫描与树视图）。 |
 | **`domain/`** | 与 UI 解耦的领域逻辑：K8s 解析、构图、`diagramPersist`、导出、`graphViewState`、运行时配置等；**单元测试与实现同目录**（`*.test.ts`）。 |
 
 根目录保留 **`App.tsx`**（`export { default } from "./app/App"`）与 **`main.tsx`**，便于 Vite/工具链入口不变。

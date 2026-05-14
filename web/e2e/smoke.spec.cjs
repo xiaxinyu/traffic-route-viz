@@ -13,7 +13,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("smoke: loads app and can refresh topology", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#/viz");
 
   await expect(page.getByText("Traffic Route Viz")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByTestId("import-dropzone")).toBeVisible({ timeout: 20_000 });
@@ -38,7 +38,7 @@ test("smoke: loads app and can refresh topology", async ({ page }) => {
 });
 
 test("yaml popout: open edit close syncs content", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#/viz");
   await expect(page.getByText("Traffic Route Viz")).toBeVisible({ timeout: 20_000 });
 
   await page.getByRole("button", { name: "YAML", exact: true }).first().click();
@@ -58,7 +58,7 @@ test("yaml popout: open edit close syncs content", async ({ page }) => {
 });
 
 test("yaml editor: inline actions expose parse clear and restore", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#/viz");
   await expect(page.getByText("Traffic Route Viz")).toBeVisible({ timeout: 20_000 });
 
   await page.getByRole("button", { name: "YAML", exact: true }).first().click();
