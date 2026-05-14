@@ -1,14 +1,11 @@
+import type { ReactNode } from "react";
 import { formatCpuFromMilli, formatMemoryFromBytes } from "../../../domain/k8sQuantity";
 import type { GitReposState, ValuesStatsState } from "../hooks/useLocalFolderScan";
 
-type FileClusterProps = {
+type SummaryClusterProps = {
   valuesStatsState: ValuesStatsState;
   gitReposState: GitReposState;
   selectedPath: string | null;
-};
-
-type ResourceClusterProps = {
-  valuesStatsState: ValuesStatsState;
 };
 
 function gitRepoCountDisplay(state: GitReposState): { text: string; title?: string } {
@@ -24,79 +21,30 @@ function gitRepoCountDisplay(state: GitReposState): { text: string; title?: stri
   }
 }
 
-/** 顶栏左侧：状态 + 当前路径 + Git / Chart / Workload 规模 */
-export function ResourceStatsHeaderFileCluster({
+/** 顶栏中部：状态、路径、Git/Chart/Workload 与加权资源合计（单条汇总区） */
+export function ResourceStatsHeaderSummaryCluster({
   valuesStatsState,
   gitReposState,
   selectedPath,
-}: FileClusterProps) {
+}: SummaryClusterProps) {
   const repoDisp = gitRepoCountDisplay(gitReposState);
   const isReady = valuesStatsState.kind === "ready";
   const inProgress = valuesStatsState.kind === "idle" || valuesStatsState.kind === "loading";
   const isErr = valuesStatsState.kind === "error";
   const statusText = isErr ? "异常" : isReady ? "就绪" : inProgress ? "扫描中" : "—";
 
-  return (
-    <div className="rs-header-file-cluster" data-testid="resource-stats-header-file-cluster">
-      <div className="rs-header-file-cluster__top">
-        <span
-          className={`rs-header-meta-pill rs-header-meta-pill--state rs-header-meta-pill--${isReady ? "ok" : inProgress ? "scan" : "err"}`}
-        >
-          状态 {statusText}
-        </span>
-        {selectedPath ? (
-          <span className="rs-header-meta-pill rs-header-meta-pill--path" title={selectedPath}>
-            {selectedPath}
-          </span>
-        ) : null}
-      </div>
-      <div className="rs-header-file-cluster__kpis" aria-label="Git、Chart 与 Workload 数量">
-        <div className="rs-header-kpi rs-header-kpi--dense" title={repoDisp.title}>
-          <span className="rs-header-kpi__k">Git</span>
-          <strong className="rs-header-kpi__v">{repoDisp.text}</strong>
-        </div>
-        <div className="rs-header-kpi rs-header-kpi--dense">
-          <span className="rs-header-kpi__k">Chart</span>
-          <strong className="rs-header-kpi__v">{isReady ? valuesStatsState.stats.summary.chartCount : "—"}</strong>
-        </div>
-        <div className="rs-header-kpi rs-header-kpi--dense rs-header-kpi--accent">
-          <span className="rs-header-kpi__k">Workload</span>
-          <strong className="rs-header-kpi__v">
-            {isReady ? valuesStatsState.stats.summary.resourceEntryCount : "—"}
-          </strong>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** 顶栏中部：按副本加权后的 CPU / 内存合计 */
-export function ResourceStatsHeaderResourceCluster({ valuesStatsState }: ResourceClusterProps) {
+  let limitsBlock: ReactNode;
   if (valuesStatsState.kind === "error") {
-    return (
-      <div className="rs-header-resource-cluster" data-testid="resource-stats-header-metrics">
-        <p className="rs-header-resource-cluster__err" role="alert">
-          统计失败：{valuesStatsState.message}
-        </p>
-      </div>
+    limitsBlock = (
+      <p className="rs-header-resource-cluster__err rs-header-resource-cluster__err--inline" role="alert">
+        统计失败：{valuesStatsState.message}
+      </p>
     );
-  }
-
-  const isReady = valuesStatsState.kind === "ready";
-  const loading = valuesStatsState.kind === "idle" || valuesStatsState.kind === "loading";
-
-  if (loading) {
-    return (
-      <div className="rs-header-resource-cluster rs-header-resource-cluster--loading" data-testid="resource-stats-header-metrics">
-        <span className="rs-header-resource-cluster__loading">Helm 汇总计算中…</span>
-      </div>
-    );
-  }
-
-  const s = valuesStatsState.stats.summary;
-
-  return (
-    <div className="rs-header-resource-cluster" data-testid="resource-stats-header-metrics" aria-label="资源统计">
+  } else if (inProgress) {
+    limitsBlock = <span className="rs-header-resource-cluster__loading">Helm 汇总计算中…</span>;
+  } else {
+    const s = valuesStatsState.stats.summary;
+    limitsBlock = (
       <div className="rs-header-resource-cluster__limits" aria-label="CPU 与内存合计">
         <span className="rs-header-limit">
           req.cpu {isReady && s.weightedHasRequestsCpu ? formatCpuFromMilli(s.weightedRequestsCpuMillisTotal) : "—"}
@@ -115,6 +63,50 @@ export function ResourceStatsHeaderResourceCluster({ valuesStatsState }: Resourc
             （部分未计入）
           </span>
         ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="rs-header-summary-cluster" data-testid="resource-stats-header-metrics" aria-label="资源统计汇总">
+      <div className="rs-header-summary-cluster__strip">
+        <div className="rs-header-summary-cluster__group rs-header-summary-cluster__group--status">
+          <span
+            className={`rs-header-meta-pill rs-header-meta-pill--state rs-header-meta-pill--${isReady ? "ok" : inProgress ? "scan" : "err"}`}
+          >
+            状态 {statusText}
+          </span>
+          {selectedPath ? (
+            <span className="rs-header-meta-pill rs-header-meta-pill--path" title={selectedPath}>
+              {selectedPath}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="rs-header-summary-cluster__divider" aria-hidden="true" />
+
+        <div className="rs-header-summary-cluster__group rs-header-summary-cluster__group--scale" aria-label="Git、Chart 与 Workload 数量">
+          <div className="rs-header-file-cluster__kpis">
+            <div className="rs-header-kpi rs-header-kpi--dense" title={repoDisp.title}>
+              <span className="rs-header-kpi__k">Git</span>
+              <strong className="rs-header-kpi__v">{repoDisp.text}</strong>
+            </div>
+            <div className="rs-header-kpi rs-header-kpi--dense">
+              <span className="rs-header-kpi__k">Chart</span>
+              <strong className="rs-header-kpi__v">{isReady ? valuesStatsState.stats.summary.chartCount : "—"}</strong>
+            </div>
+            <div className="rs-header-kpi rs-header-kpi--dense rs-header-kpi--accent">
+              <span className="rs-header-kpi__k">Workload</span>
+              <strong className="rs-header-kpi__v">
+                {isReady ? valuesStatsState.stats.summary.resourceEntryCount : "—"}
+              </strong>
+            </div>
+          </div>
+        </div>
+
+        <div className="rs-header-summary-cluster__divider" aria-hidden="true" />
+
+        <div className="rs-header-summary-cluster__group rs-header-summary-cluster__group--resources">{limitsBlock}</div>
       </div>
     </div>
   );

@@ -1,13 +1,11 @@
 import type { ReactNode } from "react";
 
 type Props = {
-  /** 顶栏左侧品牌区下方：规模与状态 */
-  fileCluster?: ReactNode;
-  /** 顶栏中部：加权资源合计 */
+  /** 顶栏中部：汇总指标（状态、规模、资源合计） */
   centerMetrics: ReactNode;
 };
 
-export function ResourceStatsHeader({ fileCluster, centerMetrics }: Props) {
+export function ResourceStatsHeader({ centerMetrics }: Props) {
   return (
     <header className="app-header rs-stats-header">
       <div className="header-app-row rs-stats-header__row">
@@ -19,11 +17,11 @@ export function ResourceStatsHeader({ fileCluster, centerMetrics }: Props) {
                 工作台
               </a>
             </div>
+            <p className="rs-stats-header__slogan">本地目录、Git 与 Helm 资源一览</p>
           </div>
-          {fileCluster ? <div className="rs-stats-header__brand-slot">{fileCluster}</div> : null}
         </div>
 
-        <div className="header-seg header-seg--metrics rs-stats-header__center" aria-label="加权资源合计">
+        <div className="header-seg header-seg--metrics rs-stats-header__center" aria-label="资源统计汇总">
           {centerMetrics}
         </div>
 

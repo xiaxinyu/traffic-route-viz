@@ -3,10 +3,7 @@ import { useMemo } from "react";
 import { findFileAtRelativePath } from "../../domain/fileTreeQueries";
 import { ResourceStatsCodePanel } from "./components/ResourceStatsCodePanel";
 import { ResourceStatsHeader } from "./components/ResourceStatsHeader";
-import {
-  ResourceStatsHeaderFileCluster,
-  ResourceStatsHeaderResourceCluster,
-} from "./components/ResourceStatsHeaderMetrics";
+import { ResourceStatsHeaderSummaryCluster } from "./components/ResourceStatsHeaderMetrics";
 import { ResourceStatsLeftPanel } from "./components/ResourceStatsLeftPanel";
 import { ResourceStatsRightPanel } from "./components/ResourceStatsRightPanel";
 import { useLocalFolderScan } from "./hooks/useLocalFolderScan";
@@ -42,18 +39,13 @@ export function ResourceStatsHome() {
   return (
     <div className="app-shell" data-testid="resource-stats-home">
       <ResourceStatsHeader
-        fileCluster={
+        centerMetrics={
           summaryLine ? (
-            <ResourceStatsHeaderFileCluster
+            <ResourceStatsHeaderSummaryCluster
               valuesStatsState={valuesStatsState}
               gitReposState={gitReposState}
               selectedPath={selectedPath}
             />
-          ) : undefined
-        }
-        centerMetrics={
-          summaryLine ? (
-            <ResourceStatsHeaderResourceCluster valuesStatsState={valuesStatsState} />
           ) : (
             <div className="rs-header-metrics rs-header-metrics--idle" data-testid="resource-stats-header-metrics">
               <span className="rs-header-metrics__hint">在左侧选择文件夹后，此处显示汇总指标</span>
