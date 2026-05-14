@@ -28,6 +28,7 @@
 - 画布操作条：`web/src/features/diagram/DiagramActions.tsx`
 - 路由合并 v1 规则引擎：`web/src/features/route-merge/routeMergeRecommend.ts`；展示由 `web/src/features/route-merge/RouteMergeHelpTrigger.tsx` + `useRouteMergeAnalysis.ts`（「?」浮层）。
 - 路由合并 AI：`web/src/features/route-merge/`（`RouteMergeAiModal.tsx`、`useRouteMergeAi.ts`、`routeMergeAi.ts`、`routeMergeAiPrompt.ts` 等）
+- 资源统计（本地目录树）：`web/src/features/resource-stats/`（`hooks/useLocalFolderScan.ts`、`ResourceStatsHeader.tsx`、`ResourceStatsLeftPanel.tsx`、`ResourceStatsCodePanel.tsx` 等）；领域：`web/src/domain/buildFileTree.ts`、`fileTreeQueries.ts`、`fileTreeExpansion.ts`、`formatByteSize.ts`、`fileSummary.ts`；页面壳 `web/src/app/ResourceStatsHome.tsx` 仅 re-export。
 
 ## 常用命令
 

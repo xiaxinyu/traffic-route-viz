@@ -13,7 +13,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("export png: can download full-graph image", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#/viz");
 
   await page.getByRole("button", { name: "刷新拓扑" }).click();
   await expect(page.locator(".react-flow").first()).toBeVisible();

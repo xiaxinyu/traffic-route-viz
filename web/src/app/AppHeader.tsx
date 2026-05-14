@@ -112,9 +112,14 @@ export function AppHeader(props: {
       <div className="header-app-row">
         <div className="header-seg header-seg--brand">
           <div className="header-title-wrap">
-            <h1 title="专业化流量拓扑工作台：导入、解析、筛选、定位、导出一体化">
-              Traffic Route Viz
-            </h1>
+            <div className="header-title-row">
+              <h1 title="专业化流量拓扑工作台：导入、解析、筛选、定位、导出一体化">
+                Traffic Route Viz
+              </h1>
+              <a className="header-portal-link" href="#/" title="返回应用入口">
+                门户
+              </a>
+            </div>
             <p className="header-tagline">
               专业化流量拓扑工作台：导入、解析、筛选、定位、导出一体化
             </p>

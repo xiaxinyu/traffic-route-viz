@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("edge editing: auto edge can be selected and deleted", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#/viz");
 
   await page.getByRole("button", { name: "刷新拓扑" }).click();
   await expect(page.locator(".react-flow").first()).toBeVisible();
@@ -34,7 +34,7 @@ test("edge editing: auto edge can be selected and deleted", async ({ page }) => 
 });
 
 test("element editing: selected node can be deleted from toolbar", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/#/viz");
 
   await page.getByRole("button", { name: "刷新拓扑" }).click();
   await expect(page.locator(".react-flow").first()).toBeVisible();
