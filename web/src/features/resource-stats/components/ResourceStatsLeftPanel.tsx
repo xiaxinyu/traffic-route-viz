@@ -1,14 +1,16 @@
-import { useMemo } from "react";
+import type { ChangeEvent, RefObject } from "react";
 
-import { findFileAtRelativePath } from "../../../domain/fileTreeQueries";
 import type { FileTreeNode } from "../../../domain/fileTreeTypes";
 import type { LocalFolderScanModel } from "../hooks/useLocalFolderScan";
 import { LOCAL_FOLDER_COPY } from "../localFolderCopy";
 
+import { LocalFolderToolbar } from "./LocalFolderToolbar";
 import { LocalFolderTreeView } from "./LocalFolderTreeView";
-import { ResourceStatsFileInspector } from "./ResourceStatsFileInspector";
 
 type Props = {
+  inputRef: RefObject<HTMLInputElement | null>;
+  onInputChange: (ev: ChangeEvent<HTMLInputElement>) => void;
+  onPickFolder: () => void;
   scan: LocalFolderScanModel;
   displayRoot: FileTreeNode | null;
   showDotGit: boolean;
@@ -20,6 +22,9 @@ type Props = {
 };
 
 export function ResourceStatsLeftPanel({
+  inputRef,
+  onInputChange,
+  onPickFolder,
   scan,
   displayRoot,
   showDotGit,
@@ -31,29 +36,12 @@ export function ResourceStatsLeftPanel({
 }: Props) {
   const hasTree = scan.phase === "ready" && !!displayRoot;
 
-  const selectedFile = useMemo(() => {
-    if (!scan.root || !selectedPath) return null;
-    return findFileAtRelativePath(scan.root, selectedPath);
-  }, [scan.root, selectedPath]);
-
   return (
     <section className="left-panel-block grow rs-left-column">
       <div className="rs-tree-section">
         <div className="block-title-row">
-          <div>
-            <div className="block-title">目录树</div>
-            <div className="block-subtitle">单击文件预览；属性在下方。汇总在顶栏，Helm/Git 明细在右侧</div>
-          </div>
+          <div className="block-title">目录树</div>
         </div>
-        <label className="rs-dotgit-toggle rs-dotgit-toggle--inline">
-          <input
-            type="checkbox"
-            checked={showDotGit}
-            onChange={(e) => onShowDotGitChange(e.target.checked)}
-            data-testid="resource-stats-show-dotgit"
-          />
-          <span>显示 .git 目录</span>
-        </label>
         <div className="rs-tree-scroll">
           {hasTree && displayRoot ? (
             <LocalFolderTreeView
@@ -73,9 +61,20 @@ export function ResourceStatsLeftPanel({
             </div>
           )}
         </div>
-      </div>
 
-      <ResourceStatsFileInspector selectedPath={selectedPath} file={selectedFile} />
+        <div className="rs-tree-footer">
+          <LocalFolderToolbar inputRef={inputRef} onInputChange={onInputChange} onPickFolder={onPickFolder} />
+          <label className="rs-dotgit-toggle rs-dotgit-toggle--footer">
+            <input
+              type="checkbox"
+              checked={showDotGit}
+              onChange={(e) => onShowDotGitChange(e.target.checked)}
+              data-testid="resource-stats-show-dotgit"
+            />
+            <span>显示 .git 目录</span>
+          </label>
+        </div>
+      </div>
     </section>
   );
 }

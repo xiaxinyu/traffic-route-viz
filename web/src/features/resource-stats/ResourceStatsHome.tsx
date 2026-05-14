@@ -22,25 +22,19 @@ export function ResourceStatsHome() {
     pickFolder,
     onInputChange,
     togglePath,
-    expandAllDirectories,
-    collapseToRootOnly,
     selectLeaf,
     summaryLine,
   } = useLocalFolderScan();
 
-  const hasTree = scan.phase === "ready" && !!displayRoot;
-
   return (
     <div className="app-shell" data-testid="resource-stats-home">
       <ResourceStatsHeader
-        inputRef={inputRef}
-        onInputChange={onInputChange}
-        onPickFolder={pickFolder}
-        showExpandControls={hasTree}
-        onExpandAll={expandAllDirectories}
-        onCollapseAll={collapseToRootOnly}
         centerMetrics={
-          <ResourceStatsHeaderMetrics summaryLine={summaryLine} valuesStatsState={valuesStatsState} />
+          <ResourceStatsHeaderMetrics
+            summaryLine={summaryLine}
+            valuesStatsState={valuesStatsState}
+            gitReposState={gitReposState}
+          />
         }
       />
 
@@ -54,6 +48,9 @@ export function ResourceStatsHome() {
       <div className="main-body rs-stats-main">
         <aside className="left-panel rs-stats-left">
           <ResourceStatsLeftPanel
+            inputRef={inputRef}
+            onInputChange={onInputChange}
+            onPickFolder={pickFolder}
             scan={scan}
             displayRoot={displayRoot}
             showDotGit={showDotGit}

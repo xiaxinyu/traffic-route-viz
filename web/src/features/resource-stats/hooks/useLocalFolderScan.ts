@@ -14,7 +14,7 @@ import { filterDotGitFromTree, collectDotGitRepos } from "../../../domain/gitTre
 import { pickActiveGitRepoRoot } from "../../../domain/gitRepoContext";
 import { findFileAtRelativePath } from "../../../domain/fileTreeQueries";
 import type { FileTreeNode } from "../../../domain/fileTreeTypes";
-import { buildValuesResourceStats, type ValuesResourceStats } from "../../../domain/valuesResourceStats";
+import { buildValuesResourceStats, helmAnchorTierForPath, type ValuesResourceStats } from "../../../domain/valuesResourceStats";
 import { LOCAL_FOLDER_ERROR } from "../localFolderCopy";
 
 export type LocalFolderScanPhase = "idle" | "ready" | "error";
@@ -249,10 +249,14 @@ export function useLocalFolderScan() {
     if (gitReposState.kind !== "ready") return [];
     const { repos } = gitReposState;
     const ar = activeGitRepoRoot;
-    if (!ar) return repos;
     return [...repos].sort((a, b) => {
-      if (a.repoRootPath === ar) return -1;
-      if (b.repoRootPath === ar) return 1;
+      if (ar) {
+        if (a.repoRootPath === ar) return -1;
+        if (b.repoRootPath === ar) return 1;
+      }
+      const ta = helmAnchorTierForPath(a.repoRootPath);
+      const tb = helmAnchorTierForPath(b.repoRootPath);
+      if (ta !== tb) return ta - tb;
       return a.repoRootPath.localeCompare(b.repoRootPath);
     });
   }, [gitReposState, activeGitRepoRoot]);

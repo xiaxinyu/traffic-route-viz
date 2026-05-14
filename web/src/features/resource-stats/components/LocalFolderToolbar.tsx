@@ -7,16 +7,16 @@ type Props = {
   inputRef: RefObject<HTMLInputElement | null>;
   onInputChange: (ev: ChangeEvent<HTMLInputElement>) => void;
   onPickFolder: () => void;
-  showExpandControls: boolean;
-  onExpandAll: () => void;
-  onCollapseAll: () => void;
+  showExpandControls?: boolean;
+  onExpandAll?: () => void;
+  onCollapseAll?: () => void;
 };
 
 export function LocalFolderToolbar({
   inputRef,
   onInputChange,
   onPickFolder,
-  showExpandControls,
+  showExpandControls = false,
   onExpandAll,
   onCollapseAll,
 }: Props) {
@@ -33,7 +33,7 @@ export function LocalFolderToolbar({
       <button type="button" className="btn-primary" onClick={onPickFolder}>
         {LOCAL_FOLDER_COPY.pickFolder}
       </button>
-      {showExpandControls ? (
+      {showExpandControls && onExpandAll && onCollapseAll ? (
         <>
           <button type="button" className="btn-secondary" onClick={onExpandAll}>
             {LOCAL_FOLDER_COPY.expandAll}

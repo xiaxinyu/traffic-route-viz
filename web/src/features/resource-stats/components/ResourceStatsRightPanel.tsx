@@ -1,4 +1,6 @@
 import { parseGitRemoteForDisplay } from "../../../domain/gitRemoteDisplay";
+import { formatCpuFromMilli, formatMemoryFromBytes } from "../../../domain/k8sQuantity";
+import { helmAnchorTierForPath, type ValuesDirectoryStats } from "../../../domain/valuesResourceStats";
 import type {
   GitRepoResolved,
   GitReposState,
@@ -12,202 +14,209 @@ type Props = {
   valuesStatsState: ValuesStatsState;
 };
 
-function renderGitBlock(
-  gitReposState: GitReposState,
-  activeGitRepoRoot: string | null,
-  gitReposOrdered: GitRepoResolved[],
-) {
-  return (
-    <section className="left-panel-block compact rs-right-block rs-right-block--git">
-      <div className="block-title-row">
-        <div>
-          <div className="block-title">Git 远程</div>
-          <div className="block-subtitle">解析 .git/config 的 origin；与当前预览文件所在仓库对齐</div>
-        </div>
-      </div>
-      <div className="rs-git-repo-block" data-testid="resource-stats-git-remote">
-        {gitReposState.kind === "loading" ? (
-          <span className="rs-git-remote-muted">正在解析 Git 远程地址…</span>
-        ) : null}
-        {gitReposState.kind === "none" ? (
-          <span className="rs-git-remote-muted">未发现 .git/config（或未导入该文件）</span>
-        ) : null}
-        {gitReposState.kind === "ready" ? (
-          <>
-            {gitReposOrdered.length > 1 ? (
-              <div className="rs-git-repo-meta">
-                <span className="rs-git-repo-count-pill">{gitReposOrdered.length} 个 Git 仓库</span>
-                {activeGitRepoRoot ? (
-                  <span className="rs-git-active-pill" title={activeGitRepoRoot}>
-                    与预览匹配：
-                    {gitReposOrdered.find((r) => r.repoRootPath === activeGitRepoRoot)?.repoFolderLabel ??
-                      activeGitRepoRoot}
-                  </span>
-                ) : (
-                  <span className="rs-git-remote-muted rs-git-active-hint">点击文件后会高亮匹配 origin</span>
-                )}
-              </div>
-            ) : null}
+function shortValuesDirLabel(directoryPath: string): string {
+  const p = directoryPath.replace(/\\/g, "/").split("/").filter(Boolean);
+  if (p.length >= 2) return `${p[p.length - 2]}/${p[p.length - 1]}`;
+  return directoryPath;
+}
 
-            <ul className="rs-git-repo-list">
-              {gitReposOrdered.map((repo) => {
-                const isActive = !!activeGitRepoRoot && repo.repoRootPath === activeGitRepoRoot;
-                const parts = repo.originUrl ? parseGitRemoteForDisplay(repo.originUrl) : null;
-                return (
-                  <li key={repo.repoRootPath} className={`rs-git-repo-card${isActive ? " rs-git-repo-card--active" : ""}`}>
-                    <div className="rs-git-repo-card-head">
-                      <span className="rs-git-repo-card-title">{repo.repoFolderLabel}</span>
-                      {gitReposOrdered.length > 1 && isActive ? (
-                        <span className="rs-git-repo-card-badge">当前</span>
-                      ) : null}
-                    </div>
-                    <div className="rs-git-repo-card-sub" title={repo.repoRootPath}>
-                      {repo.repoRootPath}
-                    </div>
-                    {repo.fileReadFailed ? (
-                      <div className="rs-git-remote-muted">无法读取该仓库的 .git/config</div>
-                    ) : !repo.originUrl ? (
-                      <div className="rs-git-remote-muted">未配置 origin.url</div>
-                    ) : parts ? (
-                      <dl className="rs-git-repo-dl">
-                        <div className="rs-git-repo-dl-row">
-                          <dt>origin</dt>
-                          <dd>
-                            {parts.browserHref ? (
-                              <a className="rs-git-remote-link" href={parts.browserHref} target="_blank" rel="noopener noreferrer">
-                                {parts.raw}
-                              </a>
-                            ) : (
-                              <code className="rs-git-repo-raw">{parts.raw}</code>
-                            )}
-                          </dd>
-                        </div>
-                        {parts.host ? (
-                          <div className="rs-git-repo-dl-row">
-                            <dt>主机</dt>
-                            <dd>{parts.host}</dd>
-                          </div>
-                        ) : null}
-                        {parts.path ? (
-                          <div className="rs-git-repo-dl-row">
-                            <dt>仓库路径</dt>
-                            <dd>{parts.path}</dd>
-                          </div>
-                        ) : null}
-                      </dl>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        ) : null}
-      </div>
-    </section>
+function WeightedResourcePills({ s }: { s: ValuesDirectoryStats["stanzaSummary"] }) {
+  const tip =
+    "在父级链上就近读取 replicaCount / replicas，与每条 resources 相乘后加总；未写字段视为 1 副本。" +
+    " CPU 以 core 展示（1000m = 1 core），内存以 Gi 展示（1024Mi = 1Gi）。" +
+    (s.weightedPartial ? " 部分标量无法解析为数值，已跳过该项。" : "");
+  const reqCpu = s.weightedHasRequestsCpu ? formatCpuFromMilli(s.weightedRequestsCpuMillisTotal) : "—";
+  const limCpu = s.weightedHasLimitsCpu ? formatCpuFromMilli(s.weightedLimitsCpuMillisTotal) : "—";
+  const reqMem = s.weightedHasRequestsMemory ? formatMemoryFromBytes(s.weightedRequestsMemoryBytesTotal) : "—";
+  const limMem = s.weightedHasLimitsMemory ? formatMemoryFromBytes(s.weightedLimitsMemoryBytesTotal) : "—";
+  return (
+    <div className="rs-values-bucket-pills rs-values-bucket-pills--weighted" aria-label="按副本加权后的 resources 合计" title={tip}>
+      <span className="rs-values-bucket-pill">
+        <span className="rs-values-bucket-pill-label">req.cpu</span>
+        <span className="rs-values-bucket-pill-values">{reqCpu}</span>
+      </span>
+      <span className="rs-values-bucket-pill">
+        <span className="rs-values-bucket-pill-label">limits.cpu</span>
+        <span className="rs-values-bucket-pill-values">{limCpu}</span>
+      </span>
+      <span className="rs-values-bucket-pill">
+        <span className="rs-values-bucket-pill-label">req.mem</span>
+        <span className="rs-values-bucket-pill-values">{reqMem}</span>
+      </span>
+      <span className="rs-values-bucket-pill">
+        <span className="rs-values-bucket-pill-label">limits.mem</span>
+        <span className="rs-values-bucket-pill-values">{limMem}</span>
+      </span>
+    </div>
   );
 }
 
-function renderValuesBlock(valuesStatsState: ValuesStatsState) {
+function ValuesEnvCard({ dir }: { dir: ValuesDirectoryStats }) {
   return (
-    <section className="left-panel-block grow rs-right-block rs-right-block--values">
-      <div className="block-title-row">
-        <div>
-          <div className="block-title">Helm / Values 明细</div>
-          <div className="block-subtitle">按子目录列出 Chart 与 resources；合计数字见顶部导航中部</div>
+    <li className="rs-values-dir-card">
+      <div className="rs-values-dir-head">
+        <div className="rs-values-dir-head-text">
+          <strong title={dir.directoryPath}>{shortValuesDirLabel(dir.directoryPath)}</strong>
+          <span className="rs-values-dir-path-full" title={dir.directoryPath}>
+            {dir.directoryPath}
+          </span>
         </div>
+        <span className="rs-values-dir-head-count" title="values 中 resources 块数量，按块解析副本并加权">
+          {dir.resourceEntryCount} 个 workload
+        </span>
       </div>
 
-      {valuesStatsState.kind === "idle" || valuesStatsState.kind === "loading" ? (
-        <p className="rs-right-muted">与顶部「正在扫描」同步；完成后此处显示逐目录解析。</p>
+      <div className="rs-values-bucket-bar">
+        <span className="rs-values-bucket-k">{dir.valuesFiles.length} 个 values 文件</span>
+        <WeightedResourcePills s={dir.stanzaSummary} />
+      </div>
+      {dir.stanzaSummary.weightedPartial ? (
+        <p className="rs-right-muted rs-values-weighted-note">部分 cpu/memory 标量无法解析，已跳过对应加总项。</p>
       ) : null}
 
-      {valuesStatsState.kind === "error" ? (
-        <p className="rs-right-muted" role="alert">
-          统计失败：{valuesStatsState.message}
-        </p>
+      {dir.valuesFiles.some((vf) => vf.parseError) ? (
+        <ul className="rs-values-parse-errors">
+          {dir.valuesFiles
+            .filter((vf) => vf.parseError)
+            .map((vf) => (
+              <li key={vf.relativePath}>
+                <code title={vf.relativePath}>{vf.relativePath}</code>
+                <span>{vf.parseError}</span>
+              </li>
+            ))}
+        </ul>
       ) : null}
+    </li>
+  );
+}
 
-      {valuesStatsState.kind === "ready" ? (
-        <div className="rs-values-wrap rs-values-wrap--detail" data-testid="resource-stats-values-stats">
-          {valuesStatsState.stats.directories.length === 0 ? (
-            <p className="rs-right-muted">未发现 values*.yaml；导入 Helm 目录后会在此展示。</p>
-          ) : (
-            <ul className="rs-values-dir-list">
-              {valuesStatsState.stats.directories.map((dir) => (
-                <li key={dir.directoryPath} className="rs-values-dir-card">
-                  <div className="rs-values-dir-head">
-                    <strong title={dir.directoryPath}>{dir.directoryPath}</strong>
-                    <span>{dir.resourceEntryCount} 个 resources</span>
-                  </div>
-
-                  {dir.chart ? (
-                    <div className="rs-chart-meta">
-                      <div className="rs-chart-meta-line">
-                        <span className="rs-chart-meta-k">Chart</span>
-                        <code>{dir.chart.relativePath}</code>
-                      </div>
-                      <div className="rs-chart-meta-line">
-                        <span className="rs-chart-meta-k">Version</span>
-                        <span>{dir.chart.chartVersion ?? "—"}</span>
-                      </div>
-                      {dir.chart.appVersion ? (
-                        <div className="rs-chart-meta-line">
-                          <span className="rs-chart-meta-k">AppVersion</span>
-                          <span>{dir.chart.appVersion}</span>
-                        </div>
-                      ) : null}
-                      {dir.chart.dependencies.length > 0 ? (
-                        <ul className="rs-chart-deps-list">
-                          {dir.chart.dependencies.map((dep, idx) => (
-                            <li key={`${dep.name}-${idx}`}>
-                              <span className="rs-chart-deps-name">{dep.name}</span>
-                              <span className="rs-chart-deps-item">version: {dep.version ?? "—"}</span>
-                              <span className="rs-chart-deps-item">repository: {dep.repository ?? "—"}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                      {dir.chart.parseError ? <p className="rs-right-muted">Chart 解析失败：{dir.chart.parseError}</p> : null}
-                    </div>
-                  ) : (
-                    <p className="rs-right-muted">同目录未发现 Chart.yaml</p>
-                  )}
-
-                  <ul className="rs-values-file-list">
-                    {dir.valuesFiles.map((vf) => (
-                      <li key={vf.relativePath} className="rs-values-file-card">
-                        <div className="rs-values-file-head">
-                          <code title={vf.relativePath}>{vf.relativePath}</code>
-                          <span>{vf.resourceEntries.length} 条</span>
-                        </div>
-                        {vf.parseError ? (
-                          <p className="rs-right-muted">解析失败：{vf.parseError}</p>
-                        ) : vf.resourceEntries.length === 0 ? (
-                          <p className="rs-right-muted">未发现 resources 字段</p>
-                        ) : (
-                          <ul className="rs-values-entry-list">
-                            {vf.resourceEntries.map((entry, idx) => (
-                              <li key={`${entry.keyPath}-${idx}`}>
-                                <div className="rs-values-entry-key">{entry.keyPath}</div>
-                                <div className="rs-values-entry-vals">
-                                  {entry.limitsCpu ? <span>limits.cpu: {entry.limitsCpu}</span> : null}
-                                  {entry.limitsMemory ? <span>limits.memory: {entry.limitsMemory}</span> : null}
-                                  {entry.requestsCpu ? <span>requests.cpu: {entry.requestsCpu}</span> : null}
-                                  {entry.requestsMemory ? <span>requests.memory: {entry.requestsMemory}</span> : null}
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+function GitRepoCard({
+  repo,
+  activeGitRepoRoot,
+  repoCount,
+}: {
+  repo: GitRepoResolved;
+  activeGitRepoRoot: string | null;
+  repoCount: number;
+}) {
+  const isActive = !!activeGitRepoRoot && repo.repoRootPath === activeGitRepoRoot;
+  const parts = repo.originUrl ? parseGitRemoteForDisplay(repo.originUrl) : null;
+  return (
+    <li className={`rs-git-repo-card${isActive ? " rs-git-repo-card--active" : ""}`}>
+      <div className="rs-git-repo-card-head">
+        <span className="rs-git-repo-card-title">{repo.repoFolderLabel}</span>
+        {repoCount > 1 && isActive ? <span className="rs-git-repo-card-badge">当前</span> : null}
+      </div>
+      <div className="rs-git-repo-card-sub" title={repo.repoRootPath}>
+        {repo.repoRootPath}
+      </div>
+      {repo.fileReadFailed ? (
+        <div className="rs-git-remote-muted">无法读取该仓库的 .git/config</div>
+      ) : !repo.originUrl ? (
+        <div className="rs-git-remote-muted">未配置 origin.url</div>
+      ) : parts ? (
+        <dl className="rs-git-repo-dl">
+          <div className="rs-git-repo-dl-row">
+            <dt>origin</dt>
+            <dd>
+              {parts.browserHref ? (
+                <a className="rs-git-remote-link" href={parts.browserHref} target="_blank" rel="noopener noreferrer">
+                  {parts.raw}
+                </a>
+              ) : (
+                <code className="rs-git-repo-raw">{parts.raw}</code>
+              )}
+            </dd>
+          </div>
+        </dl>
       ) : null}
+    </li>
+  );
+}
+
+function filterReposByTier(repos: GitRepoResolved[], tier: number): GitRepoResolved[] {
+  return repos.filter((r) => helmAnchorTierForPath(r.repoRootPath) === tier);
+}
+
+function filterDirsByTier(dirs: ValuesDirectoryStats[], tier: number): ValuesDirectoryStats[] {
+  return dirs.filter((d) => helmAnchorTierForPath(d.directoryPath) === tier);
+}
+
+function renderProductStack({
+  tier,
+  title,
+  dirs,
+  repos,
+  gitReposState,
+  activeGitRepoRoot,
+  totalGitRepoCount,
+  valuesStatsState,
+  noValuesAnywhere,
+}: {
+  tier: number;
+  title: string;
+  dirs: ValuesDirectoryStats[];
+  repos: GitRepoResolved[];
+  gitReposState: GitReposState;
+  activeGitRepoRoot: string | null;
+  totalGitRepoCount: number;
+  valuesStatsState: ValuesStatsState;
+  noValuesAnywhere: boolean;
+}) {
+  const valsKind = valuesStatsState.kind;
+  const tierDirs = filterDirsByTier(dirs, tier);
+  const tierRepos = filterReposByTier(repos, tier);
+
+  const helmLoading = valsKind === "idle" || valsKind === "loading";
+  const helmReady = valsKind === "ready";
+
+  const showStack =
+    tierRepos.length > 0 ||
+    tierDirs.length > 0 ||
+    (tier <= 1 && helmLoading) ||
+    (tier === 2 && (tierRepos.length > 0 || tierDirs.length > 0));
+
+  if (!showStack) return null;
+
+  return (
+    <section className="rs-product-stack" aria-label={title}>
+      <h3 className="rs-product-stack-title">{title}</h3>
+
+      <div className="rs-product-git-block">
+        <h4 className="rs-product-subhead">Git 仓库</h4>
+        {gitReposState.kind === "ready" && tierRepos.length > 0 ? (
+          <ul className="rs-git-repo-list rs-git-repo-list--stacked">
+            {tierRepos.map((repo) => (
+              <GitRepoCard
+                key={repo.repoRootPath}
+                repo={repo}
+                activeGitRepoRoot={activeGitRepoRoot}
+                repoCount={totalGitRepoCount}
+              />
+            ))}
+          </ul>
+        ) : null}
+        {gitReposState.kind === "ready" &&
+        tierRepos.length === 0 &&
+        tier <= 1 &&
+        repos.length > 0 ? (
+          <p className="rs-right-muted">本组路径下未匹配到 Git 仓库根（或 .git 未导入）。</p>
+        ) : null}
+      </div>
+
+      <div className="rs-product-helm-block">
+        <h4 className="rs-product-subhead">Workload 与资源</h4>
+        {helmReady && tierDirs.length === 0 && !noValuesAnywhere ? (
+          <p className="rs-right-muted">本组下未发现含 values*.yaml 的子目录。</p>
+        ) : null}
+        {helmReady && tierDirs.length > 0 ? (
+          <ul className="rs-values-dir-list">
+            {tierDirs.map((dir) => (
+              <ValuesEnvCard key={dir.directoryPath} dir={dir} />
+            ))}
+          </ul>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -218,10 +227,91 @@ export function ResourceStatsRightPanel({
   gitReposOrdered,
   valuesStatsState,
 }: Props) {
+  const dirs: ValuesDirectoryStats[] =
+    valuesStatsState.kind === "ready" ? valuesStatsState.stats.directories : [];
+
+  const valsKind = valuesStatsState.kind;
+  const helmLoading = valsKind === "idle" || valsKind === "loading";
+  const noValuesAnywhere = valsKind === "ready" && dirs.length === 0;
+  const globalValuesReady = valsKind === "ready" && dirs.length > 0;
+
   return (
     <aside className="rs-right-panel" aria-label="Helm 与 Git 解析明细">
-      {renderValuesBlock(valuesStatsState)}
-      {renderGitBlock(gitReposState, activeGitRepoRoot, gitReposOrdered)}
+      <section className="left-panel-block grow rs-right-block rs-right-unified">
+        <div className="rs-right-global-status" data-testid="resource-stats-git-remote">
+          {gitReposState.kind === "loading" ? (
+            <p className="rs-right-muted">正在解析 Git 远程地址…</p>
+          ) : null}
+          {gitReposState.kind === "none" ? (
+            <p className="rs-right-muted">未发现 .git/config（或未导入该文件）</p>
+          ) : null}
+          {helmLoading ? (
+            <p className="rs-right-muted">Helm 统计与上方「正在扫描」同步；完成后按组展示子目录。</p>
+          ) : null}
+          {valsKind === "error" ? (
+            <p className="rs-right-muted" role="alert">
+              统计失败：{valuesStatsState.message}
+            </p>
+          ) : null}
+          {valsKind === "ready" && dirs.length === 0 ? (
+            <p className="rs-right-muted">未发现 values*.yaml；导入 Helm 目录后将在对应组下展示。</p>
+          ) : null}
+        </div>
+
+        {gitReposState.kind === "ready" && gitReposOrdered.length > 1 ? (
+          <div className="rs-git-repo-meta rs-git-repo-meta--top">
+            <span className="rs-git-repo-count-pill">{gitReposOrdered.length} 个 Git 仓库</span>
+            {activeGitRepoRoot ? (
+              <span className="rs-git-active-pill" title={activeGitRepoRoot}>
+                与预览匹配：
+                {gitReposOrdered.find((r) => r.repoRootPath === activeGitRepoRoot)?.repoFolderLabel ??
+                  activeGitRepoRoot}
+              </span>
+            ) : (
+              <span className="rs-git-remote-muted rs-git-active-hint">点击文件后会高亮匹配 origin</span>
+            )}
+          </div>
+        ) : null}
+
+        <div
+          className="rs-product-stacks rs-values-wrap rs-values-wrap--detail"
+          data-testid={globalValuesReady ? "resource-stats-values-stats" : undefined}
+        >
+          {renderProductStack({
+            tier: 0,
+            title: "master-data",
+            dirs,
+            repos: gitReposOrdered,
+            gitReposState,
+            activeGitRepoRoot,
+            totalGitRepoCount: gitReposOrdered.length,
+            valuesStatsState,
+            noValuesAnywhere,
+          })}
+          {renderProductStack({
+            tier: 1,
+            title: "stock-physical",
+            dirs,
+            repos: gitReposOrdered,
+            gitReposState,
+            activeGitRepoRoot,
+            totalGitRepoCount: gitReposOrdered.length,
+            valuesStatsState,
+            noValuesAnywhere,
+          })}
+          {renderProductStack({
+            tier: 2,
+            title: "其他",
+            dirs,
+            repos: gitReposOrdered,
+            gitReposState,
+            activeGitRepoRoot,
+            totalGitRepoCount: gitReposOrdered.length,
+            valuesStatsState,
+            noValuesAnywhere,
+          })}
+        </div>
+      </section>
     </aside>
   );
 }
