@@ -157,6 +157,7 @@ describe("buildGraphPresentation", () => {
 describe("label/time helpers", () => {
   it("returns friendly node type labels", () => {
     expect(nodeTypeLabel("all")).toBe("All");
+    expect(nodeTypeLabel("ingressController")).toBe("Ingress controller");
     expect(nodeTypeLabel("route")).toBe("Route");
     expect(nodeTypeLabel("istioDestination")).toBe("VS Destination");
   });

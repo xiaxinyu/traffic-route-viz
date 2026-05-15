@@ -5,6 +5,7 @@ import { countYamlTextLines, normalizeYamlNewlines, stripK8sMetadataNoise } from
 export type NodeTypeFilter =
   | "all"
   | "ingressRegion"
+  | "ingressController"
   | "ingress"
   | "istioGateway"
   | "httpProxy"
@@ -18,6 +19,7 @@ export type NodeTypeFilter =
 export const NODE_TYPE_ORDER: NodeTypeFilter[] = [
   "all",
   "ingressRegion",
+  "ingressController",
   "ingress",
   "istioGateway",
   "httpProxy",
@@ -31,6 +33,7 @@ export const NODE_TYPE_ORDER: NodeTypeFilter[] = [
 
 const NODE_TYPE_LABELS: Record<Exclude<NodeTypeFilter, "all">, string> = {
   ingressRegion: "Region",
+  ingressController: "Ingress controller",
   ingress: "Ingress",
   istioGateway: "Istio Gateway",
   httpProxy: "Contour Gateway",
@@ -51,6 +54,7 @@ export function buildGraphMetrics(nodes: Node[], edges: Edge[]) {
   const counts: Record<NodeTypeFilter, number> = {
     all: nodes.length,
     ingressRegion: 0,
+    ingressController: 0,
     ingress: 0,
     istioGateway: 0,
     httpProxy: 0,

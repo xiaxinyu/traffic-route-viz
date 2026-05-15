@@ -3,6 +3,7 @@ import {
   EndpointsNode,
   HostNode,
   HttpProxyNode,
+  IngressControllerNode,
   IngressNode,
   IngressRegionNode,
   IstioDestinationNode,
@@ -14,6 +15,7 @@ import {
 
 export const flowNodeTypes = {
   ingressRegion: IngressRegionNode,
+  ingressController: IngressControllerNode,
   ingress: IngressNode,
   istioGateway: IstioGatewayNode,
   junction: JunctionNode,

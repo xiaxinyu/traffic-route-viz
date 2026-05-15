@@ -159,18 +159,20 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 ### 节点类型（含分区底板）
 
 1. **Ingress 分区底板**（`ingressRegion`，父节点）：视觉泳道/整块可拖
-2. **Ingress**
-3. **Istio Gateway**（当 VirtualService 引用了 `spec.gateways` 时渲染；**同名 Gateway 合并为画布左侧全局节点**，标记 **Global**，并为每个 VirtualService 分区连入）
-4. **Host**
-5. **Route**（每条 `path` 一节点，避免边标签重叠；Istio HTTP **多 destination** 时在 Route 卡列出 **subset / weight**，并在 Route→Service 边上摘要）
-6. **Service**
-7. **Endpoints**
-8. **DestinationRule**（Istio：挂载到对应 Service，展示 subsets/策略入口）
+2. **Ingress 控制器**（`ingressController`，**全局**节点）：**仅**针对 Kubernetes `Ingress`；按 **`spec.ingressClassName` 全局归并**（忽略大小写；省略 class 为独立桶），**不**再按 Ingress 的 `metadata.namespace` 拆分——同一 class 的全图仅一个控制器节点（多 namespace 的 Ingress 仍各自显示其真实 `metadata.namespace`）。**`nginx` / 空 class** 时控制器卡上的 **namespace 行固定为 `ingress-nginx`**（与常见 ingress-nginx Helm 安装一致）；其它 class 则使用锚点 Ingress 所在 namespace 作为控制器平面展示名。布局与连线仍对齐 Istio Gateway：全局左侧、`ingressController → junction → Ingress`（干线无箭头无边标签；分叉末端箭头；**`step` 折线**）。卡片浅蓝壳与 **IngressClass / Global** 标签同 Istio Gateway 风格。
+3. **Ingress**
+4. **Istio Gateway**（当 VirtualService 引用了 `spec.gateways` 时渲染；**同名 Gateway 合并为画布左侧全局节点**，标记 **Global**，并为每个 VirtualService 分区连入）
+5. **Host**
+6. **Route**（每条 `path` 一节点，避免边标签重叠；Istio HTTP **多 destination** 时在 Route 卡列出 **subset / weight**，并在 Route→Service 边上摘要）
+7. **Service**
+8. **Endpoints**
+9. **DestinationRule**（Istio：挂载到对应 Service，展示 subsets/策略入口）
 
 > 新增类型时必须同步：解析 → 构图 → 节点 UI → 宿主 `nodeTypes` → 本文档。
 
 ### 边的语义
 
+- **`ingressController → junction → Ingress`（Kubernetes Ingress）**：同 **`ingressClassName`** 仅一个全局 `ingressController`（**不按** Ingress `metadata.namespace` 拆分）；经 `junction` 分叉到该组内**每个** Ingress 头条卡。**干线**（controller→junction）**不绘制箭头、不挂边标签**；**分叉段**为虚线且 **仅在分叉段末端** 绘制箭头指向 Ingress；junction 贴近分区左缘；边类型为 **`step`** 折线（与 Istio Gateway→VS 的 smoothstep 干线可并存差异）。
 - `Ingress → Host`：入口域名规则（可 animated）
 - `Ingress → Ingress`（新增）：当两侧均为 `ingressClassName: nginx` 的入口层，且 Host/Path 规则存在语义相交时，允许自动绘制「Nginx 转发」边（用于 01/02 等分层入口转发链路展示）
 - `Istio Gateway → VirtualService`：当 VirtualService 配置 gateways 时，须存在 **全局 Istio Gateway** 节点（按 Gateway **名称**合并），并由该节点连入对应 VirtualService 入口卡；分区内 **不再**重复堆叠多块同名 Gateway 卡
@@ -285,11 +287,12 @@ kubectl apply -f k8s/traffic-route-viz.yaml
       - 末端箭头（例：`markerEnd` 颜色与 stroke 一致）
     - **连接线预览**：拖拽连线时的连接线（connection line）应为中性灰色，避免与业务语义边颜色混淆。
 - **手写边**：允许手柄拖线；手写边视觉区分（灰虚线）且在解析刷新后只要两端仍存在就应保留。
-  - **可连线性（必须）**：画布中所有业务节点（Ingress/VirtualService/Istio Gateway/HTTPProxy/Host/Route/Service/Endpoints/DestinationRule）都必须提供可见的连接手柄（至少左右各一），确保用户可手动关联任意两节点（含跨 Area）。
+  - **可连线性（必须）**：画布中所有业务节点（Ingress controller/Ingress/VirtualService/Istio Gateway/HTTPProxy/Host/Route/Service/Endpoints/DestinationRule）都必须提供可见的连接手柄（至少左右各一），确保用户可手动关联任意两节点（含跨 Area）。
   - **Istio 网关跨区连线（必须与 §5.1 一致）**：**同名（P1）** + **URI 规则相交（P6）**；**禁止**仅以 namespace / Host 分桶决定是否连线。**M×N（P5）** 只对通过 **P6** 的 **（Ingress Service 结点 × Istio Gateway 结点）** 对连线。
   - **路由粒度（语义）**：**P6** 的比对落在 **Ingress path + pathType** 与 **VS `uri.prefix|exact|regex`**；不按 Host 做匹配分桶。
   - **Ingress 分层转发（必须）**：在 Example 分层（`01/02/03`）中，若两个 Ingress 分区 Host+Path 有重叠，允许自动连 `Nginx 转发`；为避免噪声，分层场景仅绘制相邻层前向边（`01→02`、`02→03`）。
-- **节点语义配色（必须）**：`web/src/features/diagram/FlowNodes.tsx` 的 `NODE_COLOR_PALETTE` 为配色单一事实来源，要求 `ingress / host / service / virtualService / destinationRule / route / httpProxy` 使用**可区分且协调**的固定语义色，不因 `01/02/03` 层级改变语义色。
+- **节点语义配色（必须）**：`web/src/features/diagram/FlowNodes.tsx` 的 `NODE_COLOR_PALETTE` 为配色单一事实来源，要求 `ingressController / ingress / host / service / virtualService / destinationRule / route / httpProxy` 使用**可区分且协调**的固定语义色，不因 `01/02/03` 层级改变语义色。
+  - ingressController（**全局**卡，与 Istio Gateway 同款浅蓝壳）：标题行语义色沿用 **`istioGateway` 色板**（`#0369a1`）以便与「全局入口」行视觉一致；legacy 分区内旧稿若仍带绿色窄卡，可继续用 `ingressController` 色 `#047857`
   - ingress：`#4f46e5`
   - host：`#c026d3`
   - service：`#2563eb`
@@ -429,6 +432,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 - `routeGap`: **84**
 - `serviceGap`: **210**
 - `regionHeaderReserveY`: **162**（含分区页眉可选泳道一行；与 `web/src/domain/buildGraph.ts` 一致）
+- **Kubernetes `Ingress` 全局控制器**：与 Istio 全局 Gateway 共用 **`GLOBAL_GW_LANE_W`（420）** 左 gutter 预算（`layoutOffsetX = max(有无 Istio Gateway, 有无 Ingress 控制器组)`）；`ingressController` **不作为** `ingressRegion` 子节点排版
 - `SWIMLANE_BAND_GAP`: **100**（同一列内 swimlane（Global/Active01/Active02/Gateway）切换时的额外垂直间距）
 - `lanePitchX`: **round(col × 7.2) + areaGapX**（与代码一致；用于 Example tier 列距及 VS 竖列）
 - **VirtualService 竖列**：在 Example tier 画布上为第四列，分区锚点 **x = baseX + layoutOffsetX + 3 × lanePitchX**；与 **`layoutOffsetX`**（全局 Istio Gateway 预留列宽） additive

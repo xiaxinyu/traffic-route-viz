@@ -12,6 +12,8 @@ type EntryKind = "Ingress" | "VirtualService" | "HTTPProxy";
  */
 export const NODE_COLOR_PALETTE = {
   ingress: "#4f46e5",
+  /** Kubernetes Ingress controller plane (e.g. ingress-nginx), shown left of the Ingress card */
+  ingressController: "#047857",
   virtualService: "#0284c7",
   httpProxy: "#0f766e",
   host: "#c026d3",
@@ -229,6 +231,98 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
           </div>
         )}
       </div>
+    </div>
+  );
+});
+
+/** In-cluster Ingress controller (global node, Istio Gateway–like placement and chrome). */
+export const IngressControllerNode = memo(function IngressControllerNode(props: NodeProps) {
+  const { label, subtitle, namespace: ctrlNs, ingressClass, globalK8sIngressController, ingressNamespacesSummary } =
+    props.data as {
+      label?: string;
+      subtitle?: string;
+      namespace?: string;
+      ingressClass?: string;
+      globalK8sIngressController?: boolean;
+      /** When multiple Ingress namespaces share one controller class (e.g. nginx). */
+      ingressNamespacesSummary?: string;
+    };
+
+  if (globalK8sIngressController) {
+    const accent = NODE_COLOR_PALETTE.istioGateway;
+    return (
+      <div
+        style={{
+          ...cardStyle,
+          minWidth: 220,
+          maxWidth: 360,
+          padding: "13px 16px",
+          fontSize: 14.5,
+          borderLeft: `6px solid ${accent}`,
+          background: "#f0f9ff",
+        }}
+      >
+        <Handle type="target" position={Position.Left} id="t-left" style={handle(accent, "left")} />
+        <Handle
+          type="target"
+          position={Position.Right}
+          id="t-right"
+          style={handle(accent, "right")}
+        />
+        <div style={titleRow()}>
+          <span style={iconDot(accent)} />
+          <span>Ingress controller</span>
+          <span style={pill("#e0f2fe", "#0369a1")}>IngressClass</span>
+          <span style={pill("#bae6fd", "#0369a1")} title="Merged entry shared by Ingress resources">
+            Global
+          </span>
+        </div>
+        <div style={{ marginTop: 8, fontWeight: 900, color: "#0f172a", fontSize: 15.5 }}>
+          {label ?? "—"}
+        </div>
+        {ctrlNs ? <div style={meta({ marginTop: 3, fontSize: 12.5 })}>namespace: {ctrlNs}</div> : null}
+        {ingressClass ? (
+          <div style={meta({ marginTop: 2, fontSize: 12.5 })}>class: {ingressClass}</div>
+        ) : null}
+        {subtitle ? <div style={meta({ marginTop: 6, fontSize: 12.5 })}>{subtitle}</div> : null}
+        {ingressNamespacesSummary ? (
+          <div style={meta({ marginTop: 6, fontSize: 11.5, color: "#64748b" })}>{ingressNamespacesSummary}</div>
+        ) : null}
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="s-right"
+          style={handle(accent, "right")}
+        />
+        <Handle type="source" position={Position.Left} id="s-left" style={handle(accent, "left")} />
+      </div>
+    );
+  }
+
+  const accent = NODE_COLOR_PALETTE.ingressController;
+  return (
+    <div
+      style={{
+        ...cardStyle,
+        maxWidth: 220,
+        borderLeft: `5px solid ${accent}`,
+      }}
+    >
+      <Handle type="target" position={Position.Left} id="t-left" style={handle(accent, "left")} />
+      <Handle type="target" position={Position.Right} id="t-right" style={handle(accent, "right")} />
+      <Handle type="source" position={Position.Right} id="s-right" style={handle(accent, "right")} />
+      <Handle type="source" position={Position.Left} id="s-left" style={handle(accent, "left")} />
+      <div style={titleRow()}>
+        <span style={iconDot(accent)} />
+        <span>Ingress controller</span>
+        <span style={pill(`${accent}14`, accent)}>K8s</span>
+      </div>
+      <div style={{ marginTop: 6, fontWeight: 900, color: accent, wordBreak: "break-word" }}>
+        {label ?? "Ingress controller"}
+      </div>
+      {ctrlNs ? <div style={meta()}>namespace: {ctrlNs}</div> : null}
+      {ingressClass ? <div style={meta()}>class: {ingressClass}</div> : null}
+      {subtitle ? <div style={{ ...meta(), marginTop: 4 }}>{subtitle}</div> : null}
     </div>
   );
 });

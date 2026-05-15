@@ -340,6 +340,30 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     ingressIndexById.set(ingId(ing.kind, ing.namespace, ing.name), idx);
   });
 
+  /**
+   * Global Ingress controller merge key: **ingressClassName only** (case-insensitive; missing → `__none__`).
+   * Ingress objects live in their own `metadata.namespace`; the controller is shared per class (e.g. all `nginx`
+   * Ingresses attach to one ingress-nginx controller plane regardless of Ingress namespace).
+   */
+  const k8sIngressControllerGroupKey = (className: string | undefined): string => {
+    const clsRaw = (className ?? "").trim();
+    return clsRaw ? clsRaw.toLowerCase() : "__none__";
+  };
+  const sharedK8sIngressControllerNodeId = (gk: string): string => `ingress-ctrl-${sanitizeId(gk)}`;
+  const firstIngressPartitionIdByCtrlGroup = new Map<string, string>();
+  const k8sIngressCountByCtrlGroup = new Map<string, number>();
+  const k8sIngressTargetIdsByGroup = new Map<string, string[]>();
+  for (const ing of orderedIngresses) {
+    if (ing.kind !== "Ingress") continue;
+    const iid = ingId(ing.kind, ing.namespace, ing.name);
+    const gk = k8sIngressControllerGroupKey(ing.className);
+    if (!firstIngressPartitionIdByCtrlGroup.has(gk)) firstIngressPartitionIdByCtrlGroup.set(gk, iid);
+    k8sIngressCountByCtrlGroup.set(gk, (k8sIngressCountByCtrlGroup.get(gk) ?? 0) + 1);
+    const tg = k8sIngressTargetIdsByGroup.get(gk) ?? [];
+    tg.push(iid);
+    k8sIngressTargetIdsByGroup.set(gk, tg);
+  }
+
   // Group routes by ingress -> host
   const routesByIngress = new Map<string, typeof parsed.routes>();
   for (const r of parsed.routes) {
@@ -386,11 +410,14 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     }
   }
 
-  // Reserve enough left gutter for merged global Istio Gateways + trunk/branches.
-  // (Users asked for more spacing between Gateway and VS areas.)
+  // Reserve left gutter for global Istio Gateways and/or global Kubernetes Ingress controllers.
   const GLOBAL_GW_LANE_W = 420;
   const sortedGlobalGwWireNames = [...globalGwWireNames].sort();
-  const layoutOffsetX = sortedGlobalGwWireNames.length ? GLOBAL_GW_LANE_W : 0;
+  const hasK8sIngressControllerGroups = k8sIngressCountByCtrlGroup.size > 0;
+  const layoutOffsetX = Math.max(
+    sortedGlobalGwWireNames.length ? GLOBAL_GW_LANE_W : 0,
+    hasK8sIngressControllerGroups ? GLOBAL_GW_LANE_W : 0,
+  );
 
   const globalIstioGatewayNodeIdByWireName = new Map<string, string>();
   sortedGlobalGwWireNames.forEach((gwWire, idx) => {
@@ -647,6 +674,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         : leftPad + col * 4.22;
 
     const vsOffsetX = 0;
+
     nodes.push({
       id: iid,
       type: "ingress",
@@ -1470,6 +1498,147 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         },
         markerEnd: arrow("#0ea5e9"),
       });
+    }
+  }
+
+  // Global Kubernetes Ingress controllers: Istio-like placement + trunk/junction/dashed branches → Ingress entry cards.
+  const sortedK8sIngressCtrlGroupKeys = [...k8sIngressCountByCtrlGroup.keys()].sort((a, b) =>
+    a.localeCompare(b),
+  );
+  for (const gk of sortedK8sIngressCtrlGroupKeys) {
+    const sharedIcId = sharedK8sIngressControllerNodeId(gk);
+    const ingressIds = k8sIngressTargetIdsByGroup.get(gk) ?? [];
+    if (!ingressIds.length) continue;
+
+    const anchorIid = firstIngressPartitionIdByCtrlGroup.get(gk);
+    const anchorIng = orderedIngresses.find(
+      (x) =>
+        x.kind === "Ingress" &&
+        anchorIid !== undefined &&
+        ingId(x.kind, x.namespace, x.name) === anchorIid,
+    );
+    if (!anchorIng) continue;
+
+    const cls = (anchorIng.className ?? "").trim();
+    const clsLower = cls.toLowerCase();
+    const isNginxClass = !cls || clsLower === "nginx";
+    const countInGroup = k8sIngressCountByCtrlGroup.get(gk) ?? 1;
+
+    const distinctIngressNamespaces = new Set<string>();
+    for (const id of ingressIds) {
+      const ingSum = orderedIngresses.find(
+        (x) => x.kind === "Ingress" && ingId(x.kind, x.namespace, x.name) === id,
+      );
+      distinctIngressNamespaces.add((ingSum?.namespace ?? "").trim() || "default");
+    }
+    const nsListSorted = [...distinctIngressNamespaces].sort((a, b) => a.localeCompare(b));
+    const multiNs = nsListSorted.length > 1;
+    /** ingress-nginx controller install namespace is the usual chart default for class `nginx`. */
+    const controllerPlaneNs = isNginxClass ? "ingress-nginx" : (anchorIng.namespace ?? "default");
+    const nsDisp = controllerPlaneNs;
+
+    const subtitle = isNginxClass
+      ? countInGroup > 1
+        ? `Watches ${countInGroup} Ingress resources (nginx IngressClass · controller ns ${controllerPlaneNs})`
+        : "Reconciles this Ingress (nginx IngressClass)"
+      : countInGroup > 1
+        ? `Watches ${countInGroup} Ingress resources (class: ${cls} · ns ${controllerPlaneNs})`
+        : cls
+          ? `class: ${cls}`
+          : undefined;
+    const ingressNamespacesSummary = multiNs
+      ? `Ingress object namespaces: ${nsListSorted.join(", ")}`
+      : undefined;
+
+    const centers: number[] = [];
+    const xs: number[] = [];
+    for (const ingId of ingressIds) {
+      const regionId = regionIdByIngressId.get(ingId);
+      const rn = regionId ? nodes.find((x) => x.id === regionId) : undefined;
+      if (!rn || rn.type !== "ingressRegion") continue;
+      const py = rn.position?.y ?? 0;
+      const rh = Number((rn.style as { height?: number })?.height ?? 760);
+      centers.push(py + rh / 2);
+      xs.push(rn.position?.x ?? baseX + layoutOffsetX);
+    }
+    if (!centers.length) continue;
+    const midY = medianOf(centers, baseY);
+    const minX = Math.min(...xs);
+
+    const icCardW = 300;
+    const gap = 220;
+    const gx = Math.max(baseX, minX - (icCardW + gap));
+
+    nodes.push({
+      id: sharedIcId,
+      type: "ingressController",
+      position: { x: gx, y: midY - LAYOUT_EST_ISTIO_GW_H / 2 },
+      data: {
+        nodeKey: nodeKey("ingressController", "global", gk),
+        label: isNginxClass ? "Kube Ingress Nginx" : "Ingress controller",
+        subtitle,
+        namespace: nsDisp,
+        ingressClass: cls || (isNginxClass ? "nginx" : undefined),
+        ingressNamespacesSummary,
+        globalK8sIngressController: true,
+      },
+      selectable: true,
+      draggable: true,
+    });
+
+    const junctionId = `k8s-ingress-ctrl-junction-${sanitizeId(gk)}`;
+    /** Keep the merge point close to Ingress regions so step edges stay compact. */
+    const branchGap = 72;
+    const jxMin = minX - branchGap;
+    const jx = Math.max(gx + icCardW + 40, jxMin);
+    nodes.push({
+      id: junctionId,
+      type: "junction",
+      position: { x: jx, y: midY },
+      data: { nodeKey: nodeKey("junction", "k8sIngressController", gk) },
+      selectable: false,
+      draggable: false,
+    });
+
+    edges.push(
+      makeEditableEdge({
+        id: `e-${sharedIcId}-${junctionId}-k8sic-trunk-${edgeIdx++}`,
+        source: sharedIcId,
+        target: junctionId,
+        sourceHandle: "s-right",
+        targetHandle: "t-left",
+        type: "step",
+        style: {
+          stroke: "#0ea5e9",
+          strokeWidth: 2.35,
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+          shapeRendering: "geometricPrecision",
+        },
+      }),
+    );
+
+    const uniqIng = [...new Set(ingressIds)].sort();
+    for (const ingId of uniqIng) {
+      edges.push(
+        makeEditableEdge({
+          id: `e-${junctionId}-${ingId}-k8sic-branch-${edgeIdx++}`,
+          source: junctionId,
+          target: ingId,
+          sourceHandle: "s-right",
+          targetHandle: "t-left",
+          type: "step",
+          style: {
+            stroke: "#0ea5e9",
+            strokeWidth: 2.1,
+            strokeDasharray: "7 5",
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+            shapeRendering: "geometricPrecision",
+          },
+          markerEnd: arrow("#0ea5e9"),
+        }),
+      );
     }
   }
 

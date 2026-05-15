@@ -135,6 +135,107 @@ metadata:
   namespace: demo
 `;
 
+describe("buildFlowGraph Kubernetes Ingress controller lane", () => {
+  it("adds global ingressController (Istio-like) and wires trunk → junction → Ingress", () => {
+    const parsed = parseK8sYaml(INGRESS_01, "01-edge/edge-global.yaml");
+    const { nodes, edges } = buildFlowGraph(parsed);
+    const region = nodes.find((n) => n.type === "ingressRegion" && n.data?.ingressName === "edge-global");
+    expect(region).toBeTruthy();
+    const ic = nodes.find(
+      (n) => n.type === "ingressController" && n.data?.globalK8sIngressController === true,
+    );
+    expect(ic).toBeTruthy();
+    expect(ic?.parentNode).toBeUndefined();
+    const ing = nodes.find((n) => n.type === "ingress" && n.data?.label === "edge-global");
+    expect(ing).toBeTruthy();
+    const trunk = edges.find((e) => e.source === ic?.id && String(e.target ?? "").includes("junction"));
+    expect(trunk).toBeTruthy();
+    expect(trunk?.markerEnd).toBeUndefined();
+    expect(trunk?.label).toBeUndefined();
+    expect(trunk?.type).toBe("step");
+    const junctionId = trunk?.target;
+    expect(junctionId).toBeTruthy();
+    const branch = edges.find((e) => e.source === junctionId && e.target === ing?.id);
+    expect(branch).toBeTruthy();
+    expect(branch?.markerEnd).toBeTruthy();
+    expect(branch?.type).toBe("step");
+  });
+
+  it("uses generic controller label when ingressClassName is not nginx", () => {
+    const yaml = INGRESS_01.replace("ingressClassName: nginx", "ingressClassName: traefik");
+    const parsed = parseK8sYaml(yaml, "t.yaml");
+    const { nodes } = buildFlowGraph(parsed);
+    const ic = nodes.find((n) => n.type === "ingressController");
+    expect(ic?.data?.label).toBe("Ingress controller");
+    expect(String(ic?.data?.subtitle ?? "")).toContain("traefik");
+  });
+
+  it("does not add ingressController for VirtualService partitions", () => {
+    const parsed = mergeParseResults([
+      parseK8sYaml(GATEWAY_AND_VS, "istio/gw-vs.yaml"),
+      parseK8sYaml(
+        `apiVersion: v1
+kind: Service
+metadata:
+  name: reviews
+  namespace: demo
+`,
+        "svc.yaml",
+      ),
+    ]);
+    const { nodes } = buildFlowGraph(parsed);
+    expect(nodes.some((n) => n.type === "ingressController")).toBe(false);
+  });
+
+  it("dedupes one global ingressController per ingressClass; junction branches to every Ingress", () => {
+    const parsed = mergeParseResults([
+      parseK8sYaml(INGRESS_01, "01-edge/edge-global.yaml"),
+      parseK8sYaml(INGRESS_02, "02-core/core-ingress.yaml"),
+    ]);
+    const { nodes, edges } = buildFlowGraph(parsed);
+    const controllers = nodes.filter(
+      (n) => n.type === "ingressController" && n.data?.globalK8sIngressController === true,
+    );
+    expect(controllers).toHaveLength(1);
+    const ic = controllers[0]!;
+    expect(ic.parentNode).toBeUndefined();
+    const ingA = nodes.find((n) => n.type === "ingress" && n.data?.label === "edge-global");
+    const ingB = nodes.find((n) => n.type === "ingress" && n.data?.label === "core-ingress");
+    expect(ingA).toBeTruthy();
+    expect(ingB).toBeTruthy();
+    const trunk = edges.find((e) => e.source === ic.id && String(e.target ?? "").includes("junction"));
+    expect(trunk).toBeTruthy();
+    expect(trunk?.markerEnd).toBeUndefined();
+    const junctionId = trunk!.target;
+    expect(edges.filter((e) => e.source === junctionId && e.target === ingA!.id)).toHaveLength(1);
+    expect(edges.filter((e) => e.source === junctionId && e.target === ingB!.id)).toHaveLength(1);
+  });
+
+  it("merges nginx Ingress controllers across different Ingress namespaces; card shows ingress-nginx", () => {
+    const otherNs = INGRESS_01.replace("namespace: traffic", "namespace: edge");
+    const parsed = mergeParseResults([
+      parseK8sYaml(INGRESS_01, "a.yaml"),
+      parseK8sYaml(otherNs, "b.yaml"),
+    ]);
+    const { nodes } = buildFlowGraph(parsed);
+    const controllers = nodes.filter((n) => n.type === "ingressController");
+    expect(controllers).toHaveLength(1);
+    expect(controllers[0]?.data?.namespace).toBe("ingress-nginx");
+    expect(String(controllers[0]?.data?.ingressNamespacesSummary ?? "")).toContain("traffic");
+    expect(String(controllers[0]?.data?.ingressNamespacesSummary ?? "")).toContain("edge");
+  });
+
+  it("creates separate controllers for different ingressClassName values", () => {
+    const traefikIng = INGRESS_01.replace("ingressClassName: nginx", "ingressClassName: traefik").replace(
+      "name: edge-global",
+      "name: other-ing",
+    );
+    const parsed = mergeParseResults([parseK8sYaml(INGRESS_01, "a.yaml"), parseK8sYaml(traefikIng, "b.yaml")]);
+    const { nodes } = buildFlowGraph(parsed);
+    expect(nodes.filter((n) => n.type === "ingressController")).toHaveLength(2);
+  });
+});
+
 describe("buildFlowGraph ingress forwarding", () => {
   it("creates tier-forward ingress->ingress edge for overlapping nginx routes", () => {
     const parsed = mergeParseResults([
