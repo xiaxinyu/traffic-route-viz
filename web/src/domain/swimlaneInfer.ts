@@ -67,13 +67,13 @@ export function inferSwimlaneBand(
   if (tier?.tierIndex === 1) {
     return {
       band: "global",
-      swimlaneLabel: "泳道：Global",
+      swimlaneLabel: "Lane: Global",
     };
   }
   if (tier?.tierIndex === 2 || tier?.tierIndex === 3) {
-    if (isGatewayBundle) return { band: "gateway", swimlaneLabel: "泳道：Gateway" };
-    if (hay.includes("active02")) return { band: "active02", clusterHint: "Active02", swimlaneLabel: "泳道：Active02" };
-    return { band: "active01", clusterHint: "Active01", swimlaneLabel: "泳道：Active01" };
+    if (isGatewayBundle) return { band: "gateway", swimlaneLabel: "Lane: Gateway" };
+    if (hay.includes("active02")) return { band: "active02", clusterHint: "Active02", swimlaneLabel: "Lane: Active02" };
+    return { band: "active01", clusterHint: "Active01", swimlaneLabel: "Lane: Active01" };
   }
 
   if (
@@ -83,15 +83,15 @@ export function inferSwimlaneBand(
     hay.includes("/global/") ||
     hay.includes("global-ingress")
   ) {
-    return { band: "global", swimlaneLabel: "泳道：Global" };
+    return { band: "global", swimlaneLabel: "Lane: Global" };
   }
 
-  if (isGatewayBundle) return { band: "gateway", swimlaneLabel: "泳道：Gateway" };
-  if (hay.includes("active02")) return { band: "active02", clusterHint: "Active02", swimlaneLabel: "泳道：Active02" };
+  if (isGatewayBundle) return { band: "gateway", swimlaneLabel: "Lane: Gateway" };
+  if (hay.includes("active02")) return { band: "active02", clusterHint: "Active02", swimlaneLabel: "Lane: Active02" };
   const ch = clusterFromPath();
   if (ch === "Active01" || hay.includes("active01")) {
-    return { band: "active01", clusterHint: "Active01", swimlaneLabel: "泳道：Active01" };
+    return { band: "active01", clusterHint: "Active01", swimlaneLabel: "Lane: Active01" };
   }
   // Fallback: default worker lane goes to Active01
-  return { band: "active01", swimlaneLabel: "泳道：Active01" };
+  return { band: "active01", swimlaneLabel: "Lane: Active01" };
 }

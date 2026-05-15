@@ -1,16 +1,17 @@
-import { TRV_ICONS } from "./trvIcons";
-
-/** 顶栏最右侧：返回工作台（纯扁平图标按钮） */
+/** Top-right: open workbench home (`#/`). */
 export function WorkbenchToolbarButton() {
   return (
     <a
       href="#/"
       className="header-workbench-btn"
-      title="返回工作台（应用入口）"
-      aria-label="返回工作台"
+      title="Back to workbench"
+      aria-label="Back to workbench"
     >
       <svg viewBox="0 0 24 24" className="header-workbench-btn__svg" aria-hidden="true">
-        <path d={TRV_ICONS.workbench} fill="currentColor" />
+        <rect x="3" y="3" width="8.5" height="8.5" rx="2.35" ry="2.35" fill="currentColor" />
+        <rect x="12.5" y="3" width="8.5" height="8.5" rx="2.35" ry="2.35" fill="currentColor" />
+        <rect x="3" y="12.5" width="8.5" height="8.5" rx="2.35" ry="2.35" fill="currentColor" />
+        <rect x="12.5" y="12.5" width="8.5" height="8.5" rx="2.35" ry="2.35" fill="currentColor" />
       </svg>
     </a>
   );

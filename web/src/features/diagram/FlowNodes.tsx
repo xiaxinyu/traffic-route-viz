@@ -166,7 +166,7 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
         }}
       >
         <div style={{ fontSize: 13, fontWeight: 800, color: "#1e293b" }}>
-          入口流量拓扑分区 · 第 {idx} 视图
+          Entry region · view {idx}
         </div>
         <div style={{ fontSize: 12, marginTop: 4, color: accent, fontWeight: 700 }}>
           {kindLabel2}：{ingressName ?? "—"}
@@ -199,11 +199,11 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
           </div>
         ) : null}
         <div style={{ ...meta({ marginTop: 2 }), color: "#57534e" }}>
-          命名空间：{namespace ?? "—"}
+          Namespace: {namespace ?? "—"}
         </div>
         {files.length > 0 ? (
           <div style={{ ...meta({ marginTop: 6 }), color: "#57534e" }}>
-            <span style={{ fontWeight: 700 }}>来源文件：</span>
+            <span style={{ fontWeight: 700 }}>Source files:</span>
             <span
               style={{
                 display: "inline-block",
@@ -213,9 +213,9 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
               }}
-              title={files.join("，")}
+              title={files.join(", ")}
             >
-              {files.join("，")}
+              {files.join(", ")}
             </span>
           </div>
         ) : sourceSummary ? (
@@ -225,7 +225,7 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
           <div style={{ ...meta({ marginTop: 4 }), color: "#6b7280" }}>{hint}</div>
         ) : (
           <div style={{ ...meta({ marginTop: 4 }), fontSize: 11, color: "#6b7280" }}>
-            选中分区后拖动边缘/角点可调整 Area 大小；拖拽标题栏或底板可整体平移
+            Drag edges/corners to resize; drag the header or panel to move.
           </div>
         )}
       </div>
@@ -283,7 +283,7 @@ export const IngressNode = memo(function IngressNode(props: NodeProps) {
             {t.secretName ? (
               <span style={{ color: "#1e40af" }}>secret: {t.secretName}</span>
             ) : (
-              <span>（无 secret 名）</span>
+              <span>(no secret name)</span>
             )}
             {t.hosts?.length ? (
               <div style={{ marginTop: 2 }}>hosts: {t.hosts.join(", ")}</div>
@@ -293,10 +293,10 @@ export const IngressNode = memo(function IngressNode(props: NodeProps) {
       ) : (
         <div style={meta()}>
           {kind === "VirtualService"
-            ? "VirtualService 不展示 Ingress TLS（请查看 Gateway/证书配置）"
+            ? "VirtualService does not show Ingress TLS (check Gateway / certs)"
             : kind === "HTTPProxy"
-              ? "Contour Gateway 未配置 TLS（或未解析）"
-              : "未配置 spec.tls（入口为 HTTP 或仅注解终端）"}
+              ? "Contour Gateway: no TLS configured (or not parsed)"
+              : "No spec.tls (HTTP only or annotations)"}
         </div>
       )}
       <Handle
@@ -344,15 +344,15 @@ export const HostNode = memo(function HostNode(props: NodeProps) {
       </div>
       {ingressName ? <div style={meta()}>ingress: {ingressName}</div> : null}
       <div style={{ ...meta(), marginTop: 4, fontWeight: 600, color: "#334155" }}>
-        TLS（此 Host）
+        TLS (this host)
       </div>
       {tlsSecretName ? (
         <div style={{ ...meta(), color: "#1e40af", fontWeight: 600 }}>secret: {tlsSecretName}</div>
       ) : (
         <div style={meta()}>
           {entryKind === "HTTPProxy"
-            ? "Contour Gateway 未解析 TLS（或未配置）"
-            : "无匹配证书（或未配置 TLS）"}
+            ? "Contour Gateway: TLS not parsed (or missing)"
+            : "No matching cert (or no TLS)"}
         </div>
       )}
       <Handle
@@ -412,7 +412,7 @@ export const ServiceNode = memo(function ServiceNode(props: NodeProps) {
       ) : null}
       {backendPort !== undefined && backendPort !== "?" ? (
         <div style={{ ...meta(), color: "#1d4ed8", fontWeight: 600 }}>
-          Ingress backend 端口: {String(backendPort)}
+          Ingress backend port: {String(backendPort)}
         </div>
       ) : null}
       {ports?.length ? (
@@ -627,7 +627,7 @@ export const IstioDestinationNode = memo(function IstioDestinationNode(props: No
         {host ?? "?"}
       </div>
       <div style={{ ...meta({ marginTop: 2 }), fontWeight: 650 }}>
-        端口：<span style={{ color: "#0f172a" }}>:{String(port ?? "?")}</span>
+        Port: <span style={{ color: "#0f172a" }}>:{String(port ?? "?")}</span>
       </div>
       {subset ? (
         <div style={{ marginTop: 4 }}>
@@ -765,7 +765,7 @@ export const RouteNode = memo(function RouteNode(props: NodeProps) {
         </div>
       ) : ingressKind === "VirtualService" ? (
         <div style={{ ...meta({ marginTop: 6 }), color: "#57534e", fontWeight: 600 }}>
-          多目标拆分为后继 <strong>Destination</strong> 节点；<strong>权重</strong>在连线上标注。
+          Multiple targets become <strong>Destination</strong> nodes; <strong>weights</strong> are on edges.
         </div>
       ) : (
         <div style={{ ...meta(), marginTop: 4, color: "#1d4ed8", fontWeight: 700 }}>
@@ -833,7 +833,7 @@ export const EndpointsNode = memo(function EndpointsNode(props: NodeProps) {
       </ul>
       {ports?.length ? (
         <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
-          端口: {ports.map((p) => `${p.port}/${p.protocol ?? "TCP"}`).join(", ")}
+          Ports: {ports.map((p) => `${p.port}/${p.protocol ?? "TCP"}`).join(", ")}
         </div>
       ) : null}
     </div>

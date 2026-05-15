@@ -27,7 +27,7 @@ type StackMeta = {
 const STACKS: StackMeta[] = [
   { key: 0, title: "master-data" },
   { key: 1, title: "stock-physical" },
-  { key: 2, title: "其他" },
+  { key: 2, title: "Other" },
 ];
 
 function shortValuesDirLabel(directoryPath: string): string {
@@ -44,9 +44,9 @@ function hasPathPrefix(path: string, prefix: string): boolean {
 
 function WeightedResourcePills({ s }: { s: ValuesDirectoryStats["stanzaSummary"] }) {
   const tip =
-    "在父级链上就近读取 replicaCount / replicas，与每条 resources 相乘后加总；未写字段视为 1 副本。" +
-    " CPU 以 core 展示（1000m = 1 core），内存以 Gi 展示（1024Mi = 1Gi）。" +
-    (s.weightedPartial ? " 部分标量无法解析为数值，已跳过该项。" : "");
+    "Replicas are read from the nearest parent replicaCount/replicas and multiplied per resources block; missing counts as 1." +
+    " CPU is shown in cores (1000m = 1 core); memory in Gi (1024Mi = 1Gi)." +
+    (s.weightedPartial ? " Some scalars could not be parsed and were skipped." : "");
   const reqCpu = s.weightedHasRequestsCpu ? formatCpuFromMilli(s.weightedRequestsCpuMillisTotal) : "—";
   const limCpu = s.weightedHasLimitsCpu ? formatCpuFromMilli(s.weightedLimitsCpuMillisTotal) : "—";
   const reqMem = s.weightedHasRequestsMemory ? formatMemoryFromBytes(s.weightedRequestsMemoryBytesTotal) : "—";
@@ -54,7 +54,7 @@ function WeightedResourcePills({ s }: { s: ValuesDirectoryStats["stanzaSummary"]
   return (
     <div
       className="rs-values-bucket-pills rs-values-bucket-pills--weighted"
-      aria-label="按副本加权后的 resources 合计"
+      aria-label="Replica-weighted resources totals"
       title={tip}
     >
       <span className="rs-values-bucket-pill">
@@ -89,13 +89,13 @@ function ValuesEnvCard({ dir, selectedPath }: { dir: ValuesDirectoryStats; selec
             {dir.directoryPath}
           </span>
         </div>
-        <span className="rs-values-dir-head-count" title="values 中 resources 块数量，按块解析副本并加权">
+        <span className="rs-values-dir-head-count" title="resources blocks in values files, weighted by replicas">
           {dir.resourceEntryCount} workload
         </span>
       </div>
 
       {dir.chart ? (
-        <div className="rs-values-chart-compact" aria-label="Chart 元信息">
+        <div className="rs-values-chart-compact" aria-label="Chart metadata">
           <span className="rs-values-chart-pill">chart v{dir.chart.chartVersion ?? "—"}</span>
           {dir.chart.dependencies.slice(0, 1).map((dep) => (
             <span key={`${dep.name}-${dep.version ?? "na"}`} className="rs-values-chart-pill rs-values-chart-pill--dep">
@@ -110,16 +110,18 @@ function ValuesEnvCard({ dir, selectedPath }: { dir: ValuesDirectoryStats; selec
         </div>
       ) : (
         <div className="rs-values-chart-compact">
-          <span className="rs-values-chart-pill rs-values-chart-pill--muted">无 Chart.yaml</span>
+          <span className="rs-values-chart-pill rs-values-chart-pill--muted">No Chart.yaml</span>
         </div>
       )}
 
       <div className="rs-values-bucket-bar">
-        <span className="rs-values-bucket-k">{dir.valuesFiles.length} 个 values 文件</span>
+        <span className="rs-values-bucket-k">{dir.valuesFiles.length} values file(s)</span>
         <WeightedResourcePills s={dir.stanzaSummary} />
       </div>
       {dir.stanzaSummary.weightedPartial ? (
-        <p className="rs-right-muted rs-values-weighted-note">部分 cpu/memory 标量无法解析，已跳过对应加总项。</p>
+        <p className="rs-right-muted rs-values-weighted-note">
+          Some cpu/memory scalars could not be parsed; those rows were skipped in totals.
+        </p>
       ) : null}
 
       {dir.valuesFiles.some((vf) => vf.parseError) ? (
@@ -153,15 +155,15 @@ function GitRepoCard({
     <li className={`rs-git-repo-card${isActive ? " rs-git-repo-card--active" : ""}`}>
       <div className="rs-git-repo-card-head">
         <span className="rs-git-repo-card-title">{repo.repoFolderLabel}</span>
-        {repoCount > 1 && isActive ? <span className="rs-git-repo-card-badge">当前</span> : null}
+        {repoCount > 1 && isActive ? <span className="rs-git-repo-card-badge">Active</span> : null}
       </div>
       <div className="rs-git-repo-card-sub" title={repo.repoRootPath}>
         {repo.repoRootPath}
       </div>
       {repo.fileReadFailed ? (
-        <div className="rs-git-remote-muted">无法读取该仓库的 .git/config</div>
+        <div className="rs-git-remote-muted">Could not read .git/config</div>
       ) : !repo.originUrl ? (
-        <div className="rs-git-remote-muted">未配置 origin.url</div>
+        <div className="rs-git-remote-muted">origin.url not set</div>
       ) : parts ? (
         <dl className="rs-git-repo-dl">
           <div className="rs-git-repo-dl-row">
@@ -261,57 +263,57 @@ export function ResourceStatsRightPanel({
   const expandAll = () => setCollapsed(new Set());
 
   return (
-    <aside className="rs-right-panel" aria-label="Git 与 Helm 详情">
+    <aside className="rs-right-panel" aria-label="Git and Helm details">
       <section className="left-panel-block grow rs-right-block rs-right-unified">
         <div className="rs-right-section-head">
           <div className="rs-right-section-head__title-wrap">
-            <h2 className="rs-right-section-head__title">资源明细</h2>
-            <p className="rs-right-section-head__desc">按仓库分组展示 Git、Chart 与 workload 资源画像。</p>
+            <h2 className="rs-right-section-head__title">Details</h2>
+            <p className="rs-right-section-head__desc">Git, Chart metadata, and workload-weighted resources by group.</p>
           </div>
         </div>
         <div className="rs-right-topbar">
-          <div className="rs-right-health" aria-label="解析健康度">
-            <span className="status-pill">组 {stacks.filter((s) => s.repos.length > 0 || s.dirs.length > 0).length}</span>
+          <div className="rs-right-health" aria-label="Parse health">
+            <span className="status-pill">Groups {stacks.filter((s) => s.repos.length > 0 || s.dirs.length > 0).length}</span>
             <span className="status-pill">workload {dirs.reduce((n, d) => n + d.resourceEntryCount, 0)}</span>
             <span className={`status-pill${parseErrorCount > 0 ? " rs-pill-warn" : ""}`}>parse err {parseErrorCount}</span>
           </div>
           <div className="rs-right-actions">
             <button type="button" className="btn-secondary rs-mini-btn" onClick={() => setFocusCurrent((v) => !v)}>
-              {focusCurrent ? "取消聚焦" : "聚焦当前"}
+              {focusCurrent ? "Show all groups" : "Focus current tier"}
             </button>
             <button type="button" className="btn-secondary rs-mini-btn" onClick={expandAll}>
-              展开
+              Expand all
             </button>
             <button type="button" className="btn-secondary rs-mini-btn" onClick={collapseAll}>
-              折叠
+              Collapse all
             </button>
           </div>
         </div>
 
         <div className="rs-right-global-status" data-testid="resource-stats-git-remote">
-          {gitReposState.kind === "loading" ? <p className="rs-right-muted">Git 信息加载中…</p> : null}
-          {gitReposState.kind === "none" ? <p className="rs-right-muted">未检出本地 Git 配置</p> : null}
-          {helmLoading ? <p className="rs-right-muted">扫描 values / Chart…</p> : null}
+          {gitReposState.kind === "loading" ? <p className="rs-right-muted">Loading Git metadata…</p> : null}
+          {gitReposState.kind === "none" ? <p className="rs-right-muted">No local Git config found</p> : null}
+          {helmLoading ? <p className="rs-right-muted">Scanning values / Chart…</p> : null}
           {valsKind === "error" ? (
             <p className="rs-right-muted" role="alert">
-              统计失败：{valuesStatsState.message}
+              Stats error: {valuesStatsState.message}
             </p>
           ) : null}
           {valsKind === "ready" && noValuesAnywhere ? (
-            <p className="rs-right-muted">未发现 values*.yaml；导入含 Helm 的目录后在此展示。</p>
+            <p className="rs-right-muted">No values*.yaml found. Import a Helm-style folder to populate this panel.</p>
           ) : null}
         </div>
 
         {gitReposState.kind === "ready" && gitReposOrdered.length > 1 ? (
           <div className="rs-git-repo-meta rs-git-repo-meta--top">
-            <span className="rs-git-repo-count-pill">{gitReposOrdered.length} 个 Git 仓库</span>
+            <span className="rs-git-repo-count-pill">{gitReposOrdered.length} Git repo(s)</span>
             {activeGitRepoRoot ? (
               <span className="rs-git-active-pill" title={activeGitRepoRoot}>
-                与预览匹配：
+                Preview match:
                 {gitReposOrdered.find((r) => r.repoRootPath === activeGitRepoRoot)?.repoFolderLabel ?? activeGitRepoRoot}
               </span>
             ) : (
-              <span className="rs-git-remote-muted rs-git-active-hint">点击文件后会高亮匹配 origin</span>
+              <span className="rs-git-remote-muted rs-git-active-hint">Selecting a file highlights the matching origin</span>
             )}
           </div>
         ) : null}
@@ -340,7 +342,7 @@ export function ResourceStatsRightPanel({
                 {isOpen ? (
                   <>
                     <div className="rs-product-git-block">
-                      <h4 className="rs-product-subhead">Git 仓库</h4>
+                      <h4 className="rs-product-subhead">Git repos</h4>
                       {gitReposState.kind === "ready" && stack.repos.length > 0 ? (
                         <ul className="rs-git-repo-list rs-git-repo-list--stacked">
                           {stack.repos.map((repo) => (
@@ -353,14 +355,14 @@ export function ResourceStatsRightPanel({
                           ))}
                         </ul>
                       ) : (
-                        <p className="rs-right-muted">本组未匹配到 Git 仓库。</p>
+                        <p className="rs-right-muted">No Git repos in this group.</p>
                       )}
                     </div>
 
                     <div className="rs-product-helm-block">
-                      <h4 className="rs-product-subhead">Workload 与资源</h4>
+                      <h4 className="rs-product-subhead">Workloads</h4>
                       {valsKind === "ready" && stack.dirs.length === 0 && !noValuesAnywhere ? (
-                        <p className="rs-right-muted">本组下未发现含 values*.yaml 的子目录。</p>
+                        <p className="rs-right-muted">No subfolders with values*.yaml in this group.</p>
                       ) : null}
                       {valsKind === "ready" && stack.dirs.length > 0 ? (
                         <ul className="rs-values-dir-list">

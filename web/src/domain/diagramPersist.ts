@@ -254,38 +254,38 @@ export function serializeDiagram(
 }
 
 export function parseDiagramFileJson(raw: unknown): DiagramFileV1 | { error: string } {
-  if (!isRecord(raw)) return { error: "文件不是合法的 JSON 对象" };
+  if (!isRecord(raw)) return { error: "File is not a valid JSON object" };
   if (raw.schemaVersion !== DIAGRAM_FILE_VERSION) {
-    return { error: `不支持的 schema 版本（需要 ${DIAGRAM_FILE_VERSION}）` };
+    return { error: `Unsupported schema version (expected ${DIAGRAM_FILE_VERSION})` };
   }
-  if (typeof raw.savedAt !== "string") return { error: "缺少 savedAt" };
-  if (typeof raw.yamlText !== "string") return { error: "缺少 yamlText" };
+  if (typeof raw.savedAt !== "string") return { error: "Missing savedAt" };
+  if (typeof raw.yamlText !== "string") return { error: "Missing yamlText" };
   if (raw.importedFiles !== null && !Array.isArray(raw.importedFiles)) {
-    return { error: "importedFiles 格式错误（应为数组或 null）" };
+    return { error: "importedFiles must be an array or null" };
   }
   if ("importedFiles" in raw && raw.importedFiles !== null) {
     for (const f of raw.importedFiles as unknown[]) {
       if (!isRecord(f) || typeof f.name !== "string" || typeof f.text !== "string") {
-        return { error: "importedFiles 项必须为 { name, text }" };
+        return { error: "Each importedFiles entry must be { name, text }" };
       }
     }
   }
-  if (!Array.isArray(raw.nodes)) return { error: "缺少 nodes 数组" };
-  if (!Array.isArray(raw.edges)) return { error: "缺少 edges 数组" };
-  if (!isRecord(raw.viewport)) return { error: "缺少 viewport" };
+  if (!Array.isArray(raw.nodes)) return { error: "Missing nodes array" };
+  if (!Array.isArray(raw.edges)) return { error: "Missing edges array" };
+  if (!isRecord(raw.viewport)) return { error: "Missing viewport" };
   const vp = raw.viewport as Record<string, unknown>;
   const x = vp.x,
     y = vp.y,
     zoom = vp.zoom;
   if (typeof x !== "number" || typeof y !== "number" || typeof zoom !== "number") {
-    return { error: "viewport.x / y / zoom 必须为数字" };
+    return { error: "viewport.x, viewport.y, and viewport.zoom must be numbers" };
   }
 
   let activeFileIndex: number | null = null;
   if ("activeFileIndex" in raw && raw.activeFileIndex !== undefined) {
     const a = raw.activeFileIndex;
     if (a !== null && (typeof a !== "number" || !Number.isInteger(a))) {
-      return { error: "activeFileIndex 应为整数或 null" };
+      return { error: "activeFileIndex must be an integer or null" };
     }
     activeFileIndex = a === null ? null : a;
   }

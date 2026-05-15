@@ -11,13 +11,13 @@ type SummaryClusterProps = {
 function gitRepoCountDisplay(state: GitReposState): { text: string; title?: string } {
   switch (state.kind) {
     case "loading":
-      return { text: "…", title: "正在解析 Git 仓库" };
+      return { text: "…", title: "Resolving Git repos" };
     case "none":
-      return { text: "0", title: "未发现 .git/config（或未导入）" };
+      return { text: "0", title: "No .git/config found (or no import yet)" };
     case "ready":
       return { text: String(state.repos.length) };
     default:
-      return { text: "—", title: "等待导入或解析" };
+      return { text: "—", title: "Waiting for import" };
   }
 }
 
@@ -31,21 +31,21 @@ export function ResourceStatsHeaderSummaryCluster({
   const isReady = valuesStatsState.kind === "ready";
   const inProgress = valuesStatsState.kind === "idle" || valuesStatsState.kind === "loading";
   const isErr = valuesStatsState.kind === "error";
-  const statusText = isErr ? "异常" : isReady ? "就绪" : inProgress ? "扫描中" : "—";
+  const statusText = isErr ? "Error" : isReady ? "Ready" : inProgress ? "Scanning" : "—";
 
   let limitsBlock: ReactNode;
   if (valuesStatsState.kind === "error") {
     limitsBlock = (
       <p className="rs-header-resource-cluster__err rs-header-resource-cluster__err--inline" role="alert">
-        统计失败：{valuesStatsState.message}
+        Stats error: {valuesStatsState.message}
       </p>
     );
   } else if (inProgress) {
-    limitsBlock = <span className="rs-header-resource-cluster__loading">Helm 汇总计算中…</span>;
+    limitsBlock = <span className="rs-header-resource-cluster__loading">Computing Helm totals…</span>;
   } else {
     const s = valuesStatsState.stats.summary;
     limitsBlock = (
-      <div className="rs-header-resource-cluster__limits" aria-label="CPU 与内存合计">
+      <div className="rs-header-resource-cluster__limits" aria-label="CPU and memory totals">
         <span className="rs-header-limit">
           req.cpu {isReady && s.weightedHasRequestsCpu ? formatCpuFromMilli(s.weightedRequestsCpuMillisTotal) : "—"}
         </span>
@@ -59,8 +59,8 @@ export function ResourceStatsHeaderSummaryCluster({
           limits.mem {isReady && s.weightedHasLimitsMemory ? formatMemoryFromBytes(s.weightedLimitsMemoryBytesTotal) : "—"}
         </span>
         {isReady && s.weightedPartial ? (
-          <span className="rs-header-limit rs-header-limit--partial" title="部分标量无法解析为数值">
-            （部分未计入）
+          <span className="rs-header-limit rs-header-limit--partial" title="Some scalars could not be parsed">
+            (partial)
           </span>
         ) : null}
       </div>
@@ -68,13 +68,13 @@ export function ResourceStatsHeaderSummaryCluster({
   }
 
   return (
-    <div className="rs-header-summary-cluster" data-testid="resource-stats-header-metrics" aria-label="资源统计汇总">
+    <div className="rs-header-summary-cluster" data-testid="resource-stats-header-metrics" aria-label="Summary metrics">
       <div className="rs-header-summary-cluster__strip">
         <div className="rs-header-summary-cluster__group rs-header-summary-cluster__group--status">
           <span
             className={`rs-header-meta-pill rs-header-meta-pill--state rs-header-meta-pill--${isReady ? "ok" : inProgress ? "scan" : "err"}`}
           >
-            状态 {statusText}
+            Status {statusText}
           </span>
           {selectedPath ? (
             <span className="rs-header-meta-pill rs-header-meta-pill--path" title={selectedPath}>
@@ -85,7 +85,7 @@ export function ResourceStatsHeaderSummaryCluster({
 
         <div className="rs-header-summary-cluster__divider" aria-hidden="true" />
 
-        <div className="rs-header-summary-cluster__group rs-header-summary-cluster__group--scale" aria-label="Git、Chart 与 Workload 数量">
+        <div className="rs-header-summary-cluster__group rs-header-summary-cluster__group--scale" aria-label="Git, Chart, and workload counts">
           <div className="rs-header-file-cluster__kpis">
             <div className="rs-header-kpi rs-header-kpi--dense" title={repoDisp.title}>
               <span className="rs-header-kpi__k">Git</span>

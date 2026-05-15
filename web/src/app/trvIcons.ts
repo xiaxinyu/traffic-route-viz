@@ -13,6 +13,9 @@ export const TRV_ICONS = {
   minus: "M19 13H5v-2h14v2z",
   plus: "M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z",
   chart: "M5 9h3v10H5V9zm5-4h3v14h-3V5zm5 7h3v7h-3v-7z",
-  /** 工作台入口：2×2 模块栅格（与首页卡片语义一致） */
+  /** Workbench home: 2×2 module grid (legacy square tiles; prefer rounded rects in `WorkbenchToolbarButton`) */
   workbench: "M4 4h7v7H4V4zm9 0h7v7h-7V4zm-9 9h7v7H4v-7zm9 0h7v7h-7v-7z",
+  /** Sign out: door + arrow (Material-style, viewBox 0 0 24 24) */
+  signOut:
+    "M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.59L17 17l5-5-5-5zM4 5h7V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h7v-2H4V5z",
 } as const;

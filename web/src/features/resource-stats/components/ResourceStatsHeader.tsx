@@ -14,13 +14,13 @@ export function ResourceStatsHeader({ centerMetrics }: Props) {
         <div className="header-seg header-seg--brand rs-stats-header__brand">
           <div className="header-title-wrap">
             <div className="header-title-row">
-              <h1 title="资源统计：本地目录与文件预览">资源统计</h1>
+              <h1 title="Resource stats: local tree and file preview">Resource stats</h1>
             </div>
-            <p className="rs-stats-header__slogan">本地目录、Git 与 Helm 资源一览</p>
+            <p className="rs-stats-header__slogan">Local tree, Git remotes, and Helm values</p>
           </div>
         </div>
 
-        <div className="header-seg header-seg--metrics rs-stats-header__center" aria-label="资源统计汇总">
+        <div className="header-seg header-seg--metrics rs-stats-header__center" aria-label="Summary metrics">
           {centerMetrics}
         </div>
 

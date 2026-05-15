@@ -15,7 +15,7 @@ function devLog(label: string, data: Record<string, unknown>) {
 
 function clip(s: string, max: number): string {
   if (s.length <= max) return s;
-  return `${s.slice(0, max)}\n\n…(已截断，共 ${s.length} 字符)`;
+  return `${s.slice(0, max)}\n\n…(truncated, ${s.length} chars total)`;
 }
 
 function collectKindYaml(docs: IndexedRawDoc[], kind: string, budget: number): string {
@@ -48,8 +48,8 @@ export function buildRouteMergeAiUserContent(
   const completeYamlBudget = Math.floor(maxTotalChars * 0.72);
   const hasCompleteYaml = mergedYamlSample.length <= completeYamlBudget;
   const yamlSection = hasCompleteYaml
-    ? `## 当前完整 YAML（必须基于它输出完整 optimizedYaml）\n${mergedYamlSample}`
-    : `## 当前 YAML 过大（未完整发送）\n当前 YAML 共 ${mergedYamlSample.length} 字符，超过本次请求预算 ${completeYamlBudget} 字符。optimizedYaml 仍必须非空：请基于下方辅助索引输出你能保证语义等价的最安全 YAML，并在 semanticEquivalence、suggestions、disclaimer 中明确说明完整性限制；若用户需要完整可替换结果，应建议按单文件或较小范围运行 AI。`;
+    ? `## Full YAML (optimizedYaml must be a complete replacement)\n${mergedYamlSample}`
+    : `## YAML truncated\nInput is ${mergedYamlSample.length} chars; budget is ${completeYamlBudget}. optimizedYaml must still be non-empty: emit the safest equivalent YAML you can from the indexes below, and explain limits in semanticEquivalence, suggestions, and disclaimer. For a full drop-in file, recommend running AI on a single file or smaller scope.`;
 
   const remainingBudget = Math.max(12_000, maxTotalChars - yamlSection.length);
   const perKindBudget = Math.floor(remainingBudget / 3);
@@ -59,16 +59,16 @@ export function buildRouteMergeAiUserContent(
   const rules = analysis.recommendations
     .map(
       (r) =>
-        `- [${r.level}] ${r.kind} ${r.resourceRefs.join(", ")}: ${r.rationale} (Δ行≈${r.estimatedLineDelta})`,
+        `- [${r.level}] ${r.kind} ${r.resourceRefs.join(", ")}: ${r.rationale} (Δ lines ≈${r.estimatedLineDelta})`,
     )
     .join("\n");
 
   const core = clip(
-    `## 优化目标\n压缩 VirtualService、DestinationRule、Ingress YAML，保持路由功能一致，输出完整 optimizedYaml，并给出简洁清晰的优化建议。\n\n## 规则引擎摘要\n${rules || "(无规则引擎条目)"}\n\n## v1 提示\n${analysis.v1RulesReminder}\n\n${yamlSection}\n\n## Ingress YAML 辅助索引\n${ing || "(无)"}\n\n## VirtualService YAML 辅助索引\n${vs || "(无)"}\n\n## DestinationRule YAML 辅助索引\n${dr || "(无)"}`,
+    `## Goal\nCompress VirtualService, DestinationRule, and Ingress YAML with equivalent routing; output full optimizedYaml plus concise guidance.\n\n## Rule engine\n${rules || "(no rule-engine rows)"}\n\n## v1 reminder\n${analysis.v1RulesReminder}\n\n${yamlSection}\n\n## Ingress index\n${ing || "(none)"}\n\n## VirtualService index\n${vs || "(none)"}\n\n## DestinationRule index\n${dr || "(none)"}`,
     maxTotalChars,
   );
   if (!scopeHeading) return core;
-  return clip(`## 分析范围\n${scopeHeading}\n\n${core}`, maxTotalChars);
+  return clip(`## Scope\n${scopeHeading}\n\n${core}`, maxTotalChars);
 }
 
 function parseJsonPayload(raw: string): RouteMergeAiPayload {
@@ -76,7 +76,7 @@ function parseJsonPayload(raw: string): RouteMergeAiPayload {
   const start = trimmed.indexOf("{");
   const end = trimmed.lastIndexOf("}");
   if (start < 0 || end <= start) {
-    throw new Error("模型未返回可解析的 JSON");
+    throw new Error("Model did not return parseable JSON");
   }
   const parsed = JSON.parse(trimmed.slice(start, end + 1)) as Record<string, unknown>;
   const suggestionsRaw = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
@@ -108,7 +108,7 @@ function parseJsonPayload(raw: string): RouteMergeAiPayload {
 }
 
 export type CallRouteMergeAiOptions = {
-  /** 覆盖默认 system 提示；须仍约束模型输出与 `parseJsonPayload` 兼容的 JSON。 */
+  /** Overrides default system prompt; must still constrain model to JSON compatible with `parseJsonPayload`. */
   systemPrompt?: string;
 };
 
@@ -208,7 +208,7 @@ export async function callRouteMergeAi(
               .join("")
           : null;
   if (typeof content !== "string" || !content.trim()) {
-    throw new Error("模型返回空内容");
+    throw new Error("Model returned empty content");
   }
   return parseJsonPayload(content);
 }

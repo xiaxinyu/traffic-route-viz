@@ -262,7 +262,7 @@ function parseChartMeta(relativePath: string, text: string): ChartMeta {
       chartVersion: null,
       appVersion: null,
       dependencies: [],
-      parseError: error instanceof Error ? error.message : "Chart.yaml 解析失败",
+      parseError: error instanceof Error ? error.message : "Failed to parse Chart.yaml",
       relativePath,
     };
   }
@@ -284,7 +284,7 @@ function parseValuesFile(relativePath: string, text: string): ValuesFileStats {
     return {
       relativePath,
       resourceEntries: [],
-      parseError: error instanceof Error ? error.message : "values 文件解析失败",
+      parseError: error instanceof Error ? error.message : "Failed to parse values file",
     };
   }
 }

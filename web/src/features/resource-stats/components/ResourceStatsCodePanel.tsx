@@ -30,24 +30,24 @@ export function ResourceStatsCodePanel({ selectedPath, preview }: Props) {
   }, [editorValue]);
 
   const placeholder = useMemo(() => {
-    if (selectedPath && preview.status === "loading") return "读取中…";
-    if (!selectedPath) return "在左侧选择文件以预览";
+    if (selectedPath && preview.status === "loading") return "Loading…";
+    if (!selectedPath) return "Select a file on the left to preview";
     return "";
   }, [selectedPath, preview.status]);
 
   const statusLabel = useMemo(() => {
-    if (!selectedPath) return "待选择";
-    if (preview.status === "loading") return "读取中";
-    if (preview.status === "error") return "读取失败";
-    if (preview.status === "ready") return "已就绪";
-    return "待选择";
+    if (!selectedPath) return "Idle";
+    if (preview.status === "loading") return "Loading";
+    if (preview.status === "error") return "Error";
+    if (preview.status === "ready") return "Ready";
+    return "Idle";
   }, [selectedPath, preview.status]);
 
   return (
     <div className="rs-code-panel">
-      <div className="rs-code-panel-head" aria-label="当前预览文件">
-        <div className="rs-code-panel-head__path" title={selectedPath ?? "未选择文件"}>
-          {selectedPath ?? "未选择文件"}
+      <div className="rs-code-panel-head" aria-label="Preview file">
+        <div className="rs-code-panel-head__path" title={selectedPath ?? "No file selected"}>
+          {selectedPath ?? "No file selected"}
         </div>
         <span
           className={`rs-code-panel-head__status rs-code-panel-head__status--${preview.status === "error" ? "err" : preview.status === "ready" ? "ok" : preview.status === "loading" ? "loading" : "idle"}`}

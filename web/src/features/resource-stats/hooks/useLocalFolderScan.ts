@@ -169,7 +169,7 @@ export function useLocalFolderScan() {
         if (!cancelled) {
           setValuesStatsState({
             kind: "error",
-            message: error instanceof Error ? error.message : "values 统计失败",
+            message: error instanceof Error ? error.message : "Values stats failed",
           });
         }
       },
@@ -202,7 +202,7 @@ export function useLocalFolderScan() {
         if (!cancelled) setPreview({ status: "ready", text });
       },
       () => {
-        if (!cancelled) setPreview({ status: "error", message: "无法将该文件解码为文本" });
+        if (!cancelled) setPreview({ status: "error", message: "Could not decode file as text" });
       },
     );
     return () => {

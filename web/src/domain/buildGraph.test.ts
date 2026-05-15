@@ -149,7 +149,7 @@ describe("buildFlowGraph ingress forwarding", () => {
     expect(dst).toBeTruthy();
 
     const forwarding = edges.find(
-      (e) => e.label === "Nginx 转发" && e.source === src!.id && e.target === dst!.id,
+      (e) => e.label === "Nginx forward" && e.source === src!.id && e.target === dst!.id,
     );
     expect(forwarding).toBeTruthy();
     expect(forwarding?.style).toMatchObject({ stroke: "#6366f1" });
@@ -166,7 +166,7 @@ describe("buildFlowGraph ingress forwarding", () => {
 });
 
 describe("buildFlowGraph ingress forwarding (non-tiered)", () => {
-  it("renders only one Nginx 转发 edge for an overlapping ingress pair", () => {
+  it("renders only one Nginx forward edge for an overlapping ingress pair", () => {
     const parsed = mergeParseResults([
       parseK8sYaml(INGRESS_01, "edge.yaml"),
       parseK8sYaml(INGRESS_02, "core.yaml"),
@@ -180,7 +180,7 @@ describe("buildFlowGraph ingress forwarding (non-tiered)", () => {
 
     const forwards = edges.filter(
       (e) =>
-        e.label === "Nginx 转发" &&
+        e.label === "Nginx forward" &&
         ((e.source === src!.id && e.target === dst!.id) ||
           (e.source === dst!.id && e.target === src!.id)),
     );

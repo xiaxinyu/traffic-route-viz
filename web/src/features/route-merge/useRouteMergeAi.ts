@@ -49,9 +49,7 @@ export function useRouteMergeAi(yamlText: string, importedFiles: ImportedYamlFil
     setPayload(null);
     setError(null);
     setSourceYaml(mergedYaml);
-    setScopeLabel(
-      importedFiles?.length ? "全部已导入文件（合并视图）" : "当前编辑区 YAML（未使用多文件导入）",
-    );
+    setScopeLabel(importedFiles?.length ? "All imported files (merged view)" : "Editor YAML (single buffer)");
     if (!cfg) {
       setPreparedCfg(null);
       setPreviewUserContent("");
@@ -60,8 +58,8 @@ export function useRouteMergeAi(yamlText: string, importedFiles: ImportedYamlFil
       return;
     }
     const scopeHeading = importedFiles?.length
-      ? "当前为**合并视图**：目标是压缩所有已导入文件中的 VS/DR/Ingress，并保持功能等价。若输入过大无法完整发送，仍须输出非空 optimizedYaml，并明确建议用户按单文件运行以得到完整可替换结果。"
-      : "当前为**仅编辑器 YAML**（未使用多文件导入）。目标是压缩当前 YAML 内的 VS/DR/Ingress，optimizedYaml 必须是完整可替换的新 YAML；不要假设存在未出现在 YAML 中的其它资源。";
+      ? "**Merged view:** compress VS/DR/Ingress across all imported files with equivalent behavior. If input is too large to send fully, still return non-empty optimizedYaml and tell the user to run per-file for a complete drop-in."
+      : "**Editor only:** compress VS/DR/Ingress inside the current YAML; optimizedYaml must be a full replacement; do not assume resources not present in the buffer.";
     const user = buildRouteMergeAiUserContent(analysis, indexed, mergedYaml, { scopeHeading });
     setPreparedCfg(cfg);
     setPreparedUserContent(user);
@@ -79,7 +77,7 @@ export function useRouteMergeAi(yamlText: string, importedFiles: ImportedYamlFil
         setPreparedCfg(null);
         setPreviewUserContent("");
         setPreparedUserContent("");
-        setError("未导入文件，无法按单文件分析。");
+        setError("No imported files; per-file analysis unavailable.");
         return;
       }
       const f = importedFiles[index];
@@ -88,7 +86,7 @@ export function useRouteMergeAi(yamlText: string, importedFiles: ImportedYamlFil
         setPreparedCfg(null);
         setPreviewUserContent("");
         setPreparedUserContent("");
-        setError("文件索引无效。");
+        setError("Invalid file index.");
         return;
       }
       if (!cfg) {
@@ -99,13 +97,13 @@ export function useRouteMergeAi(yamlText: string, importedFiles: ImportedYamlFil
         return;
       }
       const fileKey = f.relPath ?? f.name;
-      setScopeLabel(`单个文件：${fileKey}`);
+      setScopeLabel(`File: ${fileKey}`);
       const indexedSubset = indexed.filter((d) => d.sourceFile === fileKey);
       const pr = mergeParseResults([parseK8sYaml(f.text, fileKey)]);
       const analysisSubset = analyzeRouteMerge(pr, indexedSubset);
       const mergedFile = f.text;
       setSourceYaml(mergedFile);
-      const scopeHeading = `仅分析导入文件 \`${fileKey}\`。目标是压缩该文件内的 VS/DR/Ingress 并保持功能等价；optimizedYaml 必须输出该文件完整可替换的新 YAML；不要臆测其它导入文件中的资源。`;
+      const scopeHeading = `Analyze imported file \`${fileKey}\` only. Compress VS/DR/Ingress inside that file; optimizedYaml must be a full replacement for that file; do not assume resources from other imports.`;
       const user = buildRouteMergeAiUserContent(analysisSubset, indexedSubset, mergedFile, {
         scopeHeading,
       });
@@ -122,7 +120,7 @@ export function useRouteMergeAi(yamlText: string, importedFiles: ImportedYamlFil
       return;
     }
     if (!preparedUserContent.trim()) {
-      setError("预览输入为空，无法发起 AI 请求。");
+      setError("Preview input is empty; cannot call AI.");
       return;
     }
     setBusy(true);

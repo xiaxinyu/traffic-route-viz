@@ -79,29 +79,29 @@ export function AppHeader(props: {
   } = props;
 
   const importTitle = importedFiles?.length
-    ? `已导入 ${importedFiles.length} 个文件` +
+    ? `${importedFiles.length} file(s) imported` +
       (importedLinesSummary
-        ? `；各文件合计 ${importedLinesSummary.sumOfFileLines} 行，合并后 ${importedLinesSummary.mergedLineCount} 行`
+        ? ` · ${importedLinesSummary.sumOfFileLines} lines across files · ${importedLinesSummary.mergedLineCount} lines merged`
         : "")
     : yamlTextStats.hasContent
-      ? `可合并解析多文件；当前 YAML ${yamlTextStats.lineCount} 行（文档/字符见侧栏「YAML」）`
-      : "可粘贴 YAML，或导入多文件/文件夹进行合并解析";
+      ? `Paste or import YAML; current buffer ${yamlTextStats.lineCount} lines (see YAML panel for docs/chars)`
+      : "Paste YAML or import files/folders to merge and parse";
 
   const meta = importedFiles?.length ? (
     <>
-      {importedFiles.length} 文件
+      {importedFiles.length} file(s)
       {importedLinesSummary ? (
         <>
           {" "}
-          · 合计 {importedLinesSummary.sumOfFileLines} 行 · 合并{" "}
-          {importedLinesSummary.mergedLineCount} 行
+          · {importedLinesSummary.sumOfFileLines} lines total · merged{" "}
+          {importedLinesSummary.mergedLineCount} lines
         </>
       ) : null}
     </>
   ) : yamlTextStats.hasContent ? (
-    <>未导入文件 · 当前 {yamlTextStats.lineCount} 行</>
+    <>No files · buffer {yamlTextStats.lineCount} lines</>
   ) : (
-    <>可拖拽或上传</>
+    <>Drop files here or use Upload</>
   );
 
   return (
@@ -110,19 +110,19 @@ export function AppHeader(props: {
         <div className="header-seg header-seg--brand">
           <div className="header-title-wrap">
             <div className="header-title-row">
-              <h1 title="专业化流量拓扑工作台：导入、解析、筛选、定位、导出一体化">
+              <h1 title="Traffic Route Viz — import, parse, search, and export">
                 Traffic Route Viz
               </h1>
             </div>
             <p className="header-tagline">
-              专业化流量拓扑工作台：导入、解析、筛选、定位、导出一体化
+              Import YAML, explore ingress routes, and export the diagram
             </p>
           </div>
         </div>
 
         <section
           className="header-seg header-seg--import"
-          aria-label="输入与数据源"
+          aria-label="Input and data source"
           title={importTitle}
           onDragOver={(ev) => ev.preventDefault()}
           onDrop={(ev) => {
@@ -131,10 +131,10 @@ export function AppHeader(props: {
           }}
         >
           <div className="header-import-copy">
-            <span className="header-import-label">输入与数据源</span>
+            <span className="header-import-label">Input & source</span>
             <span className="header-import-meta">{meta}</span>
             <span className="header-import-hint">
-              拖拽 YAML 文件或文件夹到此区域，自动追加、去重并刷新
+              Drop YAML files or folders here — append, dedupe, and refresh
             </span>
           </div>
           <div
@@ -142,39 +142,39 @@ export function AppHeader(props: {
             className="header-import-drop-indicator"
             aria-hidden="true"
           >
-            拖拽导入
+            Drop to import
           </div>
-          <div className="header-import-tools" role="group" aria-label="导入 YAML">
+          <div className="header-import-tools" role="group" aria-label="Import YAML">
             <button
               type="button"
               className="btn-primary btn-with-icon header-import-btn"
               onClick={onClickImportFiles}
-              title="导入一个或多个 YAML 文件"
-              aria-label="导入文件"
+              title="Import one or more YAML files"
+              aria-label="Import files"
             >
               <Icon d={icons.docFile} className="trv-icon trv-icon--sm" />
-              上传文件
+              Files
             </button>
             <button
               type="button"
               className="btn-secondary btn-with-icon header-import-btn"
               onClick={onClickImportFolder}
-              title="导入文件夹（保留相对路径）"
-              aria-label="导入文件夹"
+              title="Import a folder (keeps relative paths)"
+              aria-label="Import folder"
             >
               <Icon d={icons.folder} className="trv-icon trv-icon--sm" />
-              上传文件夹
+              Folder
             </button>
             {importedFiles?.length ? (
               <button
                 type="button"
                 className="btn-secondary btn-with-icon header-import-btn header-import-btn--danger"
                 onClick={onClearImported}
-                aria-label="清空已导入"
-                title="清空已导入与编辑区"
+                aria-label="Clear imports"
+                title="Clear imported files and editor"
               >
                 <Icon d={icons.trash} className="trv-icon trv-icon--sm" />
-                清空
+                Clear
               </button>
             ) : null}
           </div>
@@ -190,19 +190,19 @@ export function AppHeader(props: {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") onNextMatch();
                 }}
-                placeholder="搜索节点（name / host / path / service）"
-                aria-label="搜索节点"
+                placeholder="Search nodes (name / host / path / service)"
+                aria-label="Search nodes"
               />
             </div>
 
-            <div className="header-tool-cluster" role="group" aria-label="匹配与画布">
-              <div className="search-nav" role="navigation" aria-label="聚焦导航">
+            <div className="header-tool-cluster" role="group" aria-label="Match and canvas">
+              <div className="search-nav" role="navigation" aria-label="Match navigation">
                 <button
                   type="button"
                   onClick={onPrevMatch}
                   disabled={!hasMatches}
-                  aria-label="上一个"
-                  title="上一个"
+                  aria-label="Previous match"
+                  title="Previous match"
                 >
                   <Icon d={icons.chevLeft} />
                 </button>
@@ -210,8 +210,8 @@ export function AppHeader(props: {
                   type="button"
                   onClick={onNextMatch}
                   disabled={!hasMatches}
-                  aria-label="下一个"
-                  title="下一个"
+                  aria-label="Next match"
+                  title="Next match"
                 >
                   <Icon d={icons.chevRight} />
                 </button>
@@ -222,8 +222,8 @@ export function AppHeader(props: {
                 type="button"
                 className="btn-primary btn-icon"
                 onClick={onRefresh}
-                title="重新解析 YAML 并刷新拓扑"
-                aria-label="刷新"
+                title="Re-parse YAML and refresh the graph"
+                aria-label="Refresh"
               >
                 <Icon d={icons.refresh} />
               </button>
@@ -232,34 +232,34 @@ export function AppHeader(props: {
                 type="button"
                 className="btn-secondary btn-icon fit"
                 onClick={onFit}
-                title="将拓扑重新适配到当前画布"
-                aria-label="适配"
+                title="Fit the graph to the viewport"
+                aria-label="Fit view"
               >
                 <Icon d={icons.fit} />
               </button>
 
-              <div className="search-nav" role="group" aria-label="全局缩放控制">
+              <div className="search-nav" role="group" aria-label="UI zoom">
                 <button
                   type="button"
                   onClick={onZoomOut}
-                  title="缩小侧栏与拓扑（含文字）"
-                  aria-label="缩小"
+                  title="Zoom out sidebar and canvas"
+                  aria-label="Zoom out"
                 >
                   <Icon d={icons.minus} />
                 </button>
                 <button
                   type="button"
                   onClick={onZoomReset}
-                  title="将侧栏与拓扑缩放设为 100%"
-                  aria-label="重置缩放"
+                  title="Reset sidebar and canvas zoom to 100%"
+                  aria-label="Reset zoom"
                 >
                   <span className="trv-icon-btn-text">{uiScalePct}%</span>
                 </button>
                 <button
                   type="button"
                   onClick={onZoomIn}
-                  title="放大侧栏与拓扑（含文字）"
-                  aria-label="放大"
+                  title="Zoom in sidebar and canvas"
+                  aria-label="Zoom in"
                 >
                   <Icon d={icons.plus} />
                 </button>
@@ -269,7 +269,7 @@ export function AppHeader(props: {
             <div
               className="header-tool-cluster header-tool-cluster--status"
               role="group"
-              aria-label="指标"
+              aria-label="Metrics"
             >
               <button
                 type="button"
@@ -279,8 +279,8 @@ export function AppHeader(props: {
                     : "btn-secondary btn-icon metric"
                 }
                 onClick={toggleStatusOpen}
-                title={statusOpen ? "收起指标" : "展开指标"}
-                aria-label="指标"
+                title={statusOpen ? "Hide metrics" : "Show metrics"}
+                aria-label="Metrics"
               >
                 <Icon d={icons.chart} />
               </button>

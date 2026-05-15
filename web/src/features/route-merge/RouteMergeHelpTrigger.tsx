@@ -76,10 +76,10 @@ export function RouteMergeHelpTrigger(props: RouteMergeHelpTriggerProps) {
         type="button"
         className="route-merge-help-btn"
         ref={btnRef}
-        aria-label="路由合并建议（v1）说明"
+        aria-label="Route merge hints (v1)"
         aria-expanded={open}
         aria-controls={tipId}
-        title="路由合并建议（v1）"
+        title="Route merge hints (v1)"
         onClick={() => setOpen((v) => !v)}
       >
         ?
@@ -89,7 +89,7 @@ export function RouteMergeHelpTrigger(props: RouteMergeHelpTriggerProps) {
           id={tipId}
           className="route-merge-help-popover route-merge-help-popover--fixed"
           role="dialog"
-          aria-label="路由合并建议（v1）"
+          aria-label="Route merge hints (v1)"
           onMouseDown={(e) => e.stopPropagation()}
           style={
             pos
@@ -98,16 +98,16 @@ export function RouteMergeHelpTrigger(props: RouteMergeHelpTriggerProps) {
           }
         >
           <div className="route-merge-help-popover-head">
-            <span className="route-merge-help-popover-title">路由合并建议（v1）</span>
-            <button type="button" className="route-merge-help-close" onClick={close} aria-label="关闭">
+            <span className="route-merge-help-popover-title">Route merge (v1)</span>
+            <button type="button" className="route-merge-help-close" onClick={close} aria-label="Close">
               ×
             </button>
           </div>
           <div className="route-merge-help-popover-body">
             <p className="route-merge-help-reminder">{analysis.v1RulesReminder}</p>
-            <p className="route-merge-help-hint">dry-run；不修改编辑器；规则引擎仅分析与导出候选。</p>
+            <p className="route-merge-help-hint">Dry-run; does not edit YAML; engine analyzes and exports candidates only.</p>
             {!hasContent ? (
-              <p className="route-merge-help-empty">当前无规则引擎条目。</p>
+              <p className="route-merge-help-empty">No rule-engine rows.</p>
             ) : (
               <ul className="route-merge-help-list">
                 {analysis.recommendations.map((r) => (
@@ -115,7 +115,7 @@ export function RouteMergeHelpTrigger(props: RouteMergeHelpTriggerProps) {
                     <div className="route-merge-item-head">
                       <span className="route-merge-badge">{r.level}</span>
                       <span className="route-merge-kind">{r.kind}</span>
-                      <span className="route-merge-help-delta">Δ行≈{r.estimatedLineDelta}</span>
+                      <span className="route-merge-help-delta">Δ lines ≈{r.estimatedLineDelta}</span>
                     </div>
                     <div className="route-merge-rationale">{r.rationale}</div>
                     {r.resourceRefs.length ? (
@@ -135,7 +135,7 @@ export function RouteMergeHelpTrigger(props: RouteMergeHelpTriggerProps) {
                           className="btn-link"
                           onClick={() => void navigator.clipboard.writeText(r.candidateYaml!)}
                         >
-                          复制候选 YAML
+                          Copy candidate YAML
                         </button>
                         <button
                           type="button"
@@ -144,7 +144,7 @@ export function RouteMergeHelpTrigger(props: RouteMergeHelpTriggerProps) {
                             downloadText(`route-merge-${r.id}.yaml`, r.candidateYaml!, "text/yaml;charset=utf-8")
                           }
                         >
-                          下载
+                          Download
                         </button>
                       </div>
                     ) : null}
