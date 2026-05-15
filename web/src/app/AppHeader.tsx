@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 
 import type { ImportedYamlFile } from "../domain/mergeYamlBundles";
 
+import { WorkbenchToolbarButton } from "./WorkbenchToolbarButton";
+
 type ImportedLinesSummary = {
   sumOfFileLines: number;
   mergedLineCount: number;
@@ -25,7 +27,6 @@ export function AppHeader(props: {
     minus: string;
     plus: string;
     chart: string;
-    logout: string;
   };
   importedFiles: ImportedYamlFile[] | null;
   importedLinesSummary: ImportedLinesSummary | null;
@@ -48,8 +49,6 @@ export function AppHeader(props: {
   onZoomIn: () => void;
   statusOpen: boolean;
   toggleStatusOpen: () => void;
-  canLogout: boolean;
-  onLogout: () => void;
   statusStrip: ReactNode;
 }) {
   const {
@@ -76,8 +75,6 @@ export function AppHeader(props: {
     onZoomIn,
     statusOpen,
     toggleStatusOpen,
-    canLogout,
-    onLogout,
     statusStrip,
   } = props;
 
@@ -116,9 +113,6 @@ export function AppHeader(props: {
               <h1 title="专业化流量拓扑工作台：导入、解析、筛选、定位、导出一体化">
                 Traffic Route Viz
               </h1>
-              <a className="header-portal-link" href="#/" title="返回应用入口">
-                门户
-              </a>
             </div>
             <p className="header-tagline">
               专业化流量拓扑工作台：导入、解析、筛选、定位、导出一体化
@@ -275,7 +269,7 @@ export function AppHeader(props: {
             <div
               className="header-tool-cluster header-tool-cluster--status"
               role="group"
-              aria-label="指标与账号"
+              aria-label="指标"
             >
               <button
                 type="button"
@@ -291,21 +285,13 @@ export function AppHeader(props: {
                 <Icon d={icons.chart} />
               </button>
 
-              {canLogout ? (
-                <button
-                  type="button"
-                  className="btn-secondary btn-icon"
-                  onClick={onLogout}
-                  title="退出登录"
-                  aria-label="退出"
-                >
-                  <Icon d={icons.logout} />
-                </button>
-              ) : null}
-
               {statusOpen ? statusStrip : null}
             </div>
           </div>
+        </div>
+
+        <div className="header-seg header-seg--workbench">
+          <WorkbenchToolbarButton />
         </div>
       </div>
     </header>

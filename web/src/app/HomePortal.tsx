@@ -1,3 +1,6 @@
+import { clearSession } from "../features/auth/AuthGate";
+import { getRuntimeConfig } from "../domain/runtimeConfig";
+
 function IconTopology() {
   return (
     <svg className="portal-panel__glyph" viewBox="0 0 24 24" aria-hidden="true" fill="none">
@@ -31,8 +34,28 @@ function IconStats() {
 }
 
 export function HomePortal() {
+  const auth = getRuntimeConfig().auth ?? {};
+  const showLogout =
+    auth.enabled !== false &&
+    typeof auth.username === "string" &&
+    typeof auth.password === "string";
+
   return (
     <div className="portal-shell portal-shell--workbench" data-testid="home-portal">
+      {showLogout ? (
+        <div className="portal-home-actions">
+          <button
+            type="button"
+            className="portal-home-logout"
+            onClick={() => {
+              clearSession();
+              window.location.reload();
+            }}
+          >
+            退出登录
+          </button>
+        </div>
+      ) : null}
       <div className="portal-workbench">
         <header className="portal-workbench__hero">
           <h1 className="portal-workbench__title">Workbench</h1>

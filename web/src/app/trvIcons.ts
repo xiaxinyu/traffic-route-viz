@@ -13,5 +13,6 @@ export const TRV_ICONS = {
   minus: "M19 13H5v-2h14v2z",
   plus: "M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z",
   chart: "M5 9h3v10H5V9zm5-4h3v14h-3V5zm5 7h3v7h-3v-7z",
-  logout: "M10 17l1.41-1.41L9.83 14H20v-2H9.83l1.58-1.59L10 9l-5 5 5 3zM4 5h8V3H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8v-2H4V5z",
+  /** 工作台入口：2×2 模块栅格（与首页卡片语义一致） */
+  workbench: "M4 4h7v7H4V4zm9 0h7v7h-7V4zm-9 9h7v7H4v-7zm9 0h7v7h-7v-7z",
 } as const;

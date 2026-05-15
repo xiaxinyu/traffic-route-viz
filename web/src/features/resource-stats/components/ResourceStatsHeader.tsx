@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { WorkbenchToolbarButton } from "../../../app/WorkbenchToolbarButton";
+
 type Props = {
   /** 顶栏中部：汇总指标（状态、规模、资源合计） */
   centerMetrics: ReactNode;
@@ -13,9 +15,6 @@ export function ResourceStatsHeader({ centerMetrics }: Props) {
           <div className="header-title-wrap">
             <div className="header-title-row">
               <h1 title="资源统计：本地目录与文件预览">资源统计</h1>
-              <a className="header-portal-link" href="#/" title="返回工作台">
-                工作台
-              </a>
             </div>
             <p className="rs-stats-header__slogan">本地目录、Git 与 Helm 资源一览</p>
           </div>
@@ -25,10 +24,8 @@ export function ResourceStatsHeader({ centerMetrics }: Props) {
           {centerMetrics}
         </div>
 
-        <div className="header-seg header-seg--tools rs-stats-header__actions" aria-label="资源统计操作">
-          <a className="btn-secondary btn-with-icon rs-stats-header__viz" href="#/viz">
-            流量拓扑
-          </a>
+        <div className="header-seg header-seg--workbench rs-stats-header__workbench">
+          <WorkbenchToolbarButton />
         </div>
       </div>
     </header>

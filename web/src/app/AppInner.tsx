@@ -22,7 +22,6 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 
-import { clearSession } from "../features/auth/AuthGate";
 import { DiagramActions } from "../features/diagram/DiagramActions";
 import { edgeTypes } from "../features/diagram/FlowEdges";
 import { buildFlowGraph } from "../domain/buildGraph";
@@ -59,7 +58,6 @@ import {
 import { useRouteMergeAi } from "../features/route-merge/useRouteMergeAi";
 import { useRouteMergeAnalysis } from "../features/route-merge/useRouteMergeAnalysis";
 import { stripK8sMetadataNoise, summarizeImportedYamlLines } from "../domain/yamlLineStats";
-import { getRuntimeConfig } from "../domain/runtimeConfig";
 import { flowNodeTypes } from "./nodeTypes";
 import { AppHeader } from "./AppHeader";
 import { SAMPLE_YAML } from "./sampleYaml";
@@ -514,7 +512,6 @@ export function AppInner() {
           minus: TRV_ICONS.minus,
           plus: TRV_ICONS.plus,
           chart: TRV_ICONS.chart,
-          logout: TRV_ICONS.logout,
         }}
         importedFiles={importedFiles}
         importedLinesSummary={importedLinesSummary}
@@ -558,11 +555,6 @@ export function AppInner() {
         onZoomIn={() => setUiScale((v) => clampUiScale(v + UI_SCALE_STEP))}
         statusOpen={statusOpen}
         toggleStatusOpen={() => setStatusOpen((v) => !v)}
-        canLogout={getRuntimeConfig().auth?.enabled !== false}
-        onLogout={() => {
-          clearSession();
-          window.location.reload();
-        }}
         statusStrip={
           <div
             className="header-status-strip header-status-strip-compact"
