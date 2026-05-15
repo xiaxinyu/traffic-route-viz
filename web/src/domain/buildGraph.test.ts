@@ -581,3 +581,86 @@ spec:
     );
   });
 });
+
+describe("buildFlowGraph layout spacing guardrails", () => {
+  it("keeps route cards below host cards and preserves vertical spacing between sibling routes", () => {
+    const yaml = `apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: spacing-ing
+  namespace: demo
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: spacing.example.com
+      http:
+        paths:
+          - path: /api/a
+            pathType: Prefix
+            backend:
+              service:
+                name: app-a
+                port:
+                  number: 8080
+          - path: /api/b
+            pathType: Prefix
+            backend:
+              service:
+                name: app-b
+                port:
+                  number: 8081
+`;
+    const { nodes } = buildFlowGraph(parseK8sYaml(yaml, "spacing-ing.yaml"));
+    const host = nodes.find((n) => n.type === "host" && n.data?.label === "spacing.example.com");
+    const routes = nodes
+      .filter((n) => n.type === "route")
+      .sort((a, b) => (a.position?.y ?? 0) - (b.position?.y ?? 0));
+    expect(host).toBeTruthy();
+    expect(routes).toHaveLength(2);
+
+    const hostY = host!.position?.y ?? 0;
+    const firstRouteY = routes[0]!.position?.y ?? 0;
+    const secondRouteY = routes[1]!.position?.y ?? 0;
+
+    expect(firstRouteY - hostY).toBeGreaterThanOrEqual(170);
+    expect(secondRouteY - firstRouteY).toBeGreaterThanOrEqual(170);
+  });
+
+  it("keeps VirtualService split-destination chain gaps in a readable range", () => {
+    const yaml = `${GATEWAY_AND_VS}
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: reviews
+  namespace: demo
+subsets:
+  - addresses:
+      - ip: 10.1.2.3
+    ports:
+      - port: 9080
+`;
+    const { nodes } = buildFlowGraph(parseK8sYaml(yaml, "istio-gap.yaml"));
+
+    const route = nodes.find((n) => n.type === "route" && n.data?.path === "/api");
+    const dest = nodes.find((n) => n.type === "istioDestination");
+    const service = nodes.find((n) => n.type === "service" && n.data?.label === "reviews");
+    const endpoints = nodes.find((n) => n.type === "endpoints" && n.data?.serviceName === "reviews");
+    expect(route).toBeTruthy();
+    expect(dest).toBeTruthy();
+    expect(service).toBeTruthy();
+    expect(endpoints).toBeTruthy();
+
+    const edgeGapRouteToDest = (dest!.position?.x ?? 0) - ((route!.position?.x ?? 0) + 352);
+    const edgeGapDestToService = (service!.position?.x ?? 0) - ((dest!.position?.x ?? 0) + 308);
+    const edgeGapServiceToEndpoints =
+      (endpoints!.position?.x ?? 0) - ((service!.position?.x ?? 0) + 360);
+
+    expect(edgeGapRouteToDest).toBeGreaterThanOrEqual(140);
+    expect(edgeGapRouteToDest).toBeLessThanOrEqual(220);
+    expect(edgeGapDestToService).toBeGreaterThanOrEqual(110);
+    expect(edgeGapDestToService).toBeLessThanOrEqual(190);
+    expect(edgeGapServiceToEndpoints).toBeGreaterThanOrEqual(56);
+    expect(edgeGapServiceToEndpoints).toBeLessThanOrEqual(120);
+  });
+});

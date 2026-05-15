@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type { ParseResult } from "./k8sParser";
-import { mergeParseResults, mergeYamlFiles, type ImportedYamlFile } from "./mergeYamlBundles";
-import { parseK8sYaml } from "./k8sParser";
+import type { ParseResult } from "./domain/k8sParser";
+import { parseK8sYaml } from "./domain/k8sParser";
+import {
+  mergeParseResults,
+  mergeYamlFiles,
+  type ImportedYamlFile,
+} from "./domain/mergeYamlBundles";
 
 describe("mergeYamlFiles", () => {
   it("returns empty string for no files", () => {

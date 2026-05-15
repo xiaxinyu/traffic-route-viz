@@ -21,6 +21,7 @@ export function ResourceStatsCodePanel({ selectedPath, preview }: Props) {
     if (!editorValue) return 1;
     return Math.min(Math.max(editorValue.split("\n").length, 1), 9999);
   }, [editorValue]);
+  const charCount = editorValue.length;
 
   useEffect(() => {
     const ta = taRef.current;
@@ -46,8 +47,13 @@ export function ResourceStatsCodePanel({ selectedPath, preview }: Props) {
   return (
     <div className="rs-code-panel">
       <div className="rs-code-panel-head" aria-label="Preview file">
-        <div className="rs-code-panel-head__path" title={selectedPath ?? "No file selected"}>
-          {selectedPath ?? "No file selected"}
+        <div className="rs-code-panel-head__main">
+          <div className="rs-code-panel-head__path" title={selectedPath ?? "No file selected"}>
+            {selectedPath ?? "No file selected"}
+          </div>
+          <div className="rs-code-panel-head__meta">
+            {lineCount} lines · {charCount} chars
+          </div>
         </div>
         <span
           className={`rs-code-panel-head__status rs-code-panel-head__status--${preview.status === "error" ? "err" : preview.status === "ready" ? "ok" : preview.status === "loading" ? "loading" : "idle"}`}

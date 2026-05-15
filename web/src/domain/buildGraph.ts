@@ -61,7 +61,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     (parsed.destinationRules?.length ?? 0) > 0;
   // Spacing tuned for readability: keep lines visible even with many nodes.
   // Increase horizontal spacing aggressively so edges are clearly visible.
-  const col = 505;
+  const col = 480;
   /**
    * Estimated card heights + gaps for deterministic non-overlap within an Area (conservative vs FlowNodes).
    * When changing node UI padding/content, revisit these constants and §7.0 in HARNESS_ENGINEERING.md.
@@ -73,10 +73,10 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   const LAYOUT_EST_ROUTE_CARD_H = 138;
   /** Istio multi-destination 中间节点最小估算高度（长 host FQDN 会按行数加价） */
   const LAYOUT_EST_ISTIO_DEST_H = 124;
-  const LAYOUT_ISTIO_DEST_STACK_GAP = 42;
-  const LAYOUT_ROUTE_STACK_GAP = 58;
-  const LAYOUT_ROUTE_BELOW_HOST = 22;
-  const LAYOUT_AFTER_HOST_GROUP = 44; // whitespace after last route of a Host block before next Host
+  const LAYOUT_ISTIO_DEST_STACK_GAP = 34;
+  const LAYOUT_ROUTE_STACK_GAP = 50;
+  const LAYOUT_ROUTE_BELOW_HOST = 26;
+  const LAYOUT_AFTER_HOST_GROUP = 36; // whitespace after last route of a Host block before next Host
   const LAYOUT_TOP_ROW_TAIL = 28; // clearance belowIngress row & Istio Gateway column before Host chain
   const LAYOUT_EST_SERVICE_CARD_H = 190;
   const LAYOUT_SERVICE_STACK_GAP = 28;
@@ -95,9 +95,9 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   const LAYOUT_ROUTE_CARD_MAX_W = 352;
   const LAYOUT_ISTIO_DEST_CARD_MAX_W = 308;
   /** VS 拆分 destination 时：Route 卡片右外侧到 Destination 卡左缘（用户期望约 150–200px 以利 w= 标签） */
-  const LAYOUT_GAP_ROUTE_TO_ISTIO_DEST_X = 182;
-  const LAYOUT_GAP_ISTIO_DEST_TO_SERVICE_X = 156;
-  const LAYOUT_GAP_SERVICE_TO_ENDPOINTS_X = 88;
+  const LAYOUT_GAP_ROUTE_TO_ISTIO_DEST_X = 168;
+  const LAYOUT_GAP_ISTIO_DEST_TO_SERVICE_X = 136;
+  const LAYOUT_GAP_SERVICE_TO_ENDPOINTS_X = 72;
   const leftPad = 24;
   /** 分区画布：内容最大 x/y 之外的留白，避免贴边拥挤 */
   const regionPadBottom = 72;
