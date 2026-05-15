@@ -33,7 +33,7 @@
     "yaml": "^2.6.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.14",
+    "@biomejs/biome": "^2.4.15",
     "@playwright/test": "1.53.0",
     "@types/node": "^22.15.3",
     "@types/react": "^18.3.12",
