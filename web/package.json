@@ -4,12 +4,16 @@
   "version": "0.1.0",
   "type": "module",
   "packageManager": "pnpm@9.15.5",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "aoai:chat": "node scripts/aoai-chat.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "spec:check": "node ../tools/check-spec.mjs",
     "format": "biome format --write .",
     "format:check": "biome format .",
     "lint": "biome lint .",
@@ -19,7 +23,7 @@
     "playwright:install": "PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT=120000 playwright install chromium",
     "e2e": "playwright test --config playwright.config.cjs",
     "e2e:ui": "playwright test --config playwright.config.cjs --ui",
-    "ci": "corepack pnpm run format:check && corepack pnpm run lint && corepack pnpm run typecheck && corepack pnpm run test && corepack pnpm run build && corepack pnpm run playwright:install && corepack pnpm run e2e"
+    "ci": "corepack pnpm run format:check && corepack pnpm run lint && corepack pnpm run typecheck && corepack pnpm run spec:check && corepack pnpm run test && corepack pnpm run build && corepack pnpm run playwright:install && corepack pnpm run e2e"
   },
   "dependencies": {
     "html-to-image": "^1.11.13",

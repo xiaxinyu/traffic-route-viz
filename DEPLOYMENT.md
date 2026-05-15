@@ -6,7 +6,7 @@
 
 ## 0. 前置
 
-- Node.js 18+、`pnpm`
+- Node.js **20+**、`pnpm`（与 `web/package.json` `engines` 及 CI 一致）
 - Docker（构建 / 本地跑镜像）
 - 若上集群：`kubectl`、Ingress Controller
 

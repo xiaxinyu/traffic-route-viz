@@ -2,7 +2,7 @@
 
 ## 开发环境
 
-- Node.js（建议 18+）
+- Node.js **20+**（与 CI `.github/workflows/ci.yml` 一致；建议使用 `corepack enable` 与 lockfile 中的 pnpm 版本）
 
 ```bash
 cd web
@@ -35,6 +35,17 @@ pnpm run typecheck
 pnpm test
 pnpm run build
 ```
+
+## 合并前：分支保护（仓库设置）
+
+在 GitHub **Settings → Branches → Branch protection rules** 中为默认分支（如 `main`）启用：
+
+- **Require a pull request before merging**（按团队习惯）
+- **Require status checks to pass before merging**，并勾选 workflow **`ci`** 中的 job **`web`**（即 PR 上显示的必需检查）
+
+此项仅在网页配置，无法通过 git 提交；合并前确保 CI 通过可减少「本地能跑、主线已红」的回滚成本。
+
+---
 
 并且在 UI 上验证：
 
