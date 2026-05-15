@@ -52,8 +52,8 @@ importers:
         specifier: ^6.37.0
         version: 6.37.0(ws@8.20.0)
       typescript:
-        specifier: ~5.6.3
-        version: 5.6.3
+        specifier: ~6.0.3
+        version: 6.0.3
       vite:
         specifier: ^6.0.3
         version: 6.4.2(@types/node@22.19.17)(yaml@2.8.4)
@@ -1118,8 +1118,8 @@ packages:
     resolution: {integrity: sha512-hdF5ZgjTqgAntKkklYw0R03MG2x/bSzTtkxmIRw/sTNV8YXsCJ1tfLAX23lhxhHJlEf3CRCOCGGWw3vI3GaSPw==}
     engines: {node: '>=18'}
 
-  typescript@5.6.3:
-    resolution: {integrity: sha512-hjcS1mhfuyi4WW8IWtjP7brDrG2cuDZukyrYrSauoXGNgx0S7zceP07adYkJycEr56BOUTNPzbInooiN3fn1qw==}
+  typescript@6.0.3:
+    resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
     engines: {node: '>=14.17'}
     hasBin: true
 
@@ -2307,7 +2307,7 @@ snapshots:
     dependencies:
       punycode: 2.3.1
 
-  typescript@5.6.3: {}
+  typescript@6.0.3: {}
 
   undici-types@6.21.0: {}
 
