@@ -1,3 +1,7 @@
+import { clearSession } from "../features/auth/AuthGate";
+import { getRuntimeConfig } from "../domain/runtimeConfig";
+import { TRV_ICONS } from "./trvIcons";
+
 function IconTopology() {
   return (
     <svg className="portal-panel__glyph" viewBox="0 0 24 24" aria-hidden="true" fill="none">
@@ -31,12 +35,36 @@ function IconStats() {
 }
 
 export function HomePortal() {
+  const auth = getRuntimeConfig().auth ?? {};
+  const showLogout =
+    auth.enabled !== false &&
+    typeof auth.username === "string" &&
+    typeof auth.password === "string";
+
   return (
     <div className="portal-shell portal-shell--workbench" data-testid="home-portal">
+      {showLogout ? (
+        <div className="portal-home-actions">
+          <button
+            type="button"
+            className="portal-home-logout"
+            title="Sign out"
+            aria-label="Sign out"
+            onClick={() => {
+              clearSession();
+              window.location.reload();
+            }}
+          >
+            <svg viewBox="0 0 24 24" className="portal-home-logout__svg" aria-hidden="true">
+              <path d={TRV_ICONS.signOut} fill="currentColor" />
+            </svg>
+          </button>
+        </div>
+      ) : null}
       <div className="portal-workbench">
         <header className="portal-workbench__hero">
           <h1 className="portal-workbench__title">Workbench</h1>
-          <p className="portal-workbench__lead">流量与资源，一处进入</p>
+          <p className="portal-workbench__lead">Traffic graphs and repo stats in one place</p>
         </header>
 
         <div className="portal-workbench__grid">
@@ -45,13 +73,15 @@ export function HomePortal() {
               <span className="portal-panel__icon portal-panel__icon--viz" aria-hidden="true">
                 <IconTopology />
               </span>
-              <span className="portal-panel__badge">主模块</span>
+              <span className="portal-panel__badge">Primary</span>
             </div>
-            <h2 className="portal-panel__name">流量拓扑</h2>
-            <p className="portal-panel__desc">Ingress / Service 解析，调用链与实例关系</p>
+            <h2 className="portal-panel__name">Traffic graph</h2>
+            <p className="portal-panel__desc">
+              Parse Ingress, Service, and Endpoints into an interactive topology
+            </p>
             <p className="portal-panel__meta">Traffic Route Viz</p>
             <span className="portal-panel__cta">
-              进入
+              Open
               <span className="portal-panel__cta-arrow" aria-hidden="true">
                 →
               </span>
@@ -63,14 +93,14 @@ export function HomePortal() {
               <span className="portal-panel__icon portal-panel__icon--stats" aria-hidden="true">
                 <IconStats />
               </span>
-              <span className="portal-panel__badge portal-panel__badge--muted">开发中</span>
+              <span className="portal-panel__badge portal-panel__badge--muted">Preview</span>
             </div>
-            <h2 className="portal-panel__name">资源统计</h2>
+            <h2 className="portal-panel__name">Resource stats</h2>
             <p className="portal-panel__desc">
-              本地目录：选文件夹即可树形浏览；用量、分布与配额等云端指标接入中。
+              Browse a local folder as a tree; Helm/Git summaries (cloud metrics planned)
             </p>
             <span className="portal-panel__cta portal-panel__cta--secondary">
-              进入
+              Open
               <span className="portal-panel__cta-arrow" aria-hidden="true">
                 →
               </span>

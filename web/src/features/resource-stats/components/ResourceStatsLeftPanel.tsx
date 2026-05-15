@@ -99,7 +99,7 @@ export function ResourceStatsLeftPanel({
     <section className="left-panel-block grow rs-left-column">
       <div className="rs-tree-section">
         <div className="block-title-row rs-tree-head">
-          <div className="block-title">目录树</div>
+          <div className="block-title">Directory tree</div>
           <div className="rs-tree-head-actions">
             <LocalFolderToolbar
               inputRef={inputRef}
@@ -111,12 +111,12 @@ export function ResourceStatsLeftPanel({
         </div>
 
         <div className="rs-tree-toolbar">
-          <label className="rs-tree-search" aria-label="搜索目录或文件">
+          <label className="rs-tree-search" aria-label="Search files or folders">
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="搜索文件/目录…"
+              placeholder="Search…"
             />
           </label>
           <div className="rs-tree-actions">
@@ -124,8 +124,8 @@ export function ResourceStatsLeftPanel({
               type="button"
               className="btn-secondary rs-icon-btn"
               onClick={onExpandAll}
-              title="展开全部"
-              aria-label="展开全部"
+              title="Expand all"
+              aria-label="Expand all"
             >
               <Icon d={TRV_ICONS.plus} />
             </button>
@@ -133,8 +133,8 @@ export function ResourceStatsLeftPanel({
               type="button"
               className="btn-secondary rs-icon-btn"
               onClick={onCollapseToRoot}
-              title="收起"
-              aria-label="收起"
+              title="Collapse to root"
+              aria-label="Collapse to root"
             >
               <Icon d={TRV_ICONS.minus} />
             </button>
@@ -152,10 +152,10 @@ export function ResourceStatsLeftPanel({
               highlightTerm={query}
             />
           ) : hasTree && !visibleRoot ? (
-            <div className="empty-box rs-tree-empty">未匹配到目录或文件，请调整搜索关键词。</div>
+            <div className="empty-box rs-tree-empty">No matches. Try another search.</div>
           ) : (
             <div className="empty-box rs-tree-empty rs-tree-empty--minimal">
-              请选择文件夹后查看目录树
+              Choose a folder to load the tree
             </div>
           )}
         </div>

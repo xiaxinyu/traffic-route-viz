@@ -38,12 +38,12 @@ function downloadText(filename: string, content: string, mime = "text/plain;char
 
 function validateYamlForGraph(yaml: string): { ok: boolean; detail: string } {
   const trimmed = yaml.trim();
-  if (!trimmed) return { ok: true, detail: "空内容" };
+  if (!trimmed) return { ok: true, detail: "Empty" };
   try {
     const p = parseK8sYaml(trimmed);
     buildFlowGraph(p);
-    const warn = p.errors.length ? `（解析告警 ${p.errors.length} 条）` : "";
-    return { ok: true, detail: `可解析并构图 ${warn}` };
+    const warn = p.errors.length ? ` (parse warnings: ${p.errors.length})` : "";
+    return { ok: true, detail: `Parses and builds graph${warn}` };
   } catch (e) {
     return { ok: false, detail: e instanceof Error ? e.message : String(e) };
   }
@@ -330,11 +330,11 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
       >
         <div className="trv-modal-header">
           <div className="trv-modal-title" id="route-merge-ai-modal-title">
-            路由合并 · AI 输出
+            Route merge · AI output
           </div>
           <div className="trv-modal-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>
-              关闭
+              Close
             </button>
           </div>
         </div>
@@ -342,7 +342,7 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
         <div className="route-merge-ai-modal-body">
           {scopeLabel ? <div className="route-merge-ai-modal-scope">{scopeLabel}</div> : null}
 
-          {busy ? <div className="route-merge-ai-modal-status">AI 请求中…</div> : null}
+          {busy ? <div className="route-merge-ai-modal-status">Calling AI…</div> : null}
 
           {error ? (
             <div className="route-merge-error route-merge-ai-modal-error">{error}</div>
@@ -351,9 +351,9 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
           {!payload && !busy && !error ? (
             <div className="route-merge-ai-preview">
               <div className="route-merge-ai-preview-head">
-                <strong>原始 YAML 预览</strong>
+                <strong>Source YAML preview</strong>
                 <span className="route-merge-ai-preview-hint">
-                  这里只展示当前范围的原始 YAML；点击「开始分析」后会附带规则摘要发送给模型。
+                  Shows the raw YAML for the current scope; “Run analysis” also sends the rule summary to the model.
                 </span>
               </div>
               <div className="route-merge-ai-preview-actions">
@@ -363,7 +363,7 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                   onClick={() => onConfirmRun()}
                   disabled={!previewUserContent.trim()}
                 >
-                  开始分析
+                  Run analysis
                 </button>
                 <button
                   type="button"
@@ -371,13 +371,13 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                   onClick={() => void navigator.clipboard.writeText(previewUserContent)}
                   disabled={!previewUserContent.trim()}
                 >
-                  复制原始 YAML
+                  Copy source YAML
                 </button>
               </div>
               <div
                 className="route-merge-ai-preview-editor"
                 role="region"
-                aria-label="原始 YAML 预览"
+                aria-label="Source YAML preview"
               >
                 <div className="route-merge-ai-code-shell">
                   <div className="route-merge-ai-code-gutter" aria-hidden="true">
@@ -398,9 +398,9 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
               <div className="route-merge-ai-advice">
                 <div className="route-merge-ai-summary-card">
                   <div>
-                    <span className="route-merge-ai-kicker">优化结论</span>
+                    <span className="route-merge-ai-kicker">Summary</span>
                     <p className="route-merge-ai-summary">
-                      {payload.summary || "已完成 VS/DR/Ingress 等价压缩分析。"}
+                      {payload.summary || "Completed VS/DR/Ingress equivalence review."}
                     </p>
                   </div>
                   {payload.compressionEstimate ? (
@@ -411,7 +411,7 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                 </div>
                 {payload.semanticEquivalence ? (
                   <div className="route-merge-ai-equivalence">
-                    <strong>等价性判断</strong>
+                    <strong>Equivalence</strong>
                     <span>{payload.semanticEquivalence}</span>
                   </div>
                 ) : null}
@@ -419,7 +419,7 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                   <div className="route-merge-ai-review-grid">
                     {optimizationPlan.length ? (
                       <section className="route-merge-ai-review-block">
-                        <strong>优化思路</strong>
+                        <strong>Plan</strong>
                         <ol>
                           {optimizationPlan.map((x) => (
                             <li key={x}>{x}</li>
@@ -429,7 +429,7 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                     ) : null}
                     {changeSummary.length ? (
                       <section className="route-merge-ai-review-block">
-                        <strong>实际变更</strong>
+                        <strong>Changes</strong>
                         <ul>
                           {changeSummary.map((x) => (
                             <li key={x}>{x}</li>
@@ -439,7 +439,7 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                     ) : null}
                     {validationChecklist.length ? (
                       <section className="route-merge-ai-review-block">
-                        <strong>复核清单</strong>
+                        <strong>Checklist</strong>
                         <ul>
                           {validationChecklist.map((x) => (
                             <li key={x}>{x}</li>
@@ -481,7 +481,7 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                 ) : null}
                 {payload.suggestions.length ? (
                   <div className="route-merge-ai-suggestion-panel">
-                    <strong>优化建议</strong>
+                    <strong>Suggestions</strong>
                     <ul className="route-merge-ai-suggestions">
                       {payload.suggestions.map((s, i) => (
                         <li key={`${s.title}-${i}`}>
@@ -502,13 +502,13 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
               <div
                 className="route-merge-ai-yaml-area"
                 role="region"
-                aria-label="原始与优化后的 YAML"
+                aria-label="Source vs optimized YAML"
               >
                 <div className="route-merge-ai-yaml-actions">
-                  <strong className="route-merge-ai-yaml-title">YAML 输出</strong>
-                  <span className="route-merge-ai-diff-stat">左 {sourceLineCount} 行</span>
-                  <span className="route-merge-ai-diff-stat">右 {optimizedLineCount} 行</span>
-                  <div className="route-merge-ai-yaml-tabs" role="tablist" aria-label="YAML 视图">
+                  <strong className="route-merge-ai-yaml-title">YAML output</strong>
+                  <span className="route-merge-ai-diff-stat">Left {sourceLineCount} lines</span>
+                  <span className="route-merge-ai-diff-stat">Right {optimizedLineCount} lines</span>
+                  <div className="route-merge-ai-yaml-tabs" role="tablist" aria-label="YAML view">
                     <button
                       type="button"
                       className={
@@ -518,7 +518,7 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                       role="tab"
                       aria-selected={activeYamlTab === "yaml"}
                     >
-                      代码
+                      Code
                     </button>
                     <button
                       type="button"
@@ -530,7 +530,7 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                       aria-selected={activeYamlTab === "diff"}
                       disabled={!hasOptimizedYaml}
                       title={
-                        !hasOptimizedYaml ? "需要 AI 返回 optimizedYaml 才能对比" : "Diff 对比"
+                        !hasOptimizedYaml ? "Need optimizedYaml from AI to diff" : "Diff"
                       }
                     >
                       Diff
@@ -541,7 +541,7 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                     className="btn-link"
                     onClick={() => void navigator.clipboard.writeText(sourceYaml)}
                   >
-                    复制原始 YAML
+                    Copy source YAML
                   </button>
                   <button
                     type="button"
@@ -549,7 +549,7 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                     onClick={() => void navigator.clipboard.writeText(optimizedYaml)}
                     disabled={!hasOptimizedYaml}
                   >
-                    复制优化后 YAML
+                    Copy optimized YAML
                   </button>
                   <button
                     type="button"
@@ -563,7 +563,7 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                     }
                     disabled={!hasOptimizedYaml}
                   >
-                    下载优化后 YAML
+                    Download optimized YAML
                   </button>
                 </div>
 
@@ -573,28 +573,28 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                       aiYamlCheck.ok ? "route-merge-validate ok" : "route-merge-validate bad"
                     }
                   >
-                    本地校验：{aiYamlCheck.detail}
+                    Local check: {aiYamlCheck.detail}
                   </div>
                 ) : null}
 
                 {!hasOptimizedYaml ? (
                   <div className="route-merge-ai-empty-yaml">
-                    本次 AI 输出未包含完整 optimizedYaml。已保留原始
-                    YAML（左侧）；请重试或调整模型配置后再次分析。
+                    This response did not include a full optimizedYaml. Source YAML stays on the left; retry or adjust
+                    the model configuration.
                   </div>
                 ) : null}
 
-                <div className="route-merge-ai-yaml-body" role="region" aria-label="YAML 详情">
+                <div className="route-merge-ai-yaml-body" role="region" aria-label="YAML details">
                   {activeYamlTab === "yaml" ? (
                     <div
                       className="route-merge-ai-yaml-grid"
                       role="region"
-                      aria-label="原始 YAML 与优化后 YAML"
+                      aria-label="Source and optimized YAML"
                     >
                       <div className="route-merge-ai-yaml-pane">
                         <div className="route-merge-ai-yaml-head">
-                          <span>原始 YAML</span>
-                          <span>{sourceLineCount} 行</span>
+                          <span>Source YAML</span>
+                          <span>{sourceLineCount} lines</span>
                         </div>
                         <div className="route-merge-ai-code-shell">
                           <div className="route-merge-ai-code-gutter" aria-hidden="true">
@@ -612,8 +612,8 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
 
                       <div className="route-merge-ai-yaml-pane">
                         <div className="route-merge-ai-yaml-head">
-                          <span>优化后 YAML</span>
-                          <span>{optimizedLineCount} 行</span>
+                          <span>Optimized YAML</span>
+                          <span>{optimizedLineCount} lines</span>
                         </div>
                         <div className="route-merge-ai-code-shell">
                           <div className="route-merge-ai-code-gutter" aria-hidden="true">
@@ -633,15 +633,15 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                     <div
                       className="route-merge-ai-diff"
                       role="region"
-                      aria-label="原始 YAML 与 AI 生成 YAML 差异对比"
+                      aria-label="Diff between source and AI YAML"
                     >
                       <div className="route-merge-ai-diff-head route-merge-ai-diff-head--old">
-                        <span>Diff（原始）</span>
-                        <span>{sourceLineCount} 行</span>
+                        <span>Diff (source)</span>
+                        <span>{sourceLineCount} lines</span>
                       </div>
                       <div className="route-merge-ai-diff-head route-merge-ai-diff-head--new">
-                        <span>Diff（优化后）</span>
-                        <span>{optimizedLineCount} 行</span>
+                        <span>Diff (optimized)</span>
+                        <span>{optimizedLineCount} lines</span>
                       </div>
                       {diffDisplay.rows.map((row, index) =>
                         row.kind === "skip" ? (
@@ -650,9 +650,9 @@ export function RouteMergeAiModal(props: RouteMergeAiModalProps) {
                             key={`skip-${row.oldLabel}-${row.newLabel}-${index}`}
                           >
                             <div className="route-merge-ai-diff-skip">
-                              <span>{row.oldLabel ? `左 ${row.oldLabel}` : "中间内容"}</span>
-                              <strong>已折叠 {row.count} 行未变化内容</strong>
-                              <span>{row.newLabel ? `右 ${row.newLabel}` : ""}</span>
+                              <span>{row.oldLabel ? `L ${row.oldLabel}` : "Context"}</span>
+                              <strong>Collapsed {row.count} unchanged lines</strong>
+                              <span>{row.newLabel ? `R ${row.newLabel}` : ""}</span>
                             </div>
                           </div>
                         ) : (

@@ -56,7 +56,7 @@ export function AuthGate(props: { children: ReactNode; onAuthedChange?: (v: bool
     if (!required || !hasCreds) return;
     const ok = username === auth.username && password === auth.password;
     if (!ok) {
-      setErr("用户名或密码不正确");
+      setErr("Invalid username or password.");
       return;
     }
     setErr(null);
@@ -94,12 +94,12 @@ export function AuthGate(props: { children: ReactNode; onAuthedChange?: (v: bool
           <div
             style={{ marginTop: 8, color: "rgba(226,232,240,0.82)", fontSize: 13, lineHeight: 1.6 }}
           >
-            系统已开启<strong>强制登录</strong>，但未检测到账号密码配置。
+            <strong>Sign-in is required</strong>, but no username/password were found in config.
             <br />
-            请在站点根目录提供 <code style={{ color: "#c7d2fe" }}>/config.json</code>（K8s 推荐用
-            ConfigMap 挂载），或在构建时设置{" "}
+            Add <code style={{ color: "#c7d2fe" }}>/config.json</code> at the site root (for Kubernetes,
+            mount via ConfigMap), or set{" "}
             <code style={{ color: "#c7d2fe" }}>VITE_AUTH_USER</code> /{" "}
-            <code style={{ color: "#c7d2fe" }}>VITE_AUTH_PASS</code>。
+            <code style={{ color: "#c7d2fe" }}>VITE_AUTH_PASS</code> at build time.
           </div>
 
           <div
@@ -115,7 +115,7 @@ export function AuthGate(props: { children: ReactNode; onAuthedChange?: (v: bool
               color: "rgba(226,232,240,0.8)",
             }}
           >
-            示例（可参考仓库内 <code style={{ color: "#c7d2fe" }}>config.example.json</code>）：
+            Example (see <code style={{ color: "#c7d2fe" }}>config.example.json</code> in the repo):
             <pre
               style={{
                 margin: "10px 0 0",
@@ -160,8 +160,8 @@ export function AuthGate(props: { children: ReactNode; onAuthedChange?: (v: bool
         <div
           style={{ marginTop: 6, color: "rgba(226,232,240,0.76)", fontSize: 13, lineHeight: 1.5 }}
         >
-          请输入账号密码进入系统。该登录配置来自运行时{" "}
-          <code style={{ color: "#c7d2fe" }}>/config.json</code>（K8s 可用 ConfigMap 注入）。
+          Sign in with the credentials from runtime{" "}
+          <code style={{ color: "#c7d2fe" }}>/config.json</code> (mount with a ConfigMap on Kubernetes).
         </div>
 
         <div
@@ -175,7 +175,7 @@ export function AuthGate(props: { children: ReactNode; onAuthedChange?: (v: bool
           }}
         >
           <label style={{ display: "block", fontSize: 12, fontWeight: 800, color: "#cbd5e1" }}>
-            用户名
+            Username
           </label>
           <input
             value={username}
@@ -203,7 +203,7 @@ export function AuthGate(props: { children: ReactNode; onAuthedChange?: (v: bool
               marginTop: 10,
             }}
           >
-            密码
+            Password
           </label>
           <input
             value={password}
@@ -247,7 +247,7 @@ export function AuthGate(props: { children: ReactNode; onAuthedChange?: (v: bool
               boxShadow: "0 10px 28px rgba(79,70,229,0.25)",
             }}
           >
-            登录
+            Sign in
           </button>
 
           <div
@@ -258,7 +258,7 @@ export function AuthGate(props: { children: ReactNode; onAuthedChange?: (v: bool
               lineHeight: 1.45,
             }}
           >
-            会话有效期：约 {ttlHours} 小时（可在 config 中调整）。
+            Session lasts about {ttlHours} hours (adjust via <code style={{ color: "#94a3b8" }}>ttlHours</code> in config).
           </div>
         </div>
       </div>

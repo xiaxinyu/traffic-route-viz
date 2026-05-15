@@ -75,7 +75,7 @@ export function LocalFolderTreeRow({
             className={`local-folder-tree__toggle${hit ? " local-folder-tree__toggle--hit" : ""}`}
             aria-expanded={open}
             onClick={() => onToggle(key)}
-            title={open ? "折叠" : "展开"}
+            title={open ? "Collapse" : "Expand"}
           >
             <span className="local-folder-tree__chev" aria-hidden="true">
               {open ? "▾" : "▸"}
@@ -98,7 +98,7 @@ export function LocalFolderTreeRow({
             type="button"
             className={`local-folder-tree__leaf${isActive ? " local-folder-tree__leaf--active" : ""}${hit ? " local-folder-tree__leaf--hit" : ""}`}
             onClick={() => onSelectLeaf?.(node)}
-            title="在右侧预览文件内容"
+            title="Preview file on the right"
           >
             <span className="local-folder-tree__spacer" aria-hidden="true" />
             <IconFileSmall />

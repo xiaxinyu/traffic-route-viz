@@ -111,7 +111,7 @@ export function DiagramActions(props: Props) {
       }
       await el.requestFullscreen();
     } catch {
-      window.alert("全屏失败：浏览器可能阻止了该操作。");
+      window.alert("Could not enter fullscreen (browser blocked the request).");
     }
   }, [flowContainerRef]);
 
@@ -149,7 +149,7 @@ export function DiagramActions(props: Props) {
     try {
       await exportDiagramToPng(el, nodes, `traffic-route-viz-${Date.now()}.png`);
     } catch {
-      window.alert("导出 PNG 失败：请稍后重试。");
+      window.alert("PNG export failed. Try again.");
     }
   }, [flowContainerRef, nodes]);
 
@@ -212,7 +212,7 @@ export function DiagramActions(props: Props) {
         }
         applyLoadedDiagram(result);
       } catch {
-        window.alert("无法读取画图文件（需为合法的 JSON）。");
+        window.alert("Could not read diagram file (invalid JSON).");
       }
     },
     [applyLoadedDiagram],
@@ -244,16 +244,16 @@ export function DiagramActions(props: Props) {
         className="diagram-toolbar-panel"
       >
         <div className="diagram-toolbar-head">
-          <span>画布工具</span>
+          <span>Canvas</span>
           <span data-testid="diagram-selection-count">
-            已选 {selectedNodeCount} 节点 / {selectedEdgeCount} 边
+            {selectedNodeCount} node(s) / {selectedEdgeCount} edge(s)
           </span>
           <button
             type="button"
             className="btn-secondary btn-icon diagram-toolbar-icon-btn"
             onClick={toggleFullscreen}
-            aria-label={isFullscreen ? "退出全屏" : "全屏"}
-            title={isFullscreen ? "退出全屏（Esc）" : "全屏"}
+            aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            title={isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
           >
             <Icon
               d={
@@ -267,8 +267,8 @@ export function DiagramActions(props: Props) {
             type="button"
             className="btn-secondary btn-icon diagram-toolbar-icon-btn"
             onClick={() => setCollapsed((v) => !v)}
-            aria-label={collapsed ? "展开画布工具" : "收起画布工具"}
-            title={collapsed ? "展开" : "收起"}
+            aria-label={collapsed ? "Expand canvas tools" : "Collapse canvas tools"}
+            title={collapsed ? "Expand" : "Collapse"}
           >
             <Icon d={collapsed ? "M7 10l5 5 5-5" : "M7 14l5-5 5 5"} />
           </button>
@@ -276,14 +276,14 @@ export function DiagramActions(props: Props) {
 
         {!collapsed ? (
           <div className="diagram-toolbar-row">
-            <label className="diagram-toolbar-check" title="边标签">
+            <label className="diagram-toolbar-check" title="Edge labels">
               <input
                 data-testid="toggle-edge-labels"
                 type="checkbox"
                 checked={edgeLabelsEnabled}
                 onChange={(e) => setEdgeLabelsEnabled(e.target.checked)}
               />
-              <span className="diagram-toolbar-check-text">边标签</span>
+              <span className="diagram-toolbar-check-text">Edge labels</span>
             </label>
 
             <button
@@ -291,8 +291,8 @@ export function DiagramActions(props: Props) {
               className="btn-secondary btn-icon diagram-toolbar-icon-btn"
               onClick={() => fitView({ padding: 0.05, duration: 240 })}
               data-testid="canvas-fit-view"
-              aria-label="适配"
-              title="适配"
+              aria-label="Fit view"
+              title="Fit view"
             >
               <Icon d="M4 7V4h3v2H6v1H4zm14-1V4h3v3h-2V6h-1zm1 15h2v-3h-2v1h-1v2h1zm-15 0v-3h2v1h1v2H4z" />
             </button>
@@ -301,8 +301,8 @@ export function DiagramActions(props: Props) {
               className="btn-primary btn-icon diagram-toolbar-icon-btn"
               onClick={onExportPng}
               data-testid="export-png"
-              title="导出 PNG"
-              aria-label="导出 PNG"
+              title="Export PNG"
+              aria-label="Export PNG"
             >
               <Icon d="M21 19H3V5h18v14zm-2-2V7H5v10h14zM7 15l2.5-3 2 2.5L15 10l2 5H7z" />
             </button>
@@ -331,8 +331,8 @@ export function DiagramActions(props: Props) {
               className="btn-secondary btn-icon diagram-toolbar-icon-btn"
               onClick={onSaveDiagramJson}
               data-testid="save-diagram"
-              aria-label="保存"
-              title="保存"
+              aria-label="Save"
+              title="Save"
             >
               <Icon d="M17 3H5a2 2 0 0 0-2 2v14h18V7l-4-4zM7 5h8v4H7V5zm5 12H6v-6h6v6zm2 0v-6h4v6h-4z" />
             </button>
@@ -342,8 +342,8 @@ export function DiagramActions(props: Props) {
               onClick={onDeleteSelectedEdges}
               data-testid="delete-selected-edges"
               disabled={!hasSelectedEdges}
-              title="删除当前选中的连线；也支持键盘 Delete/Backspace"
-              aria-label="删线"
+              title="Delete selected edges (Delete / Backspace)"
+              aria-label="Delete edges"
             >
               <Icon d="M6 6l12 12M18 6L6 18" />
             </button>
@@ -353,8 +353,8 @@ export function DiagramActions(props: Props) {
               onClick={onDeleteSelectedElements}
               data-testid="delete-selected-elements"
               disabled={!hasSelectedElements}
-              title="删除当前选中的节点与连线（同时会清理其关联边）"
-              aria-label="删除"
+              title="Delete selected nodes and edges"
+              aria-label="Delete"
             >
               <Icon d="M6 7h12l-1 14H7L6 7zm3-3h6l1 2H8l1-2z" />
             </button>
@@ -363,8 +363,8 @@ export function DiagramActions(props: Props) {
               className="btn-secondary btn-icon diagram-toolbar-icon-btn"
               onClick={() => loadInputRef.current?.click()}
               data-testid="open-diagram"
-              aria-label="打开"
-              title="打开"
+              aria-label="Open"
+              title="Open"
             >
               <Icon d="M10 4H4v16h16V8h-8l-2-4zm-4 6h12v8H6v-8z" />
             </button>

@@ -22,7 +22,6 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 
-import { clearSession } from "../features/auth/AuthGate";
 import { DiagramActions } from "../features/diagram/DiagramActions";
 import { edgeTypes } from "../features/diagram/FlowEdges";
 import { buildFlowGraph } from "../domain/buildGraph";
@@ -59,7 +58,6 @@ import {
 import { useRouteMergeAi } from "../features/route-merge/useRouteMergeAi";
 import { useRouteMergeAnalysis } from "../features/route-merge/useRouteMergeAnalysis";
 import { stripK8sMetadataNoise, summarizeImportedYamlLines } from "../domain/yamlLineStats";
-import { getRuntimeConfig } from "../domain/runtimeConfig";
 import { flowNodeTypes } from "./nodeTypes";
 import { AppHeader } from "./AppHeader";
 import { SAMPLE_YAML } from "./sampleYaml";
@@ -514,7 +512,6 @@ export function AppInner() {
           minus: TRV_ICONS.minus,
           plus: TRV_ICONS.plus,
           chart: TRV_ICONS.chart,
-          logout: TRV_ICONS.logout,
         }}
         importedFiles={importedFiles}
         importedLinesSummary={importedLinesSummary}
@@ -558,26 +555,21 @@ export function AppInner() {
         onZoomIn={() => setUiScale((v) => clampUiScale(v + UI_SCALE_STEP))}
         statusOpen={statusOpen}
         toggleStatusOpen={() => setStatusOpen((v) => !v)}
-        canLogout={getRuntimeConfig().auth?.enabled !== false}
-        onLogout={() => {
-          clearSession();
-          window.location.reload();
-        }}
         statusStrip={
           <div
             className="header-status-strip header-status-strip-compact"
             data-testid="top-status-strip"
           >
-            <span className="status-pill">节点 {graphMetrics.nodeCount}</span>
-            <span className="status-pill">边 {graphMetrics.edgeCount}</span>
-            <span className="status-pill">自动 {graphMetrics.autoEdgeCount}</span>
-            <span className="status-pill">手写 {graphMetrics.manualEdgeCount}</span>
+            <span className="status-pill">Nodes {graphMetrics.nodeCount}</span>
+            <span className="status-pill">Edges {graphMetrics.edgeCount}</span>
+            <span className="status-pill">Auto {graphMetrics.autoEdgeCount}</span>
+            <span className="status-pill">Manual {graphMetrics.manualEdgeCount}</span>
             <span className="status-pill">
-              已选 {selectionMetrics.selectedNodeCount}/{selectionMetrics.selectedEdgeCount}
+              Selected {selectionMetrics.selectedNodeCount}/{selectionMetrics.selectedEdgeCount}
             </span>
             <span className="status-pill">
-              刷新 {formatClockTime(lastAppliedAt)}
-              {parsedMsg ? "（告警）" : "（正常）"}
+              Updated {formatClockTime(lastAppliedAt)}
+              {parsedMsg ? " (warnings)" : " (ok)"}
             </span>
           </div>
         }
@@ -585,7 +577,7 @@ export function AppInner() {
 
       {parsedMsg ? (
         <div className="parse-warning" data-testid="parse-warning">
-          <strong>解析告警：</strong>
+          <strong>Parse warnings:</strong>
           <pre>{parsedMsg}</pre>
         </div>
       ) : null}
@@ -595,8 +587,8 @@ export function AppInner() {
           <section className="left-panel-block compact">
             <div className="block-title-row">
               <div>
-                <div className="block-title">图谱聚焦</div>
-                <div className="block-subtitle">先选类型，再用顶部搜索和上下一个跳转</div>
+                <div className="block-title">Graph focus</div>
+                <div className="block-subtitle">Pick a type, then use search and prev/next above</div>
               </div>
               <button
                 type="button"
@@ -605,15 +597,15 @@ export function AppInner() {
                   setTypeFilter("all");
                   setSearchQuery("");
                 }}
-                title="清空类型筛选与搜索关键字"
+                title="Clear type filter and search"
               >
-                清空
+                Reset
               </button>
             </div>
 
             <div className="focus-controls">
               <label className="focus-select-wrap" htmlFor="node-type-filter">
-                节点类型
+                Node type
                 <select
                   id="node-type-filter"
                   value={typeFilter}
@@ -621,14 +613,14 @@ export function AppInner() {
                 >
                   {NODE_TYPE_ORDER.map((t) => (
                     <option key={t} value={t}>
-                      {nodeTypeLabel(t)}（{graphMetrics.typeCounts[t]}）
+                      {nodeTypeLabel(t)} ({graphMetrics.typeCounts[t]})
                     </option>
                   ))}
                 </select>
               </label>
               <div className="focus-hint">
-                当前筛选：{nodeTypeLabel(typeFilter)}，匹配{" "}
-                {graphPresentation.matchedNodeIds.length} 个节点
+                Filter: {nodeTypeLabel(typeFilter)} · {graphPresentation.matchedNodeIds.length}{" "}
+                matches
               </div>
             </div>
           </section>
@@ -643,28 +635,28 @@ export function AppInner() {
                       className="trv-icon trv-icon--sm"
                     />
                   </span>
-                  {leftMode === "files" ? "数据源" : "YAML 编辑器"}
+                  {leftMode === "files" ? "Data source" : "YAML editor"}
                 </span>
                 {leftMode === "files" && importedFiles && importedFiles.length > 1 ? (
                   <button
                     type="button"
                     className={`btn-ai panel-list-ai-all${routeMergeAi.busy ? " btn-ai--busy" : ""}`}
                     disabled={!canRouteMergeAi || routeMergeAi.busy}
-                    title={routeMergeAiHint ?? "基于所有已导入文件合并上下文请求 AI"}
+                    title={routeMergeAiHint ?? "Send merged context from all imported files to AI"}
                     onClick={() => routeMergeAi.prepareAll()}
                   >
                     <Icon d={TRV_ICONS.aiStar} className="trv-icon trv-icon--sm" />
-                    <span>全部</span>
+                    <span>All</span>
                   </button>
                 ) : null}
               </div>
-              <div className="mode-switch" role="group" aria-label="文件与 YAML 切换">
+              <div className="mode-switch" role="group" aria-label="Files or YAML">
                 <button
                   type="button"
                   className={leftMode === "files" ? "active" : ""}
                   onClick={() => switchLeftMode("files")}
                 >
-                  文件
+                  Files
                 </button>
                 <button
                   type="button"
@@ -733,7 +725,7 @@ export function AppInner() {
                                   disabled={!canRouteMergeAi || routeMergeAi.busy}
                                   title={
                                     routeMergeAiHint ??
-                                    "仅将本文件中的 Ingress / VirtualService / DestinationRule 与对应规则摘要发给模型"
+                                    "Send this file’s Ingress / VirtualService / DestinationRule plus rule summary to AI"
                                   }
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -746,8 +738,8 @@ export function AppInner() {
                                 <RouteMergeHelpTrigger analysis={routeMergeAnalysis} />
                               </div>
                             ) : null}
-                            <span className="file-item-lines" title="该文件 text 行数（含空行）">
-                              {lineCount} 行
+                            <span className="file-item-lines" title="Line count for this file (incl. blank lines)">
+                              {lineCount} lines
                             </span>
                           </div>
                         </div>
@@ -758,28 +750,28 @@ export function AppInner() {
                     <div
                       className="import-line-stats-note"
                       data-testid="import-line-stats-note"
-                      title="合并文本由 mergeYamlFiles 以换行 + --- + 换行连接；与各文件行数之和可能因分隔行与首尾换行而不相等。"
+                      title="Merged text joins files with newline + --- + newline; totals may differ from sum of file lines."
                     >
-                      行数口径：各文件行数相加 vs 合并拼接（
+                      Line counts: sum of files vs merged buffer (
                       <code className="import-line-stats-code">---</code>
-                      ）后行数可能不同；与左侧 YAML 编辑区行数统计一致（
+                      ) can differ; YAML panel uses the same{" "}
                       <code className="import-line-stats-code">\n</code>
-                      分段，含空行）。
+                      split (incl. blank lines).
                     </div>
                   ) : null}
                 </div>
               ) : (
                 <div className="empty-box">
-                  尚未导入。请在顶部「输入与数据源」上传文件、上传文件夹，或直接拖拽 YAML
-                  到顶部导入区。
+                  No files yet. Upload files or a folder from <strong>Input & source</strong> above,
+                  or drop YAML there.
                 </div>
               )
             ) : (
               <>
                 <div className="yaml-editor-actions">
                   <div className="yaml-editor-stats" data-testid="yaml-editor-stats">
-                    {yamlTextStats.lineCount} 行 · {yamlTextStats.documentCount} 文档 ·{" "}
-                    {yamlTextStats.characterCount} 字符
+                    {yamlTextStats.lineCount} lines · {yamlTextStats.documentCount} docs ·{" "}
+                    {yamlTextStats.characterCount} chars
                   </div>
                   <div className="yaml-editor-action-buttons">
                     <button
@@ -788,10 +780,10 @@ export function AppInner() {
                       onClick={() => applyYaml(yamlText, importedFiles)}
                       data-testid="yaml-inline-refresh"
                       disabled={!yamlTextStats.hasContent}
-                      title="解析当前 YAML 并刷新拓扑"
+                      title="Parse YAML and refresh the graph"
                     >
                       <Icon d={TRV_ICONS.refresh} className="trv-icon trv-icon--sm" />
-                      解析
+                      Parse
                     </button>
                     {!importedFiles?.length ? (
                       <div className="yaml-ai-toolbar-cluster">
@@ -803,12 +795,12 @@ export function AppInner() {
                           }
                           title={
                             routeMergeAiHint ??
-                            "将当前编辑区 YAML 与规则引擎摘要发给模型（未使用多文件导入时）"
+                            "Send editor YAML and rule-engine summary to AI (single-buffer mode)"
                           }
                           onClick={() => routeMergeAi.prepareAll()}
                         >
                           <Icon d={TRV_ICONS.aiStar} className="trv-icon trv-icon--sm" />
-                          {routeMergeAi.busy ? "请求中" : "AI 优化"}
+                          {routeMergeAi.busy ? "Working…" : "AI assist"}
                         </button>
                         <RouteMergeHelpTrigger analysis={routeMergeAnalysis} variant="toolbar" />
                       </div>
@@ -821,7 +813,7 @@ export function AppInner() {
                       disabled={!yamlTextStats.hasContent}
                     >
                       <Icon d={TRV_ICONS.trash} className="trv-icon trv-icon--sm" />
-                      清空
+                      Clear
                     </button>
                     <button
                       type="button"
@@ -837,17 +829,17 @@ export function AppInner() {
                       data-testid="yaml-restore-sample"
                     >
                       <Icon d={TRV_ICONS.docFile} className="trv-icon trv-icon--sm" />
-                      示例
+                      Sample
                     </button>
                     <button
                       type="button"
                       className="btn-secondary btn-with-icon"
                       onClick={() => setYamlPopoutOpen(true)}
                       data-testid="yaml-popout-open"
-                      title="放大查看 YAML（Esc 关闭）"
+                      title="Expand YAML editor (Esc to close)"
                     >
                       <Icon d={TRV_ICONS.fit} className="trv-icon trv-icon--sm" />
-                      放大
+                      Expand
                     </button>
                   </div>
                 </div>
@@ -934,7 +926,7 @@ export function AppInner() {
           className="trv-modal-overlay"
           role="dialog"
           aria-modal="true"
-          aria-label="YAML 放大查看"
+          aria-label="YAML editor expanded"
           data-testid="yaml-popout"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) setYamlPopoutOpen(false);
@@ -942,25 +934,25 @@ export function AppInner() {
         >
           <div className="trv-modal">
             <div className="trv-modal-header">
-              <div className="trv-modal-title">YAML 编辑器（放大查看）</div>
+              <div className="trv-modal-title">YAML editor (expanded)</div>
               <div className="trv-modal-actions">
                 <button
                   type="button"
                   className="btn-secondary"
                   onClick={() => applyYaml(yamlText, importedFiles)}
                   data-testid="yaml-popout-refresh"
-                  title="重新解析 YAML 并刷新拓扑"
+                  title="Re-parse YAML and refresh graph"
                 >
-                  刷新
+                  Refresh
                 </button>
                 <button
                   type="button"
                   className="btn-secondary"
                   onClick={() => setYamlPopoutOpen(false)}
                   data-testid="yaml-popout-close"
-                  title="关闭（Esc）"
+                  title="Close (Esc)"
                 >
-                  关闭
+                  Close
                 </button>
               </div>
             </div>

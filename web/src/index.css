@@ -369,30 +369,47 @@ body {
   flex-wrap: wrap;
 }
 
-.header-portal-link {
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--text-soft);
+/* Top bar (right): back to workbench — flat icon button */
+.header-seg--workbench {
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-workbench-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 36px;
+  margin: 0;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #64748b;
   text-decoration: none;
-  padding: 3px 8px;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 184, 0.45);
-  background: rgba(255, 255, 255, 0.65);
   transition:
-    color 0.12s ease,
-    border-color 0.12s ease,
-    background 0.12s ease;
+    color 0.14s ease,
+    background 0.14s ease,
+    border-color 0.14s ease;
 }
 
-.header-portal-link:hover {
+.header-workbench-btn:hover {
   color: var(--brand);
-  border-color: rgba(15, 118, 110, 0.35);
-  background: #fff;
+  background: rgba(20, 184, 166, 0.09);
+  border-color: rgba(20, 184, 166, 0.22);
 }
 
-.header-portal-link:focus-visible {
+.header-workbench-btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18);
+  color: var(--brand);
+  box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.28);
+}
+
+.header-workbench-btn__svg {
+  width: 22px;
+  height: 22px;
+  display: block;
 }
 
 .header-title-wrap h1 {
@@ -1685,7 +1702,7 @@ body {
   padding: max(16px, 2.5vmin);
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* 弹框高于视口时允许滚遮罩；safe 避免在矮屏上被裁到视口外（不支持时忽略第二行） */
+  /* Scroll overlay when modal exceeds viewport; safe avoids clipping on short screens (second line ignored if unsupported) */
   place-items: center;
   place-items: safe center;
 }
@@ -1734,7 +1751,7 @@ body {
   min-height: 0;
   display: grid;
   grid-template-columns: clamp(300px, 22vw, 360px) minmax(0, 1fr);
-  /* minmax(0,1fr)：避免左侧长文把整行撑出视口（grid 默认 1fr 的 min 为 auto） */
+  /* minmax(0,1fr): keep long left content from blowing out the row (default 1fr min is auto) */
   grid-template-rows: minmax(0, 1fr);
   gap: 8px;
   overflow: hidden;
@@ -2763,6 +2780,55 @@ body {
     linear-gradient(165deg, #ecfdf5 0%, #f0fdfa 22%, #f8fafc 55%, #f1f5f9 100%);
 }
 
+/* Workbench: sign out — icon button (top-right) */
+.portal-home-actions {
+  position: absolute;
+  top: clamp(14px, 2.8vw, 26px);
+  right: clamp(16px, 3.8vw, 38px);
+  z-index: 2;
+}
+
+.portal-home-logout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.72);
+  color: #64748b;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  cursor: pointer;
+  transition:
+    color 0.14s ease,
+    background 0.14s ease,
+    border-color 0.14s ease,
+    box-shadow 0.14s ease;
+}
+
+.portal-home-logout:hover {
+  color: #b91c1c;
+  background: rgba(254, 242, 242, 0.95);
+  border-color: rgba(248, 113, 113, 0.45);
+  box-shadow: 0 4px 14px rgba(185, 28, 28, 0.12);
+}
+
+.portal-home-logout:focus-visible {
+  outline: none;
+  color: #b91c1c;
+  box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.4);
+}
+
+.portal-home-logout__svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
 .portal-shell--workbench::after {
   content: "";
   position: absolute;
@@ -3102,36 +3168,8 @@ a.btn-secondary.portal-tile .portal-tile-sub {
   padding-left: 0;
 }
 
-.rs-stats-header__actions {
-  gap: 10px;
-  flex: unset;
-  justify-self: end;
-  width: 100%;
-  justify-content: flex-end;
-  display: flex;
-  align-items: center;
-}
-
 .rs-stats-header .local-folder__toolbar {
   margin: 0;
-}
-
-.rs-stats-header__viz {
-  flex-shrink: 0;
-  text-decoration: none;
-}
-
-.rs-stats-header__viz.btn-secondary {
-  border: none;
-  background: transparent;
-  box-shadow: none;
-  font-weight: 700;
-  color: var(--text-sub);
-}
-
-.rs-stats-header__viz.btn-secondary:hover {
-  background: rgba(15, 23, 42, 0.05);
-  color: var(--text-main);
 }
 
 .rs-stats-header.app-header {
@@ -3140,7 +3178,7 @@ a.btn-secondary.portal-tile .portal-tile-sub {
 
 .rs-stats-header .header-app-row.rs-stats-header__row {
   display: grid;
-  grid-template-columns: minmax(148px, 228px) minmax(0, 1fr) minmax(96px, 140px);
+  grid-template-columns: minmax(140px, min(38%, 280px)) minmax(0, 1fr) auto;
   align-items: stretch;
   width: 100%;
   column-gap: 0;
@@ -3179,6 +3217,16 @@ a.btn-secondary.portal-tile .portal-tile-sub {
   align-items: center;
   justify-content: center;
   padding: 0 10px;
+}
+
+.rs-stats-header__workbench {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-right: 4px;
+  padding-left: 12px;
+  margin-left: 8px;
+  border-left: 1px solid rgba(226, 232, 240, 0.95);
 }
 
 .rs-header-metrics {
@@ -4842,7 +4890,7 @@ a.btn-secondary.portal-tile .portal-tile-sub {
   }
 
   .rs-stats-header .header-app-row.rs-stats-header__row {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: 1fr auto;
     grid-template-rows: auto auto;
     row-gap: 8px;
   }
@@ -4852,10 +4900,14 @@ a.btn-secondary.portal-tile .portal-tile-sub {
     grid-row: 1;
   }
 
-  .rs-stats-header__actions {
+  .rs-stats-header__workbench {
     grid-column: 2;
     grid-row: 1;
-    width: auto;
+    align-self: center;
+    justify-self: end;
+    margin-left: 0;
+    padding-left: 0;
+    border-left: none;
   }
 
   .rs-stats-header__center {

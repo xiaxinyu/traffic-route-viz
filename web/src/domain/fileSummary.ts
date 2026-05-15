@@ -10,6 +10,6 @@ export function inferFileCategoryLabel(fileName: string): string {
   if (lower.endsWith(".css")) return "CSS";
   if (lower.endsWith(".html") || lower.endsWith(".htm")) return "HTML";
   if (lower.endsWith(".sh")) return "Shell";
-  if (lower.endsWith(".lock") || lower.endsWith(".sum")) return "锁文件";
-  return "文本 / 其他";
+  if (lower.endsWith(".lock") || lower.endsWith(".sum")) return "Lockfile";
+  return "Text / other";
 }

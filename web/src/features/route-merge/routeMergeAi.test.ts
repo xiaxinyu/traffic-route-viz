@@ -46,8 +46,8 @@ describe("buildRouteMergeAiUserContent", () => {
       scopeHeading: "scope",
     });
 
-    expect(content).toContain("当前完整 YAML");
-    expect(content).toContain("必须基于它输出完整 optimizedYaml");
+    expect(content).toContain("Full YAML");
+    expect(content).toContain("optimizedYaml must be a complete replacement");
     expect(content).toContain(mergedYaml);
   });
 
@@ -58,8 +58,8 @@ describe("buildRouteMergeAiUserContent", () => {
       maxTotalChars: 800,
     });
 
-    expect(content).toContain("当前 YAML 过大");
-    expect(content).toContain("optimizedYaml 仍必须非空");
-    expect(content).toContain("按单文件或较小范围运行 AI");
+    expect(content).toContain("YAML truncated");
+    expect(content).toContain("optimizedYaml must still be non-empty");
+    expect(content).toContain("smaller scope");
   });
 });

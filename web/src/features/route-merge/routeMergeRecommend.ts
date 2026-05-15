@@ -10,7 +10,7 @@ function asRecord(v: unknown): RawK8sObject | null {
 }
 
 const V1_REMINDER =
-  "v1 边界：仅同 namespace、同 Ingress class / 同 VS hosts+gateways；不处理 Gateway API；dry-run；冲突不生成 YAML。";
+  "v1 scope: same namespace; same Ingress class or same VirtualService hosts+gateways; no Gateway API; dry-run; conflicts skip YAML.";
 
 type PathEntry = {
   path: string;
@@ -89,7 +89,7 @@ function tryMergeIngressGroup(
         rec: reviewIngress(
           docs,
           host,
-          "某 Ingress 仍包含其它 host 的规则；v1 合并单 host 会丢失其它 host → 不生成候选 YAML。",
+          "An Ingress still has rules for other hosts; merging one host would drop them → no candidate YAML.",
         ),
       };
     }
@@ -99,34 +99,34 @@ function tryMergeIngressGroup(
   const ns0 = metas[0]!.ns;
   if (!metas.every((m) => m.ns === ns0)) {
     return {
-      rec: blockedIngress(docs, host, "跨 namespace，标记为 Blocked。"),
+      rec: blockedIngress(docs, host, "Different namespaces → Blocked."),
     };
   }
   const class0 = metas[0]!.className;
   if (!metas.every((m) => m.className === class0)) {
     return {
-      rec: blockedIngress(docs, host, "ingressClassName 不一致，无法安全合并。"),
+      rec: blockedIngress(docs, host, "ingressClassName differs; cannot merge safely."),
     };
   }
 
   const ann0 = shallowStableJsonRecord(metas[0]!.annotations);
   if (!metas.every((m) => shallowStableJsonRecord(m.annotations) === ann0)) {
     return {
-      rec: reviewIngress(docs, host, "metadata.annotations 不一致，仅给建议，不生成候选 YAML。"),
+      rec: reviewIngress(docs, host, "metadata.annotations differ; suggestions only, no candidate YAML."),
     };
   }
 
   const tls0 = tlsFingerprint(metas[0]!.tls);
   if (!metas.every((m) => tlsFingerprint(m.tls) === tls0)) {
     return {
-      rec: reviewIngress(docs, host, "spec.tls 不一致，需人工核对后再合并。"),
+      rec: reviewIngress(docs, host, "spec.tls differs; verify manually before merging."),
     };
   }
 
   const db0 = shallowStableJsonRecord(metas[0]!.defaultBackend);
   if (!metas.every((m) => shallowStableJsonRecord(m.defaultBackend) === db0)) {
     return {
-      rec: reviewIngress(docs, host, "defaultBackend 不一致，不生成候选 YAML。"),
+      rec: reviewIngress(docs, host, "defaultBackend differs; no candidate YAML."),
     };
   }
 
@@ -136,7 +136,7 @@ function tryMergeIngressGroup(
     const byHost = readIngressPaths(d.obj);
     const paths = byHost.get(host) ?? [];
     if (!paths.length) {
-      conflicts.push(`${ingressMeta(d.obj).name} 未包含 host ${host} 的规则`);
+      conflicts.push(`${ingressMeta(d.obj).name} has no rules for host ${host}`);
       continue;
     }
     for (const p of paths) {
@@ -149,7 +149,7 @@ function tryMergeIngressGroup(
         String(prev.servicePort) !== String(p.servicePort)
       ) {
         conflicts.push(
-          `路径冲突 ${host} ${p.path} (${p.pathType}) → ${prev.serviceName} vs ${p.serviceName}`,
+          `Path conflict ${host} ${p.path} (${p.pathType}) → ${prev.serviceName} vs ${p.serviceName}`,
         );
       }
     }
@@ -162,7 +162,7 @@ function tryMergeIngressGroup(
         kind: "Ingress",
         level: "blocked",
         resourceRefs: docs.map((d) => `Ingress:${d.namespace ?? "default"}/${d.name}`),
-        rationale: `同 host ${host} 的 Ingress 存在冲突或不完整规则。`,
+        rationale: `Ingress rules for host ${host} conflict or are incomplete.`,
         estimatedLineDelta: 0,
         warnings: conflicts,
         impact: {
@@ -186,7 +186,7 @@ function tryMergeIngressGroup(
   const httpObj = ruleForHost ? asRecord(asRecord(ruleForHost)?.http) : null;
   if (!httpObj || !Array.isArray(httpObj.paths)) {
     return {
-      rec: reviewIngress(docs, host, "无法在原始结构上定位 host 对应的 http.paths，降级 Review。"),
+      rec: reviewIngress(docs, host, "Could not locate http.paths for this host in the raw object → Review."),
     };
   }
 
@@ -214,7 +214,7 @@ function tryMergeIngressGroup(
     yamlOut = stringify(base).trimEnd();
   } catch {
     return {
-      rec: reviewIngress(docs, host, "候选对象序列化失败，不生成 YAML。"),
+      rec: reviewIngress(docs, host, "Failed to serialize merged candidate; no YAML."),
     };
   }
 
@@ -227,11 +227,11 @@ function tryMergeIngressGroup(
       kind: "Ingress",
       level: "safe",
       resourceRefs: docs.map((d) => `Ingress:${d.namespace ?? "default"}/${d.name}`),
-      rationale: `可将 ${docs.length} 个 Ingress 在 host「${host}」上的路径合并为单个 Ingress（${mergedName}）。`,
+      rationale: `Merge ${docs.length} Ingress resources for host "${host}" into one (${mergedName}).`,
       estimatedLineDelta: Math.max(0, lineApprox),
       warnings: [
-        "请在集群中核对 annotations / finalizers / 依赖后再应用。",
-        "候选名称带 -merged-candidate 后缀，避免与现网资源冲突。",
+        "Verify annotations / finalizers / dependencies in-cluster before apply.",
+        "Candidate name uses -merged-candidate to avoid collisions.",
       ],
       candidateYaml: `${yamlOut}\n`,
       impact: {
@@ -263,7 +263,7 @@ function reviewIngress(docs: IndexedRawDoc[], host: string, why: string): RouteM
     resourceRefs: docs.map((d) => `Ingress:${d.namespace ?? "default"}/${d.name}`),
     rationale: why,
     estimatedLineDelta: 0,
-    warnings: ["请人工合并或拆分后再导入验证。"],
+    warnings: ["Merge or split manually, then re-import to verify."],
     impact: {
       keptResources: docs.map((d) => d.name ?? ""),
       riskLabel: "review",
@@ -301,7 +301,7 @@ function tryMergeVsGroup(docs: IndexedRawDoc[]): { rec: RouteMergeRecommendation
         kind: "VirtualService",
         level: "blocked",
         resourceRefs: docs.map((d) => `VirtualService:${d.namespace ?? "default"}/${d.name}`),
-        rationale: "跨 namespace VirtualService 不在 v1 合并范围。",
+        rationale: "VirtualService across namespaces is out of v1 scope.",
         estimatedLineDelta: 0,
         warnings: [],
       },
@@ -317,7 +317,7 @@ function tryMergeVsGroup(docs: IndexedRawDoc[]): { rec: RouteMergeRecommendation
         kind: "VirtualService",
         level: "blocked",
         resourceRefs: docs.map((d) => `VirtualService:${d.namespace ?? "default"}/${d.name}`),
-        rationale: "hosts 或 gateways 集合不一致，不能按 v1 合并。",
+        rationale: "hosts or gateways sets differ; cannot merge under v1.",
         estimatedLineDelta: 0,
         warnings: [],
       },
@@ -339,7 +339,7 @@ function tryMergeVsGroup(docs: IndexedRawDoc[]): { rec: RouteMergeRecommendation
             kind: "VirtualService",
             level: "review",
             resourceRefs: docs.map((x) => `VirtualService:${x.namespace ?? "default"}/${x.name}`),
-            rationale: `http 路由存在未在 v1 完整建模的字段：${hit.join(", ")} → 不生成候选 YAML。`,
+            rationale: `http route has fields not fully modeled in v1: ${hit.join(", ")} → no candidate YAML.`,
             estimatedLineDelta: 0,
             warnings: [],
           },
@@ -358,9 +358,9 @@ function tryMergeVsGroup(docs: IndexedRawDoc[]): { rec: RouteMergeRecommendation
           kind: "VirtualService",
           level: "review",
           resourceRefs: docs.map((x) => `VirtualService:${x.namespace ?? "default"}/${x.name}`),
-          rationale: `存在 v1 未覆盖的 spec 字段：${bad.join(", ")}，仅输出建议。`,
+          rationale: `spec contains fields outside v1: ${bad.join(", ")}; suggestions only.`,
           estimatedLineDelta: 0,
-          warnings: ["需保留 mirror/timeout/retries 等字段时请人工合并。"],
+          warnings: ["Manually merge if you must keep mirror/timeout/retries, etc."],
         },
       };
     }
@@ -412,7 +412,7 @@ function tryMergeVsGroup(docs: IndexedRawDoc[]): { rec: RouteMergeRecommendation
         kind: "VirtualService",
         level: "review",
         resourceRefs: docs.map((d) => `VirtualService:${d.namespace ?? "default"}/${d.name}`),
-        rationale: "VirtualService 候选序列化失败。",
+        rationale: "Failed to serialize VirtualService candidate.",
         estimatedLineDelta: 0,
         warnings: [],
       },
@@ -428,10 +428,10 @@ function tryMergeVsGroup(docs: IndexedRawDoc[]): { rec: RouteMergeRecommendation
       kind: "VirtualService",
       level: "safe",
       resourceRefs: docs.map((d) => `VirtualService:${d.namespace ?? "default"}/${d.name}`),
-      rationale: `可将 ${docs.length} 个 VirtualService（相同 hosts/gateways）合并为 ${mergedName}。`,
+      rationale: `Merge ${docs.length} VirtualService resources (same hosts/gateways) into ${mergedName}.`,
       estimatedLineDelta: Math.max(0, lineApprox),
       warnings: [
-        "已按 match+route 去重；若依赖 http 顺序或 fault/retries 等未建模字段，请人工复核。",
+        "Deduped by match+route; if you rely on http ordering or fault/retries not modeled here, review manually.",
       ],
       candidateYaml: `${yamlOut}\n`,
       impact: {
@@ -499,8 +499,8 @@ export function analyzeRouteMerge(
       resourceRefs: [],
       rationale:
         parseResult.errors.length
-          ? "当前解析存在告警，未生成合并候选；修复 YAML 后可重试。"
-          : "未发现满足 v1 安全边界的重复 Ingress host 分组或重复 VirtualService 分组。",
+          ? "Parse warnings present; no merge candidates. Fix YAML and retry."
+          : "No duplicate Ingress host groups or VirtualService groups within v1 safe bounds.",
       estimatedLineDelta: 0,
       warnings: [],
     });

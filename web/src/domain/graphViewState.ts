@@ -30,8 +30,8 @@ export const NODE_TYPE_ORDER: NodeTypeFilter[] = [
 ];
 
 const NODE_TYPE_LABELS: Record<Exclude<NodeTypeFilter, "all">, string> = {
-  ingressRegion: "分区",
-  ingress: "入口",
+  ingressRegion: "Region",
+  ingress: "Ingress",
   istioGateway: "Istio Gateway",
   httpProxy: "Contour Gateway",
   host: "Host",
@@ -43,7 +43,7 @@ const NODE_TYPE_LABELS: Record<Exclude<NodeTypeFilter, "all">, string> = {
 };
 
 export function nodeTypeLabel(type: NodeTypeFilter): string {
-  if (type === "all") return "全部";
+  if (type === "all") return "All";
   return NODE_TYPE_LABELS[type] ?? type;
 }
 

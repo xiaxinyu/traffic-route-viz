@@ -556,8 +556,8 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     ingressPartitionMeta.set(iid, { tierIndex: tier?.tierIndex });
     const sourceSummary =
       sourceFiles.length > 0
-        ? `来源文件：${sourceFiles.join("，")}`
-        : "来源文件：当前为编辑器内 YAML 文本（未绑定本地文件名）";
+        ? `Source: ${sourceFiles.join(", ")}`
+        : "Source: YAML from editor (no local file path)";
 
     const ingressRoutes = routesByIngress.get(iid) ?? [];
     const istioOnlyNoDestinations =
@@ -594,7 +594,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           sourceFiles,
           ...(istioOnlyNoDestinations
             ? {
-                hint: "未发现 VirtualService 的 route.destination（或尚未导入 VS）。DestinationRule 需要挂在 Destination 后才会显示；请先导入 VirtualService（vs-*.yaml / virtualservices.yaml）。",
+                hint: "No VirtualService route.destination found (or no VS imported). DestinationRule nodes appear after Destination; import VirtualService YAML (e.g. vs-*.yaml, virtualservices.yaml).",
               }
             : {}),
           tierCode: tier?.tierCode,
@@ -1561,7 +1561,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         targetHandle: "t-left",
         type: "step",
         pathOptions: { offset: 14, borderRadius: 6 },
-        label: "Nginx 转发",
+        label: "Nginx forward",
         style: { stroke: "#6366f1", strokeWidth: 2.2, strokeDasharray: "7 4" },
         labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
         labelBgStyle: { fill: "#e0e7ff", fillOpacity: 0.92 },
