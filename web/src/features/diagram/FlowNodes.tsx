@@ -237,16 +237,21 @@ export const IngressRegionNode = memo(function IngressRegionNode(props: NodeProp
 
 /** In-cluster Ingress controller (global node, Istio Gateway–like placement and chrome). */
 export const IngressControllerNode = memo(function IngressControllerNode(props: NodeProps) {
-  const { label, subtitle, namespace: ctrlNs, ingressClass, globalK8sIngressController, ingressNamespacesSummary } =
-    props.data as {
-      label?: string;
-      subtitle?: string;
-      namespace?: string;
-      ingressClass?: string;
-      globalK8sIngressController?: boolean;
-      /** When multiple Ingress namespaces share one controller class (e.g. nginx). */
-      ingressNamespacesSummary?: string;
-    };
+  const {
+    label,
+    subtitle,
+    namespace: ctrlNs,
+    ingressClass,
+    globalK8sIngressController,
+    controllerScope,
+  } = props.data as {
+    label?: string;
+    subtitle?: string;
+    namespace?: string;
+    ingressClass?: string;
+    globalK8sIngressController?: boolean;
+    controllerScope?: "global" | "tier02";
+  };
 
   if (globalK8sIngressController) {
     const accent = NODE_COLOR_PALETTE.istioGateway;
@@ -285,8 +290,10 @@ export const IngressControllerNode = memo(function IngressControllerNode(props: 
           <div style={meta({ marginTop: 2, fontSize: 12.5 })}>class: {ingressClass}</div>
         ) : null}
         {subtitle ? <div style={meta({ marginTop: 6, fontSize: 12.5 })}>{subtitle}</div> : null}
-        {ingressNamespacesSummary ? (
-          <div style={meta({ marginTop: 6, fontSize: 11.5, color: "#64748b" })}>{ingressNamespacesSummary}</div>
+        {controllerScope === "tier02" ? (
+          <div style={meta({ marginTop: 6, fontSize: 11.5, color: "#64748b", fontWeight: 700 })}>
+            Scope: Example tier 02 (worker plane)
+          </div>
         ) : null}
         <Handle
           type="source"

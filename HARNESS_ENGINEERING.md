@@ -159,7 +159,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 ### 节点类型（含分区底板）
 
 1. **Ingress 分区底板**（`ingressRegion`，父节点）：视觉泳道/整块可拖
-2. **Ingress 控制器**（`ingressController`，**全局**节点）：**仅**针对 Kubernetes `Ingress`；按 **`spec.ingressClassName` 全局归并**（忽略大小写；省略 class 为独立桶），**不**再按 Ingress 的 `metadata.namespace` 拆分——同一 class 的全图仅一个控制器节点（多 namespace 的 Ingress 仍各自显示其真实 `metadata.namespace`）。**`nginx` / 空 class** 时控制器卡上的 **namespace 行固定为 `ingress-nginx`**（与常见 ingress-nginx Helm 安装一致）；其它 class 则使用锚点 Ingress 所在 namespace 作为控制器平面展示名。布局与连线仍对齐 Istio Gateway：全局左侧、`ingressController → junction → Ingress`（干线无箭头无边标签；分叉末端箭头；**`step` 折线**）。卡片浅蓝壳与 **IngressClass / Global** 标签同 Istio Gateway 风格。
+2. **Ingress 控制器**（`ingressController`，**全局画布**节点）：**仅**针对 Kubernetes `Ingress`；按 **`metadata.namespace` + `spec.ingressClassName`**（class 忽略大小写；省略 class 为独立桶）分组，**同组一个控制器节点**。布局与 Istio Gateway 类似：左侧、`ingressController → junction → Ingress`（干线无箭头无边标签；分叉虚线末端箭头；**`step` 折线**）。**Example 分层导入**（`01/02/…` 路径）且同组同时存在 **tier 01 + tier 02** 时：**全局** `ingress-ctrl-*` 仅服务 **tier 01**（junction 分叉到各 **tier 01 分区首 Host 卡**，**不**在 tier 01 分区内渲染 **Ingress 头条卡**）；另生成 **`ingress-ctrl-t2-*`（`controllerScope: tier02`）** 服务 **tier 02**（junction **只**连 tier 02 **Ingress** 头条卡）。仅 tier 01 或仅 tier 02、或非分层时仍按原逻辑（全局控制器 junction → Ingress 头条卡）。卡片 namespace 行与 **IngressClass / Global** 标签同 Istio Gateway 风格。
 3. **Ingress**
 4. **Istio Gateway**（当 VirtualService 引用了 `spec.gateways` 时渲染；**同名 Gateway 合并为画布左侧全局节点**，标记 **Global**，并为每个 VirtualService 分区连入）
 5. **Host**
@@ -172,9 +172,9 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 
 ### 边的语义
 
-- **`ingressController → junction → Ingress`（Kubernetes Ingress）**：同 **`ingressClassName`** 仅一个全局 `ingressController`（**不按** Ingress `metadata.namespace` 拆分）；经 `junction` 分叉到该组内**每个** Ingress 头条卡。**干线**（controller→junction）**不绘制箭头、不挂边标签**；**分叉段**为虚线且 **仅在分叉段末端** 绘制箭头指向 Ingress；junction 贴近分区左缘；边类型为 **`step`** 折线（与 Istio Gateway→VS 的 smoothstep 干线可并存差异）。
-- `Ingress → Host`：入口域名规则（可 animated）
-- `Ingress → Ingress`（新增）：当两侧均为 `ingressClassName: nginx` 的入口层，且 Host/Path 规则存在语义相交时，允许自动绘制「Nginx 转发」边（用于 01/02 等分层入口转发链路展示）
+- **`ingressController → junction → Ingress`（Kubernetes Ingress）**：同 **`namespace + ingressClassName`** 一组一个控制器；经 `junction` 分叉到组内对应 Ingress 头条卡（干线无箭头无边标签；分叉末端箭头；**`step`**）。**分层 tier 01+02**：全局控制器 junction → **tier 01 Host**（分区内无 Ingress 卡）；**tier 02** 专用控制器 junction → **tier 02 Ingress**。
+- `Ingress → Host`：入口域名规则（可 animated）；**分层 tier 01+02 时 tier 01 分区内省略 Ingress 卡**，由全局控制器 junction 直连 **Host**。
+- **`Ingress → Ingress`（Nginx 转发）**：非分层或同层逻辑不变；**Example 分层 tier 01+02** 且 tier 01 已省略 Ingress 卡时，**不再**绘制 tier 01 **Nginx forward**（改由数据平面末端衔接）。若 tier 01 仍保留 Ingress 卡（仅 tier 01 导入等同组无 tier 02），且 **tier 01 → tier 02** 时存在 **`ingress-ctrl-t2-*`**，则 **Nginx forward** 从 **tier 01 Ingress** 指向该控制器。另从 **tier 01 分区内最右侧 Service 或 Endpoints** 绘制 **无标签 `step` 虚线** 连向 **`ingress-ctrl-t2-*`**（与路径重叠的 tier 02 组），表示进入 worker 平面。
 - `Istio Gateway → VirtualService`：当 VirtualService 配置 gateways 时，须存在 **全局 Istio Gateway** 节点（按 Gateway **名称**合并），并由该节点连入对应 VirtualService 入口卡；分区内 **不再**重复堆叠多块同名 Gateway 卡
 - `Host → Route → Service`：每条 path 一条路由，Route 节点承载信息避免边标签堆叠
 - `Service → Endpoints`：后端实例（Pod IP）

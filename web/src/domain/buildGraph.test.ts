@@ -187,31 +187,53 @@ metadata:
     expect(nodes.some((n) => n.type === "ingressController")).toBe(false);
   });
 
-  it("dedupes one global ingressController per ingressClass; junction branches to every Ingress", () => {
+  it("tiered 01+02: global controller → tier-01 Host; tier-02 controller → Ingress; no tier-01 Ingress card", () => {
     const parsed = mergeParseResults([
       parseK8sYaml(INGRESS_01, "01-edge/edge-global.yaml"),
       parseK8sYaml(INGRESS_02, "02-core/core-ingress.yaml"),
     ]);
     const { nodes, edges } = buildFlowGraph(parsed);
-    const controllers = nodes.filter(
-      (n) => n.type === "ingressController" && n.data?.globalK8sIngressController === true,
+    const t2Controllers = nodes.filter(
+      (n) => n.type === "ingressController" && n.data?.controllerScope === "tier02",
     );
-    expect(controllers).toHaveLength(1);
-    const ic = controllers[0]!;
-    expect(ic.parentNode).toBeUndefined();
+    expect(t2Controllers).toHaveLength(1);
+    const t2 = t2Controllers[0]!;
+    expect(t2.id).toContain("ingress-ctrl-t2");
+
+    const globalIc = nodes.find(
+      (n) =>
+        n.type === "ingressController" &&
+        n.data?.globalK8sIngressController === true &&
+        n.data?.controllerScope !== "tier02",
+    );
+    expect(globalIc).toBeTruthy();
+
     const ingA = nodes.find((n) => n.type === "ingress" && n.data?.label === "edge-global");
     const ingB = nodes.find((n) => n.type === "ingress" && n.data?.label === "core-ingress");
-    expect(ingA).toBeTruthy();
+    expect(ingA).toBeUndefined();
     expect(ingB).toBeTruthy();
-    const trunk = edges.find((e) => e.source === ic.id && String(e.target ?? "").includes("junction"));
-    expect(trunk).toBeTruthy();
-    expect(trunk?.markerEnd).toBeUndefined();
-    const junctionId = trunk!.target;
-    expect(edges.filter((e) => e.source === junctionId && e.target === ingA!.id)).toHaveLength(1);
-    expect(edges.filter((e) => e.source === junctionId && e.target === ingB!.id)).toHaveLength(1);
+
+    const hostA = nodes.find(
+      (n) => n.type === "host" && n.parentNode?.includes("edge-global"),
+    );
+    expect(hostA).toBeTruthy();
+
+    const globalTrunk = edges.find(
+      (e) => e.source === globalIc!.id && String(e.target ?? "").includes("junction"),
+    );
+    expect(globalTrunk).toBeTruthy();
+    const globalJunction = globalTrunk!.target;
+    expect(edges.filter((e) => e.source === globalJunction && e.target === hostA!.id)).toHaveLength(
+      1,
+    );
+
+    const t2Trunk = edges.find((e) => e.source === t2.id && String(e.target ?? "").includes("junction"));
+    expect(t2Trunk).toBeTruthy();
+    const t2Junction = t2Trunk!.target;
+    expect(edges.filter((e) => e.source === t2Junction && e.target === ingB!.id)).toHaveLength(1);
   });
 
-  it("merges nginx Ingress controllers across different Ingress namespaces; card shows ingress-nginx", () => {
+  it("uses distinct Ingress controllers per namespace+class when not sharing a key", () => {
     const otherNs = INGRESS_01.replace("namespace: traffic", "namespace: edge");
     const parsed = mergeParseResults([
       parseK8sYaml(INGRESS_01, "a.yaml"),
@@ -219,10 +241,9 @@ metadata:
     ]);
     const { nodes } = buildFlowGraph(parsed);
     const controllers = nodes.filter((n) => n.type === "ingressController");
-    expect(controllers).toHaveLength(1);
-    expect(controllers[0]?.data?.namespace).toBe("ingress-nginx");
-    expect(String(controllers[0]?.data?.ingressNamespacesSummary ?? "")).toContain("traffic");
-    expect(String(controllers[0]?.data?.ingressNamespacesSummary ?? "")).toContain("edge");
+    expect(controllers).toHaveLength(2);
+    const ns = controllers.map((c) => c.data?.namespace).sort();
+    expect(ns).toEqual(["edge", "traffic"]);
   });
 
   it("creates separate controllers for different ingressClassName values", () => {
@@ -237,25 +258,51 @@ metadata:
 });
 
 describe("buildFlowGraph ingress forwarding", () => {
-  it("creates tier-forward ingress->ingress edge for overlapping nginx routes", () => {
+  it("tiered 01→02: data-plane tail connects to tier-02 controller (no tier-01 Ingress Nginx forward)", () => {
     const parsed = mergeParseResults([
       parseK8sYaml(INGRESS_01, "01-edge/edge-global.yaml"),
       parseK8sYaml(INGRESS_02, "02-core/core-ingress.yaml"),
     ]);
     const { nodes, edges } = buildFlowGraph(parsed);
 
-    const src = nodes.find((n) => n.type === "ingress" && n.data?.label === "edge-global");
-    const dst = nodes.find((n) => n.type === "ingress" && n.data?.label === "core-ingress");
-    expect(src).toBeTruthy();
-    expect(dst).toBeTruthy();
+    expect(
+      nodes.find((n) => n.type === "ingress" && n.data?.label === "edge-global"),
+    ).toBeUndefined();
 
-    const forwarding = edges.find(
-      (e) => e.label === "Nginx forward" && e.source === src!.id && e.target === dst!.id,
+    const t2 = nodes.find(
+      (n) => n.type === "ingressController" && String(n.id).includes("ingress-ctrl-t2"),
     );
-    expect(forwarding).toBeTruthy();
-    expect(forwarding?.style).toMatchObject({ stroke: "#6366f1" });
-    expect(forwarding?.type).toBe("readableLabel");
-    expect(forwarding?.data).toMatchObject({ baseType: "step" });
+    expect(t2).toBeTruthy();
+
+    const nginxFromTier01Ingress = edges.filter((e) => e.label === "Nginx forward");
+    expect(nginxFromTier01Ingress).toHaveLength(0);
+
+    const region = nodes.find(
+      (n) => n.type === "ingressRegion" && n.data?.ingressName === "edge-global",
+    );
+    expect(region).toBeTruthy();
+    const tails = nodes.filter(
+      (n) =>
+        (n.type === "service" || n.type === "endpoints") && n.parentNode === region!.id,
+    );
+    expect(tails.length).toBeGreaterThan(0);
+    const rightTail = [...tails].sort((a, b) => {
+      const ax = typeof a.position?.x === "number" ? a.position.x : 0;
+      const bx = typeof b.position?.x === "number" ? b.position.x : 0;
+      if (bx !== ax) return bx - ax;
+      const ay = typeof a.position?.y === "number" ? a.position.y : 0;
+      const by = typeof b.position?.y === "number" ? b.position.y : 0;
+      return by - ay;
+    })[0]!;
+    const bridge = edges.find(
+      (e) =>
+        e.source === rightTail.id &&
+        e.target === t2!.id &&
+        String(e.id ?? "").includes("tier-tail-next"),
+    );
+    expect(bridge).toBeTruthy();
+    expect(bridge?.label).toBeUndefined();
+    expect(bridge?.type).toBe("step");
 
     const portLabelEdge = edges.find(
       (e) => typeof e.label === "string" && e.label.startsWith("→ :"),

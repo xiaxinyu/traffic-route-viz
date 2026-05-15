@@ -341,27 +341,53 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   });
 
   /**
-   * Global Ingress controller merge key: **ingressClassName only** (case-insensitive; missing → `__none__`).
-   * Ingress objects live in their own `metadata.namespace`; the controller is shared per class (e.g. all `nginx`
-   * Ingresses attach to one ingress-nginx controller plane regardless of Ingress namespace).
+   * Kubernetes Ingress controller merge key: **`metadata.namespace` + `spec.ingressClassName`**
+   * (class case-insensitive; missing class → `__none__`).
+   * In Example tiered imports, tier-02 worker groups additionally get a **scoped** controller node
+   * (`ingress-ctrl-t2-*`) so tier-01 Ingress forwards can target that plane instead of the tier-02 Ingress card.
    */
-  const k8sIngressControllerGroupKey = (className: string | undefined): string => {
+  const k8sIngressControllerGroupKey = (
+    namespace: string | undefined,
+    className: string | undefined,
+  ): string => {
+    const ns = (namespace ?? "").trim() || "default";
     const clsRaw = (className ?? "").trim();
-    return clsRaw ? clsRaw.toLowerCase() : "__none__";
+    const clsPart = clsRaw ? clsRaw.toLowerCase() : "__none__";
+    return `${ns}::${clsPart}`;
   };
-  const sharedK8sIngressControllerNodeId = (gk: string): string => `ingress-ctrl-${sanitizeId(gk)}`;
+  const k8sIngressCtrlIdGlobal = (gk: string): string => `ingress-ctrl-${sanitizeId(gk)}`;
+  const k8sIngressCtrlIdTier2 = (gk: string): string => `ingress-ctrl-t2-${sanitizeId(gk)}`;
   const firstIngressPartitionIdByCtrlGroup = new Map<string, string>();
   const k8sIngressCountByCtrlGroup = new Map<string, number>();
   const k8sIngressTargetIdsByGroup = new Map<string, string[]>();
   for (const ing of orderedIngresses) {
     if (ing.kind !== "Ingress") continue;
     const iid = ingId(ing.kind, ing.namespace, ing.name);
-    const gk = k8sIngressControllerGroupKey(ing.className);
+    const gk = k8sIngressControllerGroupKey(ing.namespace, ing.className);
     if (!firstIngressPartitionIdByCtrlGroup.has(gk)) firstIngressPartitionIdByCtrlGroup.set(gk, iid);
     k8sIngressCountByCtrlGroup.set(gk, (k8sIngressCountByCtrlGroup.get(gk) ?? 0) + 1);
     const tg = k8sIngressTargetIdsByGroup.get(gk) ?? [];
     tg.push(iid);
     k8sIngressTargetIdsByGroup.set(gk, tg);
+  }
+
+  /** Example tier 01 partitions that share a (ns, class) with tier 02: omit in-area Ingress headline card. */
+  const ingressTierIndexByPartitionId = new Map<string, 1 | 2 | 3>();
+  for (const ing of orderedIngresses) {
+    if (ing.kind !== "Ingress") continue;
+    const tix = parseExampleTier(ing.sourceFiles)?.tierIndex;
+    if (tix) ingressTierIndexByPartitionId.set(ingId(ing.kind, ing.namespace, ing.name), tix);
+  }
+  const tier01OmitIngressHeadline = new Set<string>();
+  if (hasTieredExample) {
+    for (const gk of k8sIngressCountByCtrlGroup.keys()) {
+      const ids = k8sIngressTargetIdsByGroup.get(gk) ?? [];
+      const groupHasTier2 = ids.some((id) => ingressTierIndexByPartitionId.get(id) === 2);
+      if (!groupHasTier2) continue;
+      for (const id of ids) {
+        if (ingressTierIndexByPartitionId.get(id) === 1) tier01OmitIngressHeadline.add(id);
+      }
+    }
   }
 
   // Group routes by ingress -> host
@@ -459,6 +485,10 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     { nodeId: string; ownerKind: string; ingressPartitionId?: string }[]
   >();
   const pendingServiceToGatewayEdges: { serviceKey: string; gatewayNodeId: string }[] = [];
+  /** Tier-01 data-plane tail (rightmost Service/Endpoints) → tier-02 Ingress controller. */
+  const pendingTierTailToNextPlane: { partitionIid: string; tailNodeId: string }[] = [];
+  /** First Host node per Ingress partition (for global controller → tier-01 data plane). */
+  const firstHostIdByPartition = new Map<string, string>();
   const ingressPartitionMeta = new Map<string, { tierIndex?: 1 | 2 | 3 }>();
   const regionIdByIngressId = new Map<string, string>();
   /** Istio Gateway node id + owning VirtualService partition (for URI rule intersection checks). */
@@ -675,28 +705,33 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
 
     const vsOffsetX = 0;
 
-    nodes.push({
-      id: iid,
-      type: "ingress",
-      parentNode: regionId,
-      extent: "parent",
-      draggable: true,
-      position: {
-        x: isContourGateway
-          ? contour.gatewayX
-          : leftPad + (ing.kind === "VirtualService" ? vsOffsetX : 0),
-        y: layoutOriginY,
-      },
-      data: {
-        nodeKey: nodeKey("entry", iid),
-        label: ing.name,
-        subtitle: ing.namespace ? `namespace: ${ing.namespace}` : undefined,
-        className: ing.className,
-        kind: ing.kind,
-        tls: ing.tls,
-        loadBalancerIps: ing.loadBalancerIps,
-      },
-    });
+    const omitTier01IngressHeadline =
+      ing.kind === "Ingress" && tier01OmitIngressHeadline.has(iid);
+
+    if (!omitTier01IngressHeadline) {
+      nodes.push({
+        id: iid,
+        type: "ingress",
+        parentNode: regionId,
+        extent: "parent",
+        draggable: true,
+        position: {
+          x: isContourGateway
+            ? contour.gatewayX
+            : leftPad + (ing.kind === "VirtualService" ? vsOffsetX : 0),
+          y: layoutOriginY,
+        },
+        data: {
+          nodeKey: nodeKey("entry", iid),
+          label: ing.name,
+          subtitle: ing.namespace ? `namespace: ${ing.namespace}` : undefined,
+          className: ing.className,
+          kind: ing.kind,
+          tls: ing.tls,
+          loadBalancerIps: ing.loadBalancerIps,
+        },
+      });
+    }
 
     let maxY = layoutOriginY + 200;
     let maxX = leftPad + 260;
@@ -727,7 +762,9 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
 
     /** First Host row Y clears the Ingress/VS headline and (if any) the Istio Gateway stack in the left column. */
     const entryRowBottom = layoutOriginY + LAYOUT_EST_ENTRY_CARD_H;
-    const hostBandStartY = Math.max(entryRowBottom, istioGatewaysStackBottom) + LAYOUT_TOP_ROW_TAIL;
+    const hostBandStartY = omitTier01IngressHeadline
+      ? layoutOriginY + LAYOUT_TOP_ROW_TAIL
+      : Math.max(entryRowBottom, istioGatewaysStackBottom) + LAYOUT_TOP_ROW_TAIL;
 
     // For Contour gateway regions: add an explicit HTTPProxy config node so the chain can be
     // Service(gateway) -> Contour Gateway -> HTTPProxy -> Host -> Route -> Service(upstream).
@@ -825,6 +862,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     hosts.forEach((host, hostIdx) => {
       const hid = `host-${sanitizeId(iid)}-${sanitizeId(host)}-${hostIdx}`;
       hostIdByHost.set(host, hid);
+      if (!firstHostIdByPartition.has(iid)) firstHostIdByPartition.set(iid, hid);
 
       const hostY = hostCursorY;
       maxY = Math.max(maxY, hostY + LAYOUT_EST_HOST_CARD_H);
@@ -851,17 +889,19 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         },
       });
 
-      edges.push({
-        id: `e-${iid}-${hid}-${edgeIdx++}`,
-        source: httpProxyNodeId ?? iid,
-        target: hid,
-        sourceHandle: "s-right",
-        targetHandle: "t-left",
-        type: edgeType,
-        animated: true,
-        style: { stroke: "#7c3aed", strokeWidth: 2 },
-        markerEnd: arrow("#7c3aed"),
-      });
+      if (!omitTier01IngressHeadline) {
+        edges.push({
+          id: `e-${iid}-${hid}-${edgeIdx++}`,
+          source: httpProxyNodeId ?? iid,
+          target: hid,
+          sourceHandle: "s-right",
+          targetHandle: "t-left",
+          type: edgeType,
+          animated: true,
+          style: { stroke: "#7c3aed", strokeWidth: 2 },
+          markerEnd: arrow("#7c3aed"),
+        });
+      }
 
       const rawHostRoutes = ingressRoutes.filter((r) => r.host === host);
       /**
@@ -1349,6 +1389,31 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       }
     }
 
+    if (
+      hasTieredExample &&
+      tier?.tierIndex === 1 &&
+      ing.kind === "Ingress" &&
+      !isContourGateway &&
+      !isIstioOnlyBundle
+    ) {
+      type ChainLeaf = { id: string; rx: number; y: number };
+      const leaves: ChainLeaf[] = [];
+      for (const n of nodes) {
+        if (n.parentNode !== regionId) continue;
+        if (n.type !== "endpoints" && n.type !== "service") continue;
+        const px = typeof n.position?.x === "number" ? n.position.x : 0;
+        const py = typeof n.position?.y === "number" ? n.position.y : 0;
+        leaves.push({ id: n.id, rx: px + cardMaxW, y: py });
+      }
+      if (leaves.length) {
+        leaves.sort((a, b) => b.rx - a.rx || b.y - a.y);
+        pendingTierTailToNextPlane.push({
+          partitionIid: iid,
+          tailNodeId: leaves[0]!.id,
+        });
+      }
+    }
+
     // 3) Resize region to fit content
     const region = nodes[regionNodeIdx];
     if (region) {
@@ -1501,58 +1566,48 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
     }
   }
 
-  // Global Kubernetes Ingress controllers: Istio-like placement + trunk/junction/dashed branches → Ingress entry cards.
+  // Global + tier-02 scoped Kubernetes Ingress controllers (namespace + class), Istio-like placement.
   const sortedK8sIngressCtrlGroupKeys = [...k8sIngressCountByCtrlGroup.keys()].sort((a, b) =>
     a.localeCompare(b),
   );
-  for (const gk of sortedK8sIngressCtrlGroupKeys) {
-    const sharedIcId = sharedK8sIngressControllerNodeId(gk);
-    const ingressIds = k8sIngressTargetIdsByGroup.get(gk) ?? [];
-    if (!ingressIds.length) continue;
 
-    const anchorIid = firstIngressPartitionIdByCtrlGroup.get(gk);
-    const anchorIng = orderedIngresses.find(
-      (x) =>
-        x.kind === "Ingress" &&
-        anchorIid !== undefined &&
-        ingId(x.kind, x.namespace, x.name) === anchorIid,
-    );
-    if (!anchorIng) continue;
+  const emitIngressControllerPlane = (opts: {
+    gk: string;
+    scope: "global" | "tier02";
+    targetIngressIds: string[];
+    anchorIng: (typeof orderedIngresses)[number];
+    junctionBranchNodeIds?: string[];
+  }) => {
+    const { gk, scope, targetIngressIds, anchorIng, junctionBranchNodeIds } = opts;
+    if (!targetIngressIds.length) return;
 
+    const branchNodeIds = junctionBranchNodeIds ?? targetIngressIds;
+
+    const sharedIcId = scope === "tier02" ? k8sIngressCtrlIdTier2(gk) : k8sIngressCtrlIdGlobal(gk);
     const cls = (anchorIng.className ?? "").trim();
     const clsLower = cls.toLowerCase();
     const isNginxClass = !cls || clsLower === "nginx";
     const countInGroup = k8sIngressCountByCtrlGroup.get(gk) ?? 1;
+    const nsDisp = anchorIng.namespace ?? "default";
 
-    const distinctIngressNamespaces = new Set<string>();
-    for (const id of ingressIds) {
-      const ingSum = orderedIngresses.find(
-        (x) => x.kind === "Ingress" && ingId(x.kind, x.namespace, x.name) === id,
-      );
-      distinctIngressNamespaces.add((ingSum?.namespace ?? "").trim() || "default");
-    }
-    const nsListSorted = [...distinctIngressNamespaces].sort((a, b) => a.localeCompare(b));
-    const multiNs = nsListSorted.length > 1;
-    /** ingress-nginx controller install namespace is the usual chart default for class `nginx`. */
-    const controllerPlaneNs = isNginxClass ? "ingress-nginx" : (anchorIng.namespace ?? "default");
-    const nsDisp = controllerPlaneNs;
-
-    const subtitle = isNginxClass
-      ? countInGroup > 1
-        ? `Watches ${countInGroup} Ingress resources (nginx IngressClass · controller ns ${controllerPlaneNs})`
-        : "Reconciles this Ingress (nginx IngressClass)"
-      : countInGroup > 1
-        ? `Watches ${countInGroup} Ingress resources (class: ${cls} · ns ${controllerPlaneNs})`
-        : cls
-          ? `class: ${cls}`
-          : undefined;
-    const ingressNamespacesSummary = multiNs
-      ? `Ingress object namespaces: ${nsListSorted.join(", ")}`
-      : undefined;
+    const subtitle =
+      scope === "tier02"
+        ? countInGroup > 1
+          ? `Watches ${targetIngressIds.length} Ingress in this namespace/class (Example tier 02)`
+          : "Worker Ingress plane (Example tier 02)"
+        : isNginxClass
+          ? countInGroup > 1
+            ? `Watches ${countInGroup} Ingress resources (nginx IngressClass · ns ${nsDisp})`
+            : "Reconciles this Ingress (nginx IngressClass)"
+          : countInGroup > 1
+            ? `Watches ${countInGroup} Ingress resources (class: ${cls} · ns ${nsDisp})`
+            : cls
+              ? `class: ${cls}`
+              : undefined;
 
     const centers: number[] = [];
     const xs: number[] = [];
-    for (const ingId of ingressIds) {
+    for (const ingId of targetIngressIds) {
       const regionId = regionIdByIngressId.get(ingId);
       const rn = regionId ? nodes.find((x) => x.id === regionId) : undefined;
       if (!rn || rn.type !== "ingressRegion") continue;
@@ -1561,7 +1616,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       centers.push(py + rh / 2);
       xs.push(rn.position?.x ?? baseX + layoutOffsetX);
     }
-    if (!centers.length) continue;
+    if (!centers.length) return;
     const midY = medianOf(centers, baseY);
     const minX = Math.min(...xs);
 
@@ -1574,20 +1629,22 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       type: "ingressController",
       position: { x: gx, y: midY - LAYOUT_EST_ISTIO_GW_H / 2 },
       data: {
-        nodeKey: nodeKey("ingressController", "global", gk),
+        nodeKey: nodeKey("ingressController", scope, gk),
         label: isNginxClass ? "Kube Ingress Nginx" : "Ingress controller",
         subtitle,
         namespace: nsDisp,
         ingressClass: cls || (isNginxClass ? "nginx" : undefined),
-        ingressNamespacesSummary,
         globalK8sIngressController: true,
+        controllerScope: scope,
       },
       selectable: true,
       draggable: true,
     });
 
-    const junctionId = `k8s-ingress-ctrl-junction-${sanitizeId(gk)}`;
-    /** Keep the merge point close to Ingress regions so step edges stay compact. */
+    const junctionId =
+      scope === "tier02"
+        ? `k8s-ingress-ctrl-junction-t2-${sanitizeId(gk)}`
+        : `k8s-ingress-ctrl-junction-${sanitizeId(gk)}`;
     const branchGap = 72;
     const jxMin = minX - branchGap;
     const jx = Math.max(gx + icCardW + 40, jxMin);
@@ -1595,14 +1652,14 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       id: junctionId,
       type: "junction",
       position: { x: jx, y: midY },
-      data: { nodeKey: nodeKey("junction", "k8sIngressController", gk) },
+      data: { nodeKey: nodeKey("junction", "k8sIngressController", scope, gk) },
       selectable: false,
       draggable: false,
     });
 
     edges.push(
       makeEditableEdge({
-        id: `e-${sharedIcId}-${junctionId}-k8sic-trunk-${edgeIdx++}`,
+        id: `e-${sharedIcId}-${junctionId}-k8sic-trunk-${scope}-${edgeIdx++}`,
         source: sharedIcId,
         target: junctionId,
         sourceHandle: "s-right",
@@ -1618,13 +1675,13 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       }),
     );
 
-    const uniqIng = [...new Set(ingressIds)].sort();
-    for (const ingId of uniqIng) {
+    const uniqBranch = [...new Set(branchNodeIds)].sort();
+    for (const nodeId of uniqBranch) {
       edges.push(
         makeEditableEdge({
-          id: `e-${junctionId}-${ingId}-k8sic-branch-${edgeIdx++}`,
+          id: `e-${junctionId}-${nodeId}-k8sic-branch-${scope}-${edgeIdx++}`,
           source: junctionId,
-          target: ingId,
+          target: nodeId,
           sourceHandle: "s-right",
           targetHandle: "t-left",
           type: "step",
@@ -1640,6 +1697,75 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         }),
       );
     }
+  };
+
+  for (const gk of sortedK8sIngressCtrlGroupKeys) {
+    const ingressIds = k8sIngressTargetIdsByGroup.get(gk) ?? [];
+    if (!ingressIds.length) continue;
+
+    const tier2Ids = ingressIds.filter((id) => ingressPartitionMeta.get(id)?.tierIndex === 2);
+    const tier1Ids = ingressIds.filter((id) => ingressPartitionMeta.get(id)?.tierIndex === 1);
+    const hasTier2InGroup = Boolean(hasTieredExample && tier2Ids.length > 0);
+
+    if (hasTier2InGroup) {
+      const anchorTier2 = orderedIngresses.find(
+        (x) =>
+          x.kind === "Ingress" &&
+          k8sIngressControllerGroupKey(x.namespace, x.className) === gk &&
+          parseExampleTier(x.sourceFiles)?.tierIndex === 2,
+      );
+      if (anchorTier2) {
+        emitIngressControllerPlane({
+          gk,
+          scope: "tier02",
+          targetIngressIds: tier2Ids,
+          anchorIng: anchorTier2,
+        });
+      }
+
+      if (tier1Ids.length) {
+        const anchorTier1 = orderedIngresses.find(
+          (x) =>
+            x.kind === "Ingress" &&
+            k8sIngressControllerGroupKey(x.namespace, x.className) === gk &&
+            parseExampleTier(x.sourceFiles)?.tierIndex === 1,
+        );
+        if (anchorTier1) {
+          const hostBranches = tier1Ids
+            .map((pid) => firstHostIdByPartition.get(pid))
+            .filter((id): id is string => Boolean(id));
+          if (hostBranches.length) {
+            emitIngressControllerPlane({
+              gk,
+              scope: "global",
+              targetIngressIds: tier1Ids,
+              junctionBranchNodeIds: hostBranches,
+              anchorIng: anchorTier1,
+            });
+          }
+        }
+      }
+      continue;
+    }
+
+    const emitGlobal = !hasTieredExample || !hasTier2InGroup;
+    if (!emitGlobal) continue;
+
+    const anchorIid = firstIngressPartitionIdByCtrlGroup.get(gk);
+    const anchorIng = orderedIngresses.find(
+      (x) =>
+        x.kind === "Ingress" &&
+        anchorIid !== undefined &&
+        ingId(x.kind, x.namespace, x.name) === anchorIid,
+    );
+    if (!anchorIng) continue;
+
+    emitIngressControllerPlane({
+      gk,
+      scope: "global",
+      targetIngressIds: ingressIds,
+      anchorIng,
+    });
   }
 
   // Resolve cross-area edges after all nodes exist (order-independent).
@@ -1700,6 +1826,8 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
   // Ingress -> Ingress forwarding edges (mainly tiered 01/02 nginx forwarding layers).
   // Rule: both are Ingress partitions, and at least one host+path pair overlaps.
   // In tiered examples, only draw forward edges to the next tier (01->02, 02->03) to avoid visual noise.
+  // When a tier-02 scoped Ingress controller exists for the destination (namespace+class), tier-01→tier-02
+  // draws to that controller instead of the tier-02 Ingress card (cleaner “edge → worker plane” story).
   const ingressPartitionIds = orderedIngresses
     .filter((ing) => ing.kind === "Ingress")
     .map((ing) => ingId(ing.kind, ing.namespace, ing.name));
@@ -1718,9 +1846,42 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         const dstIdx = ingressIndexById.get(dst) ?? 0;
         if (dstIdx <= srcIdx) continue;
       }
+      if (!ingressPairPathMayOverlap(src, dst)) continue;
+
+      if (hasTieredExample && tier01OmitIngressHeadline.has(src)) continue;
+
+      if (hasTieredExample && srcMeta?.tierIndex === 1 && dstMeta?.tierIndex === 2) {
+        const dstIng = orderedIngresses.find(
+          (x) => x.kind === "Ingress" && ingId(x.kind, x.namespace, x.name) === dst,
+        );
+        if (dstIng) {
+          const gkDst = k8sIngressControllerGroupKey(dstIng.namespace, dstIng.className);
+          const t2Id = k8sIngressCtrlIdTier2(gkDst);
+          if (nodes.some((n) => n.id === t2Id)) {
+            const ctrlDedupe = `${src}>${t2Id}`;
+            if (seenIngressForward.has(ctrlDedupe)) continue;
+            seenIngressForward.add(ctrlDedupe);
+            edges.push({
+              id: `e-${src}-${t2Id}-nginx-fwd-tier2-${edgeIdx++}`,
+              source: src,
+              target: t2Id,
+              sourceHandle: "s-right",
+              targetHandle: "t-left",
+              type: "step",
+              pathOptions: { offset: 14, borderRadius: 6 },
+              label: "Nginx forward",
+              style: { stroke: "#6366f1", strokeWidth: 2.2, strokeDasharray: "7 4" },
+              labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
+              labelBgStyle: { fill: "#e0e7ff", fillOpacity: 0.92 },
+              markerEnd: arrow("#6366f1"),
+            });
+            continue;
+          }
+        }
+      }
+
       const pair = `${src}>${dst}`;
       if (seenIngressForward.has(pair)) continue;
-      if (!ingressPairPathMayOverlap(src, dst)) continue;
       seenIngressForward.add(pair);
       edges.push({
         id: `e-${src}-${dst}-ingress-forward-${edgeIdx++}`,
@@ -1736,6 +1897,62 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
         labelBgStyle: { fill: "#e0e7ff", fillOpacity: 0.92 },
         markerEnd: arrow("#6366f1"),
       });
+    }
+  }
+
+  const tierTailForwardTargets = (partitionIid: string): string[] => {
+    const srcMeta = ingressPartitionMeta.get(partitionIid);
+    if (srcMeta?.tierIndex !== 1) return [];
+
+    const out: string[] = [];
+    for (const dst of ingressPartitionIds) {
+      const dstMeta = ingressPartitionMeta.get(dst);
+      if (dstMeta?.tierIndex !== 2) continue;
+      if (!ingressPairPathMayOverlap(partitionIid, dst)) continue;
+
+      const dstIng = orderedIngresses.find(
+        (x) => x.kind === "Ingress" && ingId(x.kind, x.namespace, x.name) === dst,
+      );
+      if (!dstIng) continue;
+      const gkDst = k8sIngressControllerGroupKey(dstIng.namespace, dstIng.className);
+      const t2Id = k8sIngressCtrlIdTier2(gkDst);
+      if (nodes.some((n) => n.id === t2Id)) {
+        out.push(t2Id);
+      } else if (!tier01OmitIngressHeadline.has(partitionIid)) {
+        out.push(dst);
+      }
+    }
+    return [...new Set(out)].sort();
+  };
+
+  const seenTierTailToNext = new Set<string>();
+  for (const { partitionIid, tailNodeId } of pendingTierTailToNextPlane) {
+    const tailNode = nodes.find((n) => n.id === tailNodeId);
+    if (!tailNode || (tailNode.type !== "endpoints" && tailNode.type !== "service")) continue;
+    for (const targetId of tierTailForwardTargets(partitionIid)) {
+      const dedupe = `${tailNodeId}|${targetId}`;
+      if (seenTierTailToNext.has(dedupe)) continue;
+      seenTierTailToNext.add(dedupe);
+      if (!nodes.some((n) => n.id === targetId)) continue;
+      edges.push(
+        makeEditableEdge({
+          id: `e-${tailNodeId}-${targetId}-tier-tail-next-${edgeIdx++}`,
+          source: tailNodeId,
+          target: targetId,
+          sourceHandle: "s-right",
+          targetHandle: "t-left",
+          type: "step",
+          pathOptions: { offset: 26, borderRadius: 6 },
+          style: {
+            stroke: "#94a3b8",
+            strokeWidth: 2,
+            strokeDasharray: "5 5",
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+            shapeRendering: "geometricPrecision",
+          },
+        }),
+      );
     }
   }
 
