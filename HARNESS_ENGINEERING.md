@@ -174,7 +174,7 @@ kubectl apply -f k8s/traffic-route-viz.yaml
 
 - **`ingressController → junction → Ingress`（Kubernetes Ingress）**：同 **`namespace + ingressClassName`** 一组一个控制器；经 `junction` 分叉到组内对应 Ingress 头条卡（干线无箭头无边标签；分叉末端箭头；**`step`**）。**分层 tier 01+02**：全局控制器 junction → **tier 01 Host**（分区内无 Ingress 卡）；**tier 02** 专用控制器 junction → **tier 02 Ingress**。
 - `Ingress → Host`：入口域名规则（可 animated）；**分层 tier 01+02 时 tier 01 分区内省略 Ingress 卡**，由全局控制器 junction 直连 **Host**。
-- **`Ingress → Ingress`（Nginx 转发）**：非分层或同层逻辑不变；**Example 分层 tier 01+02** 且 tier 01 已省略 Ingress 卡时，**不再**绘制 tier 01 **Nginx forward**（改由数据平面末端衔接）。若 tier 01 仍保留 Ingress 卡（仅 tier 01 导入等同组无 tier 02），且 **tier 01 → tier 02** 时存在 **`ingress-ctrl-t2-*`**，则 **Nginx forward** 从 **tier 01 Ingress** 指向该控制器。另从 **tier 01 分区内最右侧 Service 或 Endpoints** 绘制 **无标签 `step` 虚线** 连向 **`ingress-ctrl-t2-*`**（与路径重叠的 tier 02 组），表示进入 worker 平面。
+- **`Ingress → Ingress`（Nginx 转发）**：非分层或同层逻辑不变；**Example 分层**且 **tier 01 → tier 02** 时，**不**绘制 **tier 01 Ingress → `ingress-ctrl-t2-*`**（进入 worker 平面仅由 **tier 01 链尾 Service/Endpoints → `ingress-ctrl-t2-*`** 的 **无标签 `step` 虚线**表达）。若目的地未生成 **`ingress-ctrl-t2-*`**，仍允许 **Nginx forward** 为 **tier 01 Ingress → tier 02 Ingress** 卡。同组 tier 01 已省略 Ingress 头条卡时，本段 **tier 01** 侧亦无 **Nginx forward**。
 - `Istio Gateway → VirtualService`：当 VirtualService 配置 gateways 时，须存在 **全局 Istio Gateway** 节点（按 Gateway **名称**合并），并由该节点连入对应 VirtualService 入口卡；分区内 **不再**重复堆叠多块同名 Gateway 卡
 - `Host → Route → Service`：每条 path 一条路由，Route 节点承载信息避免边标签堆叠
 - `Service → Endpoints`：后端实例（Pod IP）

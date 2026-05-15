@@ -1858,23 +1858,10 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
           const gkDst = k8sIngressControllerGroupKey(dstIng.namespace, dstIng.className);
           const t2Id = k8sIngressCtrlIdTier2(gkDst);
           if (nodes.some((n) => n.id === t2Id)) {
+            // Tier handoff is **chain tail → tier-02 controller** only; do not draw Ingress → t2.
             const ctrlDedupe = `${src}>${t2Id}`;
             if (seenIngressForward.has(ctrlDedupe)) continue;
             seenIngressForward.add(ctrlDedupe);
-            edges.push({
-              id: `e-${src}-${t2Id}-nginx-fwd-tier2-${edgeIdx++}`,
-              source: src,
-              target: t2Id,
-              sourceHandle: "s-right",
-              targetHandle: "t-left",
-              type: "step",
-              pathOptions: { offset: 14, borderRadius: 6 },
-              label: "Nginx forward",
-              style: { stroke: "#6366f1", strokeWidth: 2.2, strokeDasharray: "7 4" },
-              labelStyle: { fontSize: 11, fill: "#0f172a", fontWeight: 700 },
-              labelBgStyle: { fill: "#e0e7ff", fillOpacity: 0.92 },
-              markerEnd: arrow("#6366f1"),
-            });
             continue;
           }
         }
@@ -1918,7 +1905,7 @@ export function buildFlowGraph(parsed: ParseResult): { nodes: Node[]; edges: Edg
       const t2Id = k8sIngressCtrlIdTier2(gkDst);
       if (nodes.some((n) => n.id === t2Id)) {
         out.push(t2Id);
-      } else if (!tier01OmitIngressHeadline.has(partitionIid)) {
+      } else {
         out.push(dst);
       }
     }
